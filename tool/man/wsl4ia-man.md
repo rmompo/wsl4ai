@@ -6,11 +6,11 @@ Use `wsl4ai <command> --help` for argparse details.
 
 ## Runtime fields (automatic)
 
-Handlers receive **`machine`**, **`user`**, and **`runtime_identity`** (includes **`wsl_name`** for WSL resolution) on `args`; they are **not** CLI flags (filled in `main()` before the handler runs). Semantics are documented in **`wsl4ia-setup.md`** and **`wsl4ai/specs/specs.md`** §1.6.
+Handlers receive **`machine`**, **`user`**, and **`runtime_identity`** (includes **`wsl_name`** for WSL resolution) on `args`; they are **not** CLI flags (filled in `main()` before the handler runs). Semantics are documented in **`wsl4ia-setup.md`** and **`specs/tool/specs.md`** §1.6.
 
 ## Command shortcuts
 
-Same behavior as the long form; see **`wsl4ai/specs/specs.md`** §4.
+Same behavior as the long form; see **`specs/tool/specs.md`** §4.
 
 | Long | Under `registry` / `use` | Top-level |
 | ----- | ------------------------ | --------- |
@@ -36,7 +36,7 @@ Same behavior as the long form; see **`wsl4ai/specs/specs.md`** §4.
 
 ### 1.a `whoami`
 
-Prints the runtime **`machine`** and **`user`** strings (see **`wsl4ai/specs/specs.md`** §1 and §6) — the same values other commands receive on `args`. **No database required** — no arguments or flags.
+Prints the runtime **`machine`** and **`user`** strings (see **`specs/tool/specs.md`** §1 and §6) — the same values other commands receive on `args`. **No database required** — no arguments or flags.
 
 ```bash
 wsl4ai whoami
@@ -55,7 +55,7 @@ Subcommand of **`registry`**. Lists **registry** as the identity: each block is 
 
 On a **TTY**, the registry title line uses a **red** background when linked (busy) and **green** when not; plain text if output is piped or **`NO_COLOR`** is set.
 
-Requires an existing database file (see **`install --database`**). Full rules: **`wsl4ai/specs/specs-registry.md`**.
+Requires an existing database file (see **`install database`**). Full rules: **`specs/tool/specs-registry.md`**.
 
 ```bash
 wsl4ai registry list
@@ -63,7 +63,7 @@ wsl4ai registry list
 
 ### 1.c `registry add`
 
-Subcommand of **`registry`**. Inserts one row into **`registries`** only. Requires an existing database file. By default, for each side, the base from `parameters` is expanded with **`expandvars`** and **`expanduser`**, then joined to the flag value with **`os.path.join`** (no manual `/` between base and segment), and **both** resulting paths must exist on disk before insert. With **`--force`**, those existence checks are skipped. Full rules: **`wsl4ai/specs/specs-registry.md`**.
+Subcommand of **`registry`**. Inserts one row into **`registries`** only. Requires an existing database file. By default, for each side, the base from `parameters` is expanded with **`expandvars`** and **`expanduser`**, then joined to the flag value with **`os.path.join`** (no manual `/` between base and segment), and **both** resulting paths must exist on disk before insert. With **`--force`**, those existence checks are skipped. Full rules: **`specs/tool/specs-registry.md`**.
 
 
 | Flag     | Meaning                                                                                        |
@@ -81,7 +81,7 @@ wsl4ai registry add --name myproj --host projects/foo --wsl work/foo --force
 
 ### 1.d `registry remove`
 
-Subcommand of **`registry`**. Deletes one row from **`registries`** **only if** there are **no** **`uses`** rows for that registry (remove links with **`use remove`** first). **At least one** of **`--uuid`** or **`--name`** is required. If both are given, only **`--uuid`** is used for lookup. Full rules: **`wsl4ai/specs/specs-registry.md`**.
+Subcommand of **`registry`**. Deletes one row from **`registries`** **only if** there are **no** **`uses`** rows for that registry (remove links with **`use remove`** first). **At least one** of **`--uuid`** or **`--name`** is required. If both are given, only **`--uuid`** is used for lookup. Full rules: **`specs/tool/specs-registry.md`**.
 
 
 | Flag | Meaning |
@@ -98,7 +98,7 @@ wsl4ai registry remove --uuid 550e8400-e29b-41d4-a716-446655440000
 
 ### 1.e `use`
 
-Router for usage links between **`wsls`** and **`registries`**. Subcommands: **`list`**, **`add`**, **`remove`**, **`enable`**, **`disable`**, **`disableall`** (shortcuts **`ul`**, **`ua`** … **`uda`**). Typical flags: **`--registry-uuid`** or **`--registry-name`**; optional **`--wsl-uuid`** / **`--wsl-name`** (if omitted, runtime WSL identity is used). `use list` also supports **`-a/--all`** for global read-only listing. **`enable`** / **`disable`** set **`uses.mounted`** to 1 or 0. Full rules: **`wsl4ai/specs/specs-use.md`**.
+Router for usage links between **`wsls`** and **`registries`**. Subcommands: **`list`**, **`add`**, **`remove`**, **`enable`**, **`disable`**, **`disableall`** (shortcuts **`ul`**, **`ua`** … **`uda`**). Typical flags: **`--registry-uuid`** or **`--registry-name`**; optional **`--wsl-uuid`** / **`--wsl-name`** (if omitted, runtime WSL identity is used). `use list` also supports **`-a/--all`** for global read-only listing. **`enable`** / **`disable`** set **`uses.mounted`** to 1 or 0. Full rules: **`specs/tool/specs-use.md`**.
 
 ```bash
 wsl4ai use list

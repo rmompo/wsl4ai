@@ -12,8 +12,8 @@ Substitute `<username>` with the actual Linux username. Substitute `/path/to/wsl
 | **Python** | **Python 3** on `PATH` as `python3`. |
 | **`pip`** | Only needed if you choose to install optional dependencies from `requirements.txt`. |
 | **`rich`** | Optional. The registered CLI no longer includes `man` (so `rich` is not required for core commands). |
-| **Layout** | After clone/copy you should have `wsl4ai.py`, `commands/` (and `ddbb/` after `install --tool` or first DB create). `wsl4ai.py` refuses to start if `ddbb/` is missing next to the script. |
-| **Database** | Optional until you use `registry list` / `registry add` / `registry remove`: run **`wsl4ai install --database`** once to create `ddbb/wsl4ai.db` and seed **`parameters`** (`id` + `value` for `base_path_host` and `base_path_wsl`) (see command reference in **`wsl4ia-man.md`**). |
+| **Layout** | After clone/copy you should have `wsl4ai.py`, `commands/` (and `ddbb/` after **`install tool`** or manual create). `wsl4ai.py` refuses to start if `ddbb/` is missing next to the script. |
+| **Database** | Optional until you use `registry list` / `registry add` / `registry remove`: run **`wsl4ai install database`** once to create `ddbb/wsl4ai.db` and seed **`parameters`** (`id` + `value` for `base_path_host` and `base_path_wsl`) (see **`wsl4ia-man.md`**). |
 
 ### `machine` and `user` (runtime)
 
@@ -109,30 +109,30 @@ python3 -m pip install --user -r requirements.txt
 
 (Replace `~/wsl4ai` with your real tool directory if different. Omit `--user` if you use a virtual environment and have already activated it.)
 
-3. **Install the Bash helper for `wsl4ai` (required)**
+3. **Install the on-disk tool layout (required)**
 
-One-time setup uses `python3` to register the wrapper; then load it into your shell.
+`wsl4ai.py` only runs after `ddbb/` exists. Create the layout (including `ddbb/` and `man/`):
 
 ```bash
-python3 ~/wsl4ai/wsl4ai.py alias --bash
+python3 ~/wsl4ai/wsl4ai.py install tool
+```
+
+4. **(Optional) Create the database**
+
+```bash
+python3 ~/wsl4ai/wsl4ai.py install database
+```
+
+5. **Install the Bash helper for `wsl4ai` (recommended)**
+
+Registers a `wsl4ai` shell function that points at this script:
+
+```bash
+python3 ~/wsl4ai/wsl4ai.py install alias -a add -t bash -n wsl4ai
 source ~/.bashrc
 ```
 
 After this, the `wsl4ai` command is available in new Bash sessions (and in the current session after `source`).
-
-4. **(Optional) Create the database**
-
-The `wsl4ai` alias already exists (step 3).
-
-```bash
-wsl4ai install --database
-```
-
-5. **Install the on-disk tool layout**
-
-```bash
-wsl4ai install --tool
-```
 
 ## 3. Others
 

@@ -1,6 +1,6 @@
 # WSL4AI — specifications
 
-This document records product and CLI rules for WSL4AI. It is part of `**wsl4ai/specs/**`, the **sole** specification tree for this package. Implementation may lag; the authoritative behavior for shipped code is still the source, but new work should follow this file unless explicitly revised.
+This document records product and CLI rules for WSL4AI. It is part of **`specs/tool/`**, the **sole** specification tree for this package (repository root). Implementation may lag; the authoritative behavior for shipped code is still the source, but new work should follow this file unless explicitly revised.
 
 **Layout:** **§1** runtime identity → **§2** shared core rules → **§4** command inventory (table) → **§5** command specifications in **the same order as §4** → **§6** `whoami` notes → **§7** style constants → **§8** special-command exceptions.
 
