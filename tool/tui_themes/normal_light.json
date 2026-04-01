@@ -1,0 +1,18 @@
+{
+  "name": "Normal (Light)",
+  "styles": {
+    "qmark": "fg:#005f87 bold",
+    "question": "fg:#005f87 bold",
+    "question-mark": "fg:#005f87 bold",
+    "answer": "fg:#9a5a00 bold",
+    "pointer": "fg:#8a5b00 bold",
+    "highlighted": "fg:#8a5b00 bold underline",
+    "selected": "fg:#007a3d bold",
+    "separator": "fg:#9b005f bold",
+    "instruction": "fg:#1a365d",
+    "text": "fg:#102030",
+    "disabled": "fg:#b04a4a",
+    "search_success": "fg:#0a7a0a bold",
+    "search_none": "fg:#b00040 bold"
+  }
+}

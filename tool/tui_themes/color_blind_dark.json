@@ -1,0 +1,18 @@
+{
+  "name": "Color Blind (Dark)",
+  "styles": {
+    "qmark": "fg:#89cff0 bold",
+    "question": "fg:#89cff0 bold",
+    "question-mark": "fg:#89cff0 bold",
+    "answer": "fg:#ffd166 bold",
+    "pointer": "fg:#ffd166 bold",
+    "highlighted": "fg:#ffd166 bold underline",
+    "selected": "fg:#7ae582 bold",
+    "separator": "fg:#c77dff bold",
+    "instruction": "fg:#f1f5f9",
+    "text": "fg:#f8fafc",
+    "disabled": "fg:#ffa69e bold",
+    "search_success": "fg:#7ae582 bold",
+    "search_none": "fg:#ffa69e bold"
+  }
+}
