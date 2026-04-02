@@ -5,13 +5,8 @@ from argparse import Namespace, _SubParsersAction
 from pathlib import Path
 
 from commands.api_json import emit_envelope, row_from_pairs
-from commands.common import DB_PATH, connect_db, expand_path_template, require_database_file
+from commands.common import DB_PATH, connect_db, expand_path_template, load_local_env_paths, require_database_file
 from commands.help_md import help_summary_for_root, parser_description_from_manual
-
-
-def _param_value(con, key: str) -> str:
-    row = con.execute("SELECT value FROM parameters WHERE id = ?", (key,)).fetchone()
-    return (row[0] if row else "") or ""
 
 
 def _resolved_path_line(base_raw: str, rel_segment: str) -> str:
@@ -32,8 +27,7 @@ def cmd_list(_: Namespace) -> int:
             message="database file not found",
         )
     with connect_db(DB_PATH) as con:
-        param_host = _param_value(con, "base_path_host")
-        param_local = _param_value(con, "base_path_wsl")
+        param_host, param_local = load_local_env_paths()
         rows = con.execute(
             """
             SELECT uuid, name, rel_path_host, rel_path_wsl

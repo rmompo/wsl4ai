@@ -29,10 +29,12 @@ This identifies one concrete `use`: (`wsl_uuid`, `registry_uuid`).
 1. The `use` row must exist; otherwise fail.
 2. The `use` row must have `mounted = 1`; otherwise fail (security gate).
 3. The working directory is resolved as:
-   - `base_path_wsl` (from `parameters`) + `rel_path_wsl` (from selected `registry`).
+   - `WSL_PROJECTS` (from `local.env`) + `rel_path_wsl` (from selected `registry`).
 4. `wsls.cli_command` for the resolved `wsl_uuid` must be non-empty; otherwise fail.
 5. Execution mode is foreground in the same terminal session (not detached).
 6. TUI-triggered `start` also runs in the same console session.
+
+Path resolution uses `load_local_env_paths()` from `common.py` (reads `WSL_PROJECTS` from `local.env`).
 
 The command is fail-closed: any missing/invalid dependency prevents execution.
 
@@ -45,4 +47,3 @@ The command is fail-closed: any missing/invalid dependency prevents execution.
 - `output.result.status`:
   - `0` when command exits successfully
   - non-zero for validation errors or subprocess failure
-

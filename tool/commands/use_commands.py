@@ -1,12 +1,26 @@
 """``wsl4ai use`` subcommands and top-level shortcuts (``ua``, ``ur``, …)."""
 
+import os
+import subprocess
 from argparse import Namespace, _SubParsersAction
 from collections.abc import Callable
 
 from commands.api_json import OptionSpec, emit_envelope, options_from_args, row_from_pairs
-from commands.common import DB_PATH, connect_db, require_database_file
+from commands.common import DB_PATH, connect_db, expand_path_template, load_local_env_paths, require_database_file
 from commands.help_md import help_summary_for_root, parser_description_from_manual
 from commands.wsl_db import resolve_registry_target, resolve_wsl_uuid
+
+
+def _resolve_full_paths(rel_host: str, rel_wsl: str) -> tuple[str, str, str]:
+    """Return (host_full_path, wsl_full_path, error). Error is empty string on success."""
+    base_host, base_wsl = load_local_env_paths()
+    if not base_host:
+        return "", "", "missing HOST_PROJECTS in local.env"
+    if not base_wsl:
+        return "", "", "missing WSL_PROJECTS in local.env"
+    host_path = os.path.normpath(os.path.join(expand_path_template(base_host), rel_host))
+    wsl_path = os.path.normpath(os.path.join(expand_path_template(base_wsl), rel_wsl))
+    return host_path, wsl_path, ""
 
 
 def _ri(args: Namespace):
@@ -145,25 +159,74 @@ def cmd_use_enable(args: Namespace) -> int:
     )
     if not require_database_file():
         return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message="database file not found")
+
     with connect_db(DB_PATH) as con:
         wsl_id, reg_id, err = _resolve_pair(con, args)
         if err:
             return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message=err)
-        cur = con.execute(
-            "UPDATE uses SET mounted = 1 WHERE wsl_uuid = ? AND registry_uuid = ?",
+        row = con.execute(
+            "SELECT u.mounted, r.rel_path_host, r.rel_path_wsl FROM uses u JOIN registries r ON r.uuid = u.registry_uuid WHERE u.wsl_uuid = ? AND u.registry_uuid = ?",
             (wsl_id, reg_id),
-        )
-        if cur.rowcount == 0:
+        ).fetchone()
+        if not row:
             return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message="use enable: link not found")
+        _, rel_host, rel_wsl = row
+
+    host_path, wsl_path, path_err = _resolve_full_paths(rel_host, rel_wsl)
+    if path_err:
+        return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message=f"use enable: {path_err}")
+
+    # 1. create folder
+    try:
+        os.makedirs(wsl_path, exist_ok=True)
+    except OSError as exc:
+        return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message=f"use enable: could not create directory {wsl_path}: {exc}")
+
+    # 2. mount
+    try:
+        subprocess.run(["sudo", "mount", "--bind", host_path, wsl_path], check=True, capture_output=True)
+    except subprocess.CalledProcessError as exc:
+        try:
+            os.rmdir(wsl_path)
+        except OSError:
+            pass
+        return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message=f"use enable: mount failed: {exc.stderr.decode().strip() if exc.stderr else exc}")
+
+    # 3. update DB
+    with connect_db(DB_PATH) as con:
+        con.execute("UPDATE uses SET mounted = 1 WHERE wsl_uuid = ? AND registry_uuid = ?", (wsl_id, reg_id))
+
     return emit_envelope(
         args=args,
         command="use",
         subcommand="enable",
         options=opts,
         status=0,
-        message="use enable: mounted=1",
-        rows=[row_from_pairs([("wslUuid", wsl_id), ("registryUuid", reg_id), ("mounted", "1")])],
+        message=f"use enable: mounted {wsl_path}",
+        rows=[row_from_pairs([("wslUuid", wsl_id), ("registryUuid", reg_id), ("mounted", "1"), ("wslPath", wsl_path)])],
     )
+
+
+def _disable_one(wsl_id: str, reg_id: str, rel_host: str, rel_wsl: str) -> tuple[bool, str]:
+    """Unmount, remove folder and update DB for one use. Returns (success, message)."""
+    _, wsl_path, path_err = _resolve_full_paths(rel_host, rel_wsl)
+    if path_err:
+        return False, f"use disable: {path_err}"
+
+    try:
+        subprocess.run(["sudo", "umount", wsl_path], check=True, capture_output=True)
+    except subprocess.CalledProcessError as exc:
+        return False, f"use disable: umount failed: {exc.stderr.decode().strip() if exc.stderr else exc}"
+
+    try:
+        os.rmdir(wsl_path)
+    except OSError as exc:
+        return False, f"use disable: could not remove directory {wsl_path}: {exc}"
+
+    with connect_db(DB_PATH) as con:
+        con.execute("UPDATE uses SET mounted = 0 WHERE wsl_uuid = ? AND registry_uuid = ?", (wsl_id, reg_id))
+
+    return True, f"use disable: unmounted and removed {wsl_path}"
 
 
 def cmd_use_disable(args: Namespace) -> int:
@@ -178,52 +241,85 @@ def cmd_use_disable(args: Namespace) -> int:
     )
     if not require_database_file():
         return emit_envelope(args=args, command="use", subcommand="disable", options=opts, status=1, message="database file not found")
+
     with connect_db(DB_PATH) as con:
         wsl_id, reg_id, err = _resolve_pair(con, args)
         if err:
             return emit_envelope(args=args, command="use", subcommand="disable", options=opts, status=1, message=err)
-        cur = con.execute(
-            "UPDATE uses SET mounted = 0 WHERE wsl_uuid = ? AND registry_uuid = ?",
+        row = con.execute(
+            "SELECT u.mounted, r.rel_path_host, r.rel_path_wsl FROM uses u JOIN registries r ON r.uuid = u.registry_uuid WHERE u.wsl_uuid = ? AND u.registry_uuid = ?",
             (wsl_id, reg_id),
-        )
-        if cur.rowcount == 0:
+        ).fetchone()
+        if not row:
             return emit_envelope(args=args, command="use", subcommand="disable", options=opts, status=1, message="use disable: link not found")
+        _, rel_host, rel_wsl = row
+
+    ok, msg = _disable_one(wsl_id, reg_id, rel_host, rel_wsl)
+    if not ok:
+        return emit_envelope(args=args, command="use", subcommand="disable", options=opts, status=1, message=msg)
     return emit_envelope(
         args=args,
         command="use",
         subcommand="disable",
         options=opts,
         status=0,
-        message="use disable: mounted=0",
+        message=msg,
         rows=[row_from_pairs([("wslUuid", wsl_id), ("registryUuid", reg_id), ("mounted", "0")])],
     )
 
 
 def cmd_use_disableall(args: Namespace) -> int:
-    opts = options_from_args(
-        args,
-        [
-            OptionSpec("--wsl-uuid", "use_wsl_uuid"),
-            OptionSpec("--wsl-name", "use_wsl_name"),
-        ],
-    )
+    opts = options_from_args(args, [OptionSpec("--quiet", "quiet", is_flag=True)])
+    quiet = bool(getattr(args, "quiet", False))
     if not require_database_file():
-        return emit_envelope(args=args, command="use", subcommand="disableall", options=opts, status=1, message="database file not found")
+        if not quiet:
+            return emit_envelope(args=args, command="use", subcommand="disableall", options=opts, status=1, message="database file not found")
+        return 1
     ri = _ri(args)
     with connect_db(DB_PATH) as con:
         wsl_id, err_w = resolve_wsl_uuid(
             con,
-            wsl_uuid=getattr(args, "use_wsl_uuid", "") or "",
-            wsl_name=getattr(args, "use_wsl_name", "") or "",
+            wsl_uuid="",
+            wsl_name="",
             runtime_user=ri.user,
             runtime_wsl_name=ri.wsl_name,
             create_if_missing=False,
         )
         if err_w:
-            return emit_envelope(args=args, command="use", subcommand="disableall", options=opts, status=1, message=err_w)
-        cur = con.execute(
-            "UPDATE uses SET mounted = 0 WHERE wsl_uuid = ?",
+            if not quiet:
+                return emit_envelope(args=args, command="use", subcommand="disableall", options=opts, status=1, message=err_w)
+            return 1
+        mounted_uses = con.execute(
+            """
+            SELECT u.registry_uuid, r.rel_path_host, r.rel_path_wsl
+            FROM uses u
+            JOIN registries r ON r.uuid = u.registry_uuid
+            WHERE u.wsl_uuid = ?
+            """,
             (wsl_id,),
+        ).fetchall()
+
+    errors = []
+    disabled = []
+    for reg_id, rel_host, rel_wsl in mounted_uses:
+        ok, msg = _disable_one(wsl_id, reg_id, rel_host, rel_wsl)
+        if ok:
+            disabled.append(row_from_pairs([("wslUuid", wsl_id), ("registryUuid", reg_id), ("mounted", "0")]))
+        else:
+            errors.append(msg)
+
+    if quiet:
+        return 1 if errors else 0
+
+    if errors:
+        return emit_envelope(
+            args=args,
+            command="use",
+            subcommand="disableall",
+            options=opts,
+            status=1,
+            message=f"use disableall: {len(disabled)} disabled, {len(errors)} failed: {'; '.join(errors)}",
+            rows=disabled,
         )
     return emit_envelope(
         args=args,
@@ -231,8 +327,8 @@ def cmd_use_disableall(args: Namespace) -> int:
         subcommand="disableall",
         options=opts,
         status=0,
-        message="use disableall: mounted=0 for all uses of this wsl",
-        rows=[row_from_pairs([("wslUuid", wsl_id), ("affected", str(cur.rowcount))])],
+        message=f"use disableall: {len(disabled)} use(s) disabled",
+        rows=disabled,
     )
 
 
@@ -432,6 +528,7 @@ def register_use_command(subparsers: _SubParsersAction) -> None:
     da_help = "Turn off every mount attachment for this WSL"
     da = use_sub.add_parser("disableall", aliases=["uda"], help=da_help, description=da_help)
     _add_wsl_only(da)
+    da.add_argument("-q", "--quiet", dest="quiet", action="store_true", help="Suppress all output")
     da.set_defaults(func=cmd_use_disableall)
 
 
@@ -459,6 +556,7 @@ def register_use_root_shortcuts(subparsers: _SubParsersAction) -> None:
             )
         elif short == "uda":
             _add_wsl_only(p)
+            p.add_argument("-q", "--quiet", dest="quiet", action="store_true", help="Suppress all output")
         else:
             _add_registry_pair(p)
             _add_wsl_triple(p)

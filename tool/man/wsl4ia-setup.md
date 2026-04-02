@@ -1,155 +1,77 @@
 # WSL4AI SETUP
 
-Everything runs on the **WSL side** (your Linux distro).
-
-Substitute `<username>` with the actual Linux username. Substitute `/path/to/wsl4ai` with the directory that contains the tool (bind mount, git clone, etc.).
-
-## Requirements and dependencies
-
-| Requirement | Notes |
-| ----------- | ----- |
-| **Environment** | WSL distro (Linux user space). Commands that edit Bash expect a normal user shell. |
-| **Python** | **Python 3** on `PATH` as `python3`. |
-| **`pip`** | Only needed if you choose to install optional dependencies from `requirements.txt`. |
-| **`rich`** | Optional. The registered CLI no longer includes `man` (so `rich` is not required for core commands). |
-| **Layout** | After clone/copy you should have `wsl4ai.py`, `commands/` (and `ddbb/` after **`install tool`** or manual create). `wsl4ai.py` refuses to start if `ddbb/` is missing next to the script. |
-| **Database** | Optional until you use `registry list` / `registry add` / `registry remove`: run **`wsl4ai install database`** once to create `ddbb/wsl4ai.db` and seed **`parameters`** (`id` + `value` for `base_path_host` and `base_path_wsl`) (see **`wsl4ia-man.md`**). |
-
-### `machine` and `user` (runtime)
-
-The CLI does **not** pass `machine` or `user` as flags. Every handler receives them on `args`:
-
-- **`machine`**: Preferred source is **`/etc/machine-id`** (or **`/var/lib/dbus/machine-id`**) inside Linux — one stable ID per root filesystem; two WSL instances can share the same distro *label* (`WSL_DISTRO_NAME`) but still differ here. **Fallback** if no id file (e.g. Windows host running Python): `wsl:<distro>:<node>` when `WSL_DISTRO_NAME` is set, else `win:<COMPUTERNAME>` / `platform.node()`, else `unknown`.
-- **`user`**: From **`getpass.getuser()`** (login name / `whoami` for the current process).
-
-Handlers may use `args.machine` as a stable key for this environment (DB, logs, future mount logic).
+Installation is handled by the **bootstrap installer** (`install/install.sh`). Manual setup is not required under normal circumstances.
 
 ---
 
-## 1. As root
+## Automated install (recommended)
 
-Open a root shell (`sudo -i` or `su -`).
-
-1. **Create the new user**
+Place `install.sh` in `/tmp/wsl4ai/` and run as root:
 
 ```bash
-useradd -m -s /bin/bash <username>
-passwd <username>
+mkdir -p /tmp/wsl4ai
+curl -fsSL https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh -o /tmp/wsl4ai/install.sh
+sudo bash /tmp/wsl4ai/install.sh
 ```
 
-2. **Grant sudo**
+The installer prompts for:
+
+1. **`WSL4AI_USER`** — Linux account to create (password = username).
+2. **`WSL_BASE`** — default `/home/<WSL4AI_USER>/wsl4ai/`.
+3. **`HOST_DDBB`** — Windows path to the shared ddbb folder.
+4. **`HOST_PROJECTS`** — Windows base path for projects.
+
+After installation:
+
+- The `wsl4ai` alias is available in every new Bash session.
+- Each session start runs `wsl4ai use disableall --quiet` for safety.
+- **Exit the WSL session and run `wsl --shutdown` from Windows** to apply all changes.
+
+Full installer specification: [`specs/install/installer.md`](../../specs/install/installer.md).
+
+---
+
+## Runtime identity (`machine`, `user`)
+
+The CLI resolves identity automatically — no flags needed:
+
+- **`machine`**: Contents of `/etc/machine-id` (lowercase hex). Fallback on Windows: `win:<COMPUTERNAME>`.
+- **`user`**: From `getpass.getuser()` (effective login name).
+
+Unique identity is the pair `(machine, user)`.
+
+---
+
+## Path configuration (`local.env`)
+
+Located at **`<WSL_TOOL>/local.env`** (next to `wsl4ai.py`). Written by the installer.
+
+| Variable | Role |
+| -------- | ---- |
+| `WSL_BASE` | Base directory of the WSL4AI installation |
+| `WSL_DDBB` | Path to the shared database directory |
+| `WSL_TOOL` | Path to the tool directory |
+| `WSL_PROJECTS` | WSL-side base path for projects |
+| `HOST_DDBB` | Windows path to the shared ddbb folder |
+| `HOST_PROJECTS` | Windows base path for projects |
+| `HOST_DDBB_WSL` | `/mnt/...` translation of `HOST_DDBB` |
+
+`HOST_PROJECTS` and `WSL_PROJECTS` are read at runtime by the tool to resolve absolute paths for registry operations (`registry add`, `registry list`, `use enable`, `use disable`, `start`). There is no `parameters` database table.
+
+---
+
+## `.bashrc` additions
+
+The installer adds the following to the new user's `.bashrc` in order:
 
 ```bash
-usermod -aG sudo <username>
+export PATH="${HOME}/.local/bin:${PATH}"   # pip --user scripts
+cd ~                                        # start in home
+alias wsl4ai="python3 <WSL_TOOL>/wsl4ai.py"
+wsl4ai use disableall --quiet              # safety on session start
+echo ""
+echo "WSL4AI ready"
+echo "  cli: wsl4ai <command>"
+echo "  tui: wsl4ai tui"
+echo ""
 ```
-
-3. **Create `~/wsl4ai` for that user**
-
-```bash
-mkdir -p /home/<username>/wsl4ai
-chown <username>:<username> /home/<username>/wsl4ai
-```
-
-4. **Copy the tool into the user's home**
-
-```bash
-cp -r /path/to/wsl4ai/. /home/<username>/wsl4ai/
-chown -R <username>:<username> /home/<username>/wsl4ai
-```
-
-5. **(Optional) Default user for this distro**
-
-```bash
-printf "[user]\ndefault=<username>\n" > /etc/wsl.conf
-```
-
-Then on **Windows** (PowerShell or CMD) run `wsl --shutdown`, then start the distro again; you should log in as `<username>`.
-
-## 2. As the new user
-
-1. **Verify Python 3**
-
-```bash
-python3 --version
-```
-
-If `python3` is missing (`command not found`), install it (pick one that matches your distro):
-
-**Debian / Ubuntu**
-
-```bash
-sudo apt update
-sudo apt install -y python3
-```
-
-**Fedora**
-
-```bash
-sudo dnf install -y python3
-```
-
-**openSUSE**
-
-```bash
-sudo zypper install -y python3
-```
-
-Then run `python3 --version` again.
-
-2. **(Optional) Install `rich`**
-
-`rich` is only needed for the legacy/local manual renderer. The registered CLI commands do not require it.
-
-If you still want it:
-
-```bash
-cd ~/wsl4ai
-python3 -m pip install --user -r requirements.txt
-```
-
-(Replace `~/wsl4ai` with your real tool directory if different. Omit `--user` if you use a virtual environment and have already activated it.)
-
-3. **Install the on-disk tool layout (required)**
-
-`wsl4ai.py` only runs after `ddbb/` exists. Create the layout (including `ddbb/` and `man/`):
-
-```bash
-python3 ~/wsl4ai/wsl4ai.py install tool
-```
-
-4. **(Optional) Create the database**
-
-```bash
-python3 ~/wsl4ai/wsl4ai.py install database
-```
-
-5. **Install the Bash helper for `wsl4ai` (recommended)**
-
-Registers a `wsl4ai` shell function that points at this script:
-
-```bash
-python3 ~/wsl4ai/wsl4ai.py install alias -a add -t bash -n wsl4ai
-source ~/.bashrc
-```
-
-After this, the `wsl4ai` command is available in new Bash sessions (and in the current session after `source`).
-
-## 3. Others
-
-### Remove the Bash helper (`wsl4ai` function in `~/.bashrc`)
-
-If the `wsl4ai` command works in your shell:
-
-```bash
-wsl4ai unalias --bash
-source ~/.bashrc
-```
-
-If it does not (e.g. you removed the tool first), call the CLI directly:
-
-```bash
-python3 ~/wsl4ai/wsl4ai.py unalias --bash
-source ~/.bashrc
-```
-
-This deletes the marked block WSL4AI adds between `# >>> WSL4AI BEGIN >>>` and `# <<< WSL4AI END <<<` in `~/.bashrc`.

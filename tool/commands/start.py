@@ -7,7 +7,7 @@ import subprocess
 from argparse import Namespace, _SubParsersAction
 
 from commands.api_json import OptionSpec, emit_envelope, options_from_args
-from commands.common import DB_PATH, connect_db, expand_path_template, require_database_file
+from commands.common import DB_PATH, connect_db, expand_path_template, load_local_env_paths, require_database_file
 from commands.help_md import help_summary_for_root, parser_description_from_manual
 from commands.wsl_db import resolve_registry_target, resolve_wsl_uuid
 
@@ -72,7 +72,7 @@ def cmd_start(args: Namespace) -> int:
                 message="start: blocked by safety rule (use must be mounted=1)",
             )
 
-        base_path_wsl = (con.execute("SELECT value FROM parameters WHERE id = ?", ("base_path_wsl",)).fetchone() or [""])[0]
+    _, base_path_wsl = load_local_env_paths()
 
     cli = str(cli_command or "").strip()
     if not cli:
@@ -80,7 +80,7 @@ def cmd_start(args: Namespace) -> int:
 
     root = expand_path_template(str(base_path_wsl or ""))
     if not root:
-        return emit_envelope(args=args, command="start", options=opts, status=1, message="start: missing base_path_wsl in parameters")
+        return emit_envelope(args=args, command="start", options=opts, status=1, message="start: missing WSL_PROJECTS in local.env")
 
     workdir = os.path.normpath(os.path.join(root, str(rel_path_wsl or "").strip()))
     if not os.path.isdir(workdir):

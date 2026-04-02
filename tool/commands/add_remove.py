@@ -8,7 +8,7 @@ from argparse import Namespace, _SubParsersAction
 from pathlib import Path
 
 from commands.api_json import OptionSpec, emit_envelope, options_from_args, row_from_pairs
-from commands.common import DB_PATH, connect_db, expand_path_template, require_database_file
+from commands.common import DB_PATH, connect_db, expand_path_template, load_local_env_paths, require_database_file
 from commands.help_md import help_summary_for_root, parser_description_from_manual
 from commands.wsl_db import count_uses_for_registry
 
@@ -42,11 +42,6 @@ def _registry_row_by_name(con: sqlite3.Connection, name: str) -> tuple[str, str,
     return row
 
 
-def _param_value(con: sqlite3.Connection, key: str) -> str:
-    row = con.execute("SELECT value FROM parameters WHERE id = ?", (key,)).fetchone()
-    return (row[0] if row else "") or ""
-
-
 def _absolute_under_param(base_raw: str, rel_segment: str) -> Path:
     """Join expanded base with relative segment using ``os.path.join`` (no manual slash)."""
     root = expand_path_template(base_raw)
@@ -54,14 +49,13 @@ def _absolute_under_param(base_raw: str, rel_segment: str) -> Path:
     return Path(os.path.normpath(os.path.join(root, rel)))
 
 
-def _paths_under_param_exist(con: sqlite3.Connection, host_rel: str, wsl_rel: str) -> tuple[bool, str]:
-    """Ensure paths under ``base_path_host`` and ``base_path_wsl`` exist on disk."""
-    host_root = _param_value(con, "base_path_host").strip()
-    wsl_root = _param_value(con, "base_path_wsl").strip()
+def _paths_under_param_exist(host_rel: str, wsl_rel: str) -> tuple[bool, str]:
+    """Ensure paths under HOST_PROJECTS and WSL_PROJECTS from local.env exist on disk."""
+    host_root, wsl_root = load_local_env_paths()
     if not host_root:
-        return False, "add: missing base_path_host in parameters"
+        return False, "add: missing HOST_PROJECTS in local.env"
     if not wsl_root:
-        return False, "add: missing base_path_wsl in parameters"
+        return False, "add: missing WSL_PROJECTS in local.env"
     host_full = _absolute_under_param(host_root, host_rel)
     wsl_full = _absolute_under_param(wsl_root, wsl_rel)
     if not host_full.exists():
@@ -106,7 +100,7 @@ def cmd_add(args: Namespace) -> int:
     try:
         with connect_db(DB_PATH) as con:
             if not getattr(args, "force", False):
-                ok_paths, err_paths = _paths_under_param_exist(con, host_rel, wsl_rel)
+                ok_paths, err_paths = _paths_under_param_exist(host_rel, wsl_rel)
                 if not ok_paths:
                     return emit_envelope(
                         args=args,

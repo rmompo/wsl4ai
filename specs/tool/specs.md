@@ -224,16 +224,16 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | `wsl4ai use list`          | `ul`     | List `uses` links (default: runtime WSL; filter by WSL or use `-a/--all` for global list).               |
 | `wsl4ai use add …`         | `ua`     | Link `wsls` + `registries` in `uses` (`mounted=0`); create `wsls` if needed (`cli_command` NULL).         |
 | `wsl4ai use remove …`      | `ur`     | Remove a `uses` row if `mounted=0`.                                                                       |
-| `wsl4ai use enable …`      | `ue`     | Set `uses.mounted = 1`.                                                                                   |
-| `wsl4ai use disable …`     | `ud`     | Set `uses.mounted = 0`.                                                                                   |
-| `wsl4ai use disableall`    | `uda`    | Set `uses.mounted = 0` for all `uses` of the resolved `wsls`.                                             |
+| `wsl4ai use enable …`      | `ue`     | Create WSL directory + bind-mount host path; then set `uses.mounted = 1`.                                 |
+| `wsl4ai use disable …`     | `ud`     | Unmount + remove WSL directory; then set `uses.mounted = 0`.                                              |
+| `wsl4ai use disableall`    | `uda`    | Disable (umount + rmdir + DB update) all `uses` of the runtime WSL regardless of `mounted` state. Supports `-q/--quiet`. |
 | `wsl4ai wsl list`          | `wl`     | List all known `wsls` rows and their `cli_command` values.                                                |
 | `wsl4ai wsl set …`         | `ws`     | Set `wsls.cli_command` (row must exist).                                                                  |
 | `wsl4ai whoami`            | `wai`    | Print the current `machine` and `user` runtime identity.                                                  |
 | `wsl4ai tui`               | -        | Open the interactive text user interface.                                                                 |
 | `wsl4ai start`             | -        | Run one mounted use in foreground: cd to resolved WSL path and execute that WSL `cli_command`.           |
 
-The SQLite model uses `**parameters`**, `**registries**`, `**wsls**`, and `**uses**` (`mounted` only; no `enabled` column).
+The SQLite model uses `**registries**`, `**wsls**`, and `**uses**` (`mounted` only; no `enabled` column). Path bases (`HOST_PROJECTS`, `WSL_PROJECTS`) are read directly from **`local.env`** beside `wsl4ai.py`; there is no `parameters` table.
 
 ---
 

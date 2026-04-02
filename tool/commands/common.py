@@ -5,6 +5,7 @@ from pathlib import Path
 import getpass
 import os
 import platform
+import re
 import sqlite3
 import sys
 
@@ -14,8 +15,55 @@ MAN_DIR = APP_DIR / "man"
 DB_PATH = DDBB_DIR / "wsl4ai.db"
 
 
+def load_local_env_paths() -> tuple[str, str]:
+    """Return ``(base_path_host, base_path_wsl)`` read directly from ``local.env`` beside ``wsl4ai.py``.
+
+    Reads ``HOST_PROJECTS`` and ``WSL_PROJECTS``; converts Windows paths (``C:/...``) to ``/mnt/...``.
+    Returns empty strings if the file is missing or keys are absent.
+    """
+    env_file = APP_DIR / "local.env"
+    env: dict[str, str] = {}
+    if env_file.is_file():
+        try:
+            for raw in env_file.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                env[key.strip()] = val.strip()
+        except OSError:
+            pass
+
+    def _ensure_slash(p: str) -> str:
+        return p if p.endswith("/") else p + "/"
+
+    def _win_to_mnt(p: str) -> str:
+        p = p.replace("\\", "/").rstrip("/")
+        m = re.match(r"^([A-Za-z]):/(.*)$", p)
+        if not m:
+            return _ensure_slash(p)
+        rest = m.group(2).strip("/")
+        base = f"/mnt/{m.group(1).lower()}"
+        return f"{base}/{rest}/" if rest else f"{base}/"
+
+    host_raw = env.get("HOST_PROJECTS", "").strip()
+    wsl_raw = env.get("WSL_PROJECTS", "").strip()
+
+    if host_raw:
+        if len(host_raw) >= 2 and host_raw[1] == ":":
+            base_host = _win_to_mnt(host_raw)
+        else:
+            base_host = _ensure_slash(host_raw)
+    else:
+        base_host = ""
+
+    base_wsl = _ensure_slash(wsl_raw) if wsl_raw else ""
+
+    return base_host, base_wsl
+
+
 def expand_path_template(value: str) -> str:
-    """Expand path templates in ``parameters`` values: ``$HOME`` / ``${HOME}``, ``%VAR%`` (Windows), ``~``.
+    """Expand path templates: ``$HOME`` / ``${HOME}``, ``%VAR%`` (Windows), ``~``.
 
     POSIX configs often use ``$HOME``; :func:`os.path.expandvars` on Windows only expands ``%NAME%``.
     Replacing ``$HOME`` with ``HOME`` or ``USERPROFILE`` lets the CLI run on the Windows host while
@@ -161,11 +209,6 @@ def _sql_create_uses(*, if_not_exists: bool) -> str:
 
 
 TABLE_DDL = f"""
-CREATE TABLE IF NOT EXISTS parameters (
-  id TEXT NOT NULL PRIMARY KEY,
-  value TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS registries (
   uuid TEXT NOT NULL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,

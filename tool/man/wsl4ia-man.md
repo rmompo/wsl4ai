@@ -1,12 +1,18 @@
 # WSL4AI command reference
 
-CLI reference only: what each subcommand does, flags, and examples. For prerequisites, installation, and environment setup, see **`wsl4ia-setup.md`**.
+CLI reference only: what each subcommand does, flags, and examples. For installation and environment setup, see **`wsl4ia-setup.md`**.
 
 Use `wsl4ai <command> --help` for argparse details.
 
+---
+
 ## Runtime fields (automatic)
 
-Handlers receive **`machine`**, **`user`**, and **`runtime_identity`** (includes **`wsl_name`** for WSL resolution) on `args`; they are **not** CLI flags (filled in `main()` before the handler runs). Semantics are documented in **`wsl4ia-setup.md`** and **`specs/tool/specs.md`** §1.6.
+Handlers receive **`machine`**, **`user`**, and **`runtime_identity`** (includes **`wsl_name`** for WSL resolution) on `args`; they are **not** CLI flags. Semantics are documented in **`wsl4ia-setup.md`** and **`specs/tool/specs.md`** §1.6.
+
+## Path bases (automatic)
+
+`HOST_PROJECTS` and `WSL_PROJECTS` are read at runtime from **`local.env`** beside `wsl4ai.py` via `load_local_env_paths()`. They are used to resolve absolute paths for registry and use operations. No database `parameters` table is involved.
 
 ## Command shortcuts
 
@@ -36,7 +42,7 @@ Same behavior as the long form; see **`specs/tool/specs.md`** §4.
 
 ### 1.a `whoami`
 
-Prints the runtime **`machine`** and **`user`** strings (see **`specs/tool/specs.md`** §1 and §6) — the same values other commands receive on `args`. **No database required** — no arguments or flags.
+Prints the runtime **`machine`** and **`user`** strings. **No database required.**
 
 ```bash
 wsl4ai whoami
@@ -51,11 +57,7 @@ user: alice
 
 ### 1.b `registry list`
 
-Subcommand of **`registry`**. Lists **registry** as the identity: each block is `name (uuid)`, then **`host:`** and **`wsl:`** as **fully resolved paths** (bases from `parameters` with **`expand_path_template`**, joined to each row’s relative segments with **`os.path.join`** / **`normpath`**, same as **`registry add`**). If any **`uses`** row links that registry to a **`wsls`** row, one indented line per link: `- wsl.name/wsl.user (wsl.uuid) mounted={0|1}`.
-
-On a **TTY**, the registry title line uses a **red** background when linked (busy) and **green** when not; plain text if output is piped or **`NO_COLOR`** is set.
-
-Requires an existing database file (see **`install database`**). Full rules: **`specs/tool/specs-registry.md`**.
+Lists all **registries** with fully resolved paths (`HOST_PROJECTS + rel_path_host`, `WSL_PROJECTS + rel_path_wsl` from `local.env`) and linked `uses` + `wsls` information. On a TTY the registry title uses **red** background when linked (busy) and **green** when free.
 
 ```bash
 wsl4ai registry list
@@ -63,16 +65,14 @@ wsl4ai registry list
 
 ### 1.c `registry add`
 
-Subcommand of **`registry`**. Inserts one row into **`registries`** only. Requires an existing database file. By default, for each side, the base from `parameters` is expanded with **`expandvars`** and **`expanduser`**, then joined to the flag value with **`os.path.join`** (no manual `/` between base and segment), and **both** resulting paths must exist on disk before insert. With **`--force`**, those existence checks are skipped. Full rules: **`specs/tool/specs-registry.md`**.
+Inserts one row into **`registries`**. By default, both resolved paths must exist on disk. With **`--force`**, existence checks are skipped.
 
-
-| Flag     | Meaning                                                                                        |
-| -------- | ---------------------------------------------------------------------------------------------- |
-| `--name` | Logical name; **unique in `registries` ignoring case** (`Foo` clashes with `foo`). **Required.** |
-| `--host` | Path segment joined under `base_path_host` (`parameters`). **Required.**                            |
-| `--wsl`  | Path segment joined under `base_path_wsl` (`parameters`). **Required.**                           |
-| `--force` | Do **not** verify that the resolved host and WSL paths exist. **Optional.**                   |
-
+| Flag | Meaning |
+| ---- | ------- |
+| `--name` | Logical name; **unique case-insensitively**. Required. |
+| `--host` | Path segment joined under `HOST_PROJECTS`. Required. |
+| `--wsl` | Path segment joined under `WSL_PROJECTS`. Required. |
+| `--force` | Skip path existence checks. Optional. |
 
 ```bash
 wsl4ai registry add --name myproj --host projects/foo --wsl work/foo
@@ -81,15 +81,12 @@ wsl4ai registry add --name myproj --host projects/foo --wsl work/foo --force
 
 ### 1.d `registry remove`
 
-Subcommand of **`registry`**. Deletes one row from **`registries`** **only if** there are **no** **`uses`** rows for that registry (remove links with **`use remove`** first). **At least one** of **`--uuid`** or **`--name`** is required. If both are given, only **`--uuid`** is used for lookup. Full rules: **`specs/tool/specs-registry.md`**.
-
+Deletes one row from **`registries`** only if there are **no** `uses` rows for it. At least one of `--uuid` or `--name` required.
 
 | Flag | Meaning |
-| ----- | -------- |
+| ---- | ------- |
 | `--uuid` | Registry UUID. |
-| `--name` | Logical name (**case-insensitive** match). |
-| *(one required)* | Pass `--uuid` and/or `--name`; not both empty. |
-
+| `--name` | Logical name (case-insensitive). |
 
 ```bash
 wsl4ai registry remove --name myproj
@@ -98,36 +95,79 @@ wsl4ai registry remove --uuid 550e8400-e29b-41d4-a716-446655440000
 
 ### 1.e `use`
 
-Router for usage links between **`wsls`** and **`registries`**. Subcommands: **`list`**, **`add`**, **`remove`**, **`enable`**, **`disable`**, **`disableall`** (shortcuts **`ul`**, **`ua`** … **`uda`**). Typical flags: **`--registry-uuid`** or **`--registry-name`**; optional **`--wsl-uuid`** / **`--wsl-name`** (if omitted, runtime WSL identity is used). `use list` also supports **`-a/--all`** for global read-only listing. **`enable`** / **`disable`** set **`uses.mounted`** to 1 or 0. Full rules: **`specs/tool/specs-use.md`**.
+Router for usage links between **`wsls`** and **`registries`**.
+
+#### `use list`
+
+Lists usage links. Default scope: runtime WSL. Optional `-a/--all` for global listing.
 
 ```bash
 wsl4ai use list
 wsl4ai use list -a
-wsl4ai use list --wsl-name Ubuntu
-wsl4ai use add --registry-name myproj
-wsl4ai use remove --registry-name myproj
 wsl4ai ul
-wsl4ai ul -a
+```
+
+#### `use add`
+
+Creates a `uses` link (`mounted=0`). Creates `wsls` row if missing.
+
+```bash
+wsl4ai use add --registry-name myproj
 wsl4ai ua --registry-name myproj
 ```
 
-### 1.f `wsl` / `ws`
+#### `use remove`
 
-Router for WSL rows. Subcommands:
+Removes a `uses` link. Requires `mounted=0` (run `use disable` first).
 
-- **`list`**: show tracked `wsls` rows.
-- **`set`**: update **`wsls.cli_command`** for an existing WSL row (`--cli` required; optional `--wsl-uuid/--wsl-name`, default runtime WSL).
+```bash
+wsl4ai use remove --registry-name myproj
+wsl4ai ur --registry-name myproj
+```
 
-Top-level shortcuts:
+#### `use enable`
 
-- **`wsl4ai wl`** = `wsl4ai wsl list`
-- **`wsl4ai ws`** = `wsl4ai wsl set`
+**Order (strict):** creates WSL directory → bind-mounts host path → sets `mounted=1`.
+
+Paths resolved from `local.env`: `HOST_PROJECTS + rel_path_host` and `WSL_PROJECTS + rel_path_wsl`.
+
+```bash
+wsl4ai use enable --registry-name myproj
+wsl4ai ue --registry-name myproj
+```
+
+#### `use disable`
+
+**Order (strict):** unmounts (`sudo umount`) → removes WSL directory → sets `mounted=0`.
+
+```bash
+wsl4ai use disable --registry-name myproj
+wsl4ai ud --registry-name myproj
+```
+
+#### `use disableall`
+
+Applies `use disable` logic to **all** `uses` of the runtime WSL, regardless of `mounted` state. Called automatically on session start with `--quiet`.
+
+| Flag | Meaning |
+| ---- | ------- |
+| `-q` / `--quiet` | Suppress all output; return exit code only. |
+
+```bash
+wsl4ai use disableall
+wsl4ai use disableall --quiet
+wsl4ai uda
+```
+
+### 1.f `wsl list` / `wsl set`
+
+- **`wsl list`**: show tracked `wsls` rows and their `cli_command`.
+- **`wsl set`**: update `wsls.cli_command` for an existing WSL row (`--cli` required).
 
 ```bash
 wsl4ai wsl list
 wsl4ai wl
 wsl4ai wsl set --cli "echo ok"
-wsl4ai wsl set --cli "echo ok" --wsl-name Ubuntu
 wsl4ai ws --cli "echo ok"
 ```
 
@@ -135,11 +175,11 @@ wsl4ai ws --cli "echo ok"
 
 Runs one concrete mounted `use` in the current terminal session.
 
-- Select target by `--registry-uuid` or `--registry-name` (required).
-- Optional `--wsl-uuid` / `--wsl-name`; if omitted, runtime WSL is used.
-- Security gate: only runs when the target `use` has `mounted=1`.
-- Working directory is resolved as `base_path_wsl + rel_path_wsl`.
-- Executes the resolved WSL `cli_command` in foreground (not detached).
+- Selector required: `--registry-uuid` or `--registry-name`.
+- Optional: `--wsl-uuid` / `--wsl-name` (default: runtime WSL).
+- Security gate: only runs when `mounted=1`.
+- Working directory: `WSL_PROJECTS + rel_path_wsl` (from `local.env`).
+- Executes `wsls.cli_command` in foreground.
 
 ```bash
 wsl4ai start --registry-name myproj
@@ -148,7 +188,7 @@ wsl4ai start --registry-uuid 550e8400-e29b-41d4-a716-446655440000 --wsl-name Ubu
 
 ### 1.h `tui`
 
-Interactive text user interface with arrow navigation, submenu flow, and prompt-based forms. TUI actions are runtime-local (no WSL selector prompts, no global `-a/--all` exposure in menus). `Start` runs in the same terminal session (foreground, non-detached).
+Interactive text user interface. Runtime-local only; no global scope actions.
 
 ```bash
 wsl4ai tui
@@ -156,17 +196,11 @@ wsl4ai tui
 
 ---
 
-## 2. Special commands
-
-Special router: **`install`** with subcommands:
-
-- **`install tool`** (`it`): ensure tool layout.
-- **`install database`** (`id`): create DB if missing; with `-f/--force`, recreate.
-- **`install alias`** (`ia`): add/remove aliases in shell profiles.
+## 2. Special commands (`install`)
 
 ### 2.a `install tool`
 
-No options.
+Verify tool layout. No options.
 
 ```bash
 wsl4ai install tool
@@ -175,9 +209,7 @@ wsl4ai it
 
 ### 2.b `install database`
 
-| Option | Meaning |
-| ------ | ------- |
-| `-f`, `--force` | Recreate database content if the file already exists (destructive). |
+Create the SQLite database. With `-f/--force`, recreate (destructive).
 
 ```bash
 wsl4ai install database
@@ -187,20 +219,15 @@ wsl4ai id
 
 ### 2.c `install alias`
 
-Required options:
+Add/remove aliases in shell profiles.
 
 | Option | Meaning |
 | ------ | ------- |
-| `-a`, `--action` | `add` or `remove` |
-| `-t`, `--type` | `ps` or `bash` |
-| `-n`, `--name` | Alias name (repeatable) |
-
-Rules:
-
-- add: if alias already exists, return error.
-- remove: if alias does not exist, return error.
+| `-a` / `--action` | `add` or `remove` |
+| `-t` / `--type` | `ps` or `bash` |
+| `-n` / `--name` | Alias name (repeatable) |
 
 ```bash
-wsl4ai install alias -a add -t bash -n wsl4ai -n myw
+wsl4ai install alias -a add -t bash -n wsl4ai
 wsl4ai ia -a remove -t ps -n wsl4ai
 ```
