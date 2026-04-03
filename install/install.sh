@@ -139,9 +139,12 @@ if id -u "${WSL4AI_USER}" &>/dev/null; then
   exit 1
 fi
 
+_USER_HOME="/home/${WSL4AI_USER}"
+WSL_BASE="${WSL_BASE//${HOME}/${_USER_HOME}}"
+WSL_PROJECTS="${WSL_PROJECTS//${HOME}/${_USER_HOME}}"
 WSL_PROJECTS_SUFFIX="${WSL_PROJECTS#${WSL_BASE}}"
 WSL_PROJECTS_SUFFIX="${WSL_PROJECTS_SUFFIX:-projects/}"
-WSL_BASE_DEFAULT="${WSL_BASE:-$(printf '/home/%s/wsl4ai/' "${WSL4AI_USER}")}"
+WSL_BASE_DEFAULT="${WSL_BASE:-${_USER_HOME}/wsl4ai}"
 WSL_BASE="$(ensure_trailing_slash "$(prompt "WSL_BASE" "${WSL_BASE_DEFAULT}")")"
 WSL_CONF="${WSL_BASE}conf/"
 WSL_DDBB="${WSL_CONF}ddbb/"
@@ -208,7 +211,7 @@ echo -e "${C_STEP}  (restart WSL from Windows if needed: wsl --shutdown)${C_R}"
 # ─── PHASE 6: COPY tool/ ─────────────────────────────────────────────────────
 
 echo -e "${C_STEP}Step 6: copying tool/ to ${WSL_TOOL}${C_R}"
-mkdir -p "${WSL_TOOL}" "${WSL_PROJECTS}"
+sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_TOOL}"
 shopt -s dotglob nullglob
 for _src in "${TOOL_SRC}"/*; do
   [[ -e "${_src}" ]] || continue
@@ -216,8 +219,8 @@ for _src in "${TOOL_SRC}"/*; do
     .gitkeep) continue ;;
   esac
   cp -a "${_src}" "${WSL_TOOL}/"
+  chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_TOOL}/$(basename "${_src}")"
 done
-chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_TOOL}" "${WSL_PROJECTS}"
 
 REQ="${WSL_TOOL}requirements.txt"
 if [[ ! -f "${REQ}" ]]; then
@@ -264,12 +267,14 @@ echo -e "${C_STEP}Step 8: bind-mount shared host directories (host → WSL)...${
 HOST_BASE_WSL="$(win_path_to_wsl_mnt "${HOST_BASE}")"
 HOST_PROJECTS_WSL="$(win_path_to_wsl_mnt "${HOST_PROJECTS}")"
 
-mkdir -p "${HOST_BASE_WSL}" "${WSL_DDBB}"
+sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_DDBB}"
+mkdir -p "${HOST_BASE_WSL}"
 if command -v mountpoint >/dev/null 2>&1 && mountpoint -q "${WSL_DDBB}" 2>/dev/null; then
   echo "install.sh: ${WSL_DDBB} is already a mount point; skipping mount." >&2
 else
   mount --bind "${HOST_BASE_WSL}" "${WSL_DDBB}"
 fi
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_DDBB}"
 FSTAB_LINE_DDBB="${HOST_BASE_WSL} ${WSL_DDBB} none bind 0 0"
 if ! grep -qF "${WSL_DDBB}" /etc/fstab 2>/dev/null; then
   {
@@ -279,12 +284,14 @@ if ! grep -qF "${WSL_DDBB}" /etc/fstab 2>/dev/null; then
   } >>/etc/fstab
 fi
 
-mkdir -p "${HOST_PROJECTS_WSL}" "${WSL_PROJECTS}"
+sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_PROJECTS}"
+mkdir -p "${HOST_PROJECTS_WSL}"
 if command -v mountpoint >/dev/null 2>&1 && mountpoint -q "${WSL_PROJECTS}" 2>/dev/null; then
   echo "install.sh: ${WSL_PROJECTS} is already a mount point; skipping mount." >&2
 else
   mount --bind "${HOST_PROJECTS_WSL}" "${WSL_PROJECTS}"
 fi
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_PROJECTS}"
 FSTAB_LINE_PROJECTS="${HOST_PROJECTS_WSL} ${WSL_PROJECTS} none bind 0 0"
 if ! grep -qF "${WSL_PROJECTS}" /etc/fstab 2>/dev/null; then
   {
@@ -294,13 +301,9 @@ if ! grep -qF "${WSL_PROJECTS}" /etc/fstab 2>/dev/null; then
   } >>/etc/fstab
 fi
 
-chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_BASE}"
+# ─── PHASE 9: conf/ (local.env, wsl4ai-update.py, config.json) ──────────────
 
-# ─── PHASE 9: conf/ (ddbb, local.env, wsl4ai-update.py, config.json) ────────
-
-mkdir -p "${WSL_CONF}" "${WSL_DDBB}"
-chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_CONF}"
-
+# WSL_CONF already exists (created by mkdir -p WSL_DDBB in phase 8)
 CONF_LOCAL="${WSL_CONF}local.env"
 echo -e "${C_STEP}Step 9: writing local.env → ${CONF_LOCAL}...${C_R}"
 {
@@ -313,16 +316,17 @@ echo -e "${C_STEP}Step 9: writing local.env → ${CONF_LOCAL}...${C_R}"
   printf '%s\n' "HOST_BASE=${HOST_BASE}"
   printf '%s\n' "HOST_PROJECTS=${HOST_PROJECTS}"
 } >"${CONF_LOCAL}"
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "${CONF_LOCAL}"
 
 echo -e "${C_STEP}       copying wsl4ai-update.py → ${WSL_CONF}${C_R}"
 cp -a "${CONF_SRC}/wsl4ai-update.py" "${WSL_CONF}wsl4ai-update.py"
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_CONF}wsl4ai-update.py"
 
 if [[ ! -f "${WSL_CONF}config.json" ]]; then
   echo -e "${C_STEP}       copying config.json → ${WSL_CONF}${C_R}"
   cp -a "${CONF_SRC}/config.json" "${WSL_CONF}config.json"
+  chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_CONF}config.json"
 fi
-
-chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_CONF}"
 
 # ─── PHASE 10: INSTALL DATABASE ─────────────────────────────────────────────
 
