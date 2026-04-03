@@ -18,15 +18,18 @@ from commands.help_md import root_description_short, root_epilog_short
 from commands.install import register_install_command
 from commands.output_decorator import format_envelope_for_cli, try_parse_envelope
 
+__version__ = "1.3.1"
+
 APP_DIR = Path(__file__).resolve().parent
-DDBB_DIR = APP_DIR / "ddbb"
+CONF_DIR = APP_DIR.parent / "conf"
+DDBB_DIR = CONF_DIR / "ddbb"
 
 
 def _ensure_layout() -> None:
-    """Validate mandatory WSL4AI folder layout near the entry script.
+    """Validate mandatory WSL4AI folder layout.
 
     Required directories:
-        - `ddbb/`: SQLite database directory.
+        - `conf/ddbb/`: SQLite database directory.
 
     Raises:
         RuntimeError: If one or more required directories are missing.
@@ -49,6 +52,12 @@ def build_parser() -> Wsl4aiArgumentParser:
         prog="wsl4ai",
         description=root_description_short(),
         epilog=root_epilog_short(),
+    )
+
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=f"wsl4ai {__version__}",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=False)

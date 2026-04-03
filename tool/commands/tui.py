@@ -38,7 +38,7 @@ from commands.whoami import cmd_whoami
 from commands.wsl_cli import cmd_wsl_list, cmd_wsl_set
 
 THEMES_DIR = APP_DIR / "tui_themes"
-THEME_CONFIG_PATH = APP_DIR / "config.json"
+THEME_CONFIG_PATH = APP_DIR.parent / "conf" / "config.json"
 DEFAULT_THEME_ID = "normal_dark"
 THEME_LABELS: list[tuple[str, str]] = [
     ("Normal (Dark)", "normal_dark"),

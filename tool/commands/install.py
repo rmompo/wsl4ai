@@ -5,6 +5,7 @@ from argparse import Namespace, _SubParsersAction
 from commands.install_alias import cmd_install_alias
 from commands.install_database import cmd_install_database
 from commands.install_tool import cmd_install_tool
+from commands.install_update import cmd_install_update
 
 
 def register_install_command(subparsers: _SubParsersAction) -> None:
@@ -47,6 +48,10 @@ def register_install_command(subparsers: _SubParsersAction) -> None:
     )
     p_alias.set_defaults(func=cmd_install_alias)
 
+    p_update = install_sub.add_parser("update", help="Check and apply updates from GitHub")
+    p_update.add_argument("--check", dest="check_only", action="store_true", help="Check for updates without applying")
+    p_update.set_defaults(func=cmd_install_update)
+
     p_it = subparsers.add_parser("it", help="Shorthand for install tool")
     p_it.set_defaults(func=cmd_install_tool)
 
@@ -80,3 +85,7 @@ def register_install_command(subparsers: _SubParsersAction) -> None:
         help="Alias name (repeatable)",
     )
     p_ia.set_defaults(func=cmd_install_alias)
+
+    p_iu = subparsers.add_parser("iu", help="Shorthand for install update")
+    p_iu.add_argument("--check", dest="check_only", action="store_true", help="Check for updates without applying")
+    p_iu.set_defaults(func=cmd_install_update)

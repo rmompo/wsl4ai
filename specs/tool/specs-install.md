@@ -9,6 +9,7 @@ Command group for setup and shell integration tasks.
 - `install tool` (`it`)
 - `install database` (`id`)
 - `install alias` (`ia`)
+- `install update` (`iu`)
 
 ---
 
@@ -47,4 +48,20 @@ Command group for setup and shell integration tasks.
 - Output contract:
   - Always `output.result`
   - No `output.data` (non-query operation)
+
+---
+
+## 5. `install update`
+
+- Purpose: check for and apply a new version of the tool from GitHub.
+- Options:
+  - Optional `--check` — print available version without applying the update.
+- Behavior:
+  1. Delegates immediately to `conf/wsl4ai-update.py` via `os.execv` (the standalone updater is never replaced by updates).
+  2. The updater downloads `wsl4ai.py` from GitHub raw to extract the remote `__version__`.
+  3. If the remote version is not superior to the local one, exits with no changes.
+  4. With `--check`: prints the available version and exits.
+  5. If updating: clones the full repository to `.tmp/`, moves current `tool/` to `.tmp/old/`, moves new `tool/` into place, cleans up `.tmp/`.
+  6. `conf/` is **never touched** during update.
+- Output contract: plain text (not JSON envelope — delegated to external script).
 

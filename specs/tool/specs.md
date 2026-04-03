@@ -218,6 +218,7 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | `wsl4ai install tool`      | `it`     | Install/verify WSL4AI tool layout (no options).                                                           |
 | `wsl4ai install database`  | `id`     | Create the database if missing; with `-f/--force`, overwrite (destructive reset).                         |
 | `wsl4ai install alias`     | `ia`     | Add/remove one or more shell aliases in PowerShell or Bash (`-a/-t/-n` required).                         |
+| `wsl4ai install update`    | `iu`     | Check for and apply a new version of the tool. `--check` flag prints available version without updating.  |
 | `wsl4ai registry list`     | `rl`     | List `registries` rows with resolved paths and linked `wsls` lines (`uses.mounted` on link lines).        |
 | `wsl4ai registry add …`    | `ra`     | Insert a row into `registries` (mount definition).                                                        |
 | `wsl4ai registry remove …` | `rr`     | Delete a row from `registries` **only if** there are **no** rows in `uses` for that registry.             |
@@ -233,7 +234,7 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | `wsl4ai tui`               | -        | Open the interactive text user interface.                                                                 |
 | `wsl4ai start`             | -        | Run one mounted use in foreground: cd to resolved WSL path and execute that WSL `cli_command`.           |
 
-The SQLite model uses `**registries**`, `**wsls**`, and `**uses**` (`mounted` only; no `enabled` column). Path bases (`HOST_PROJECTS`, `WSL_PROJECTS`) are read directly from **`local.env`** beside `wsl4ai.py`; there is no `parameters` table.
+The SQLite model uses `**registries**`, `**wsls**`, and `**uses**` (`mounted` only; no `enabled` column). Path bases (`HOST_PROJECTS`, `WSL_PROJECTS`) are read directly from **`conf/local.env`** (never from the database); there is no `parameters` table.
 
 ---
 
@@ -250,6 +251,7 @@ This section is an index only. Operational details must live in grouped files na
 - `whoami` -> [`specs-whoami.md`](specs-whoami.md)
 - `start` -> [`specs-start.md`](specs-start.md)
 - `tui` (interactive mode spec) -> [`specs-tui.md`](specs-tui.md)
+- `-v/--version` flag -> [`specs-version.md`](specs-version.md)
 
 ### 5.2 Grouping rule (normative)
 
@@ -259,7 +261,7 @@ This section is an index only. Operational details must live in grouped files na
 
 ### 5.3 TUI config location (global reference)
 
-- `wsl4ai tui` persists user-selected theme in `wsl4ai/config.json`.
+- `wsl4ai tui` persists user-selected theme in `conf/config.json`.
 - Theme key path: `tui.theme`.
 - If config is missing/invalid/unknown, implementation must recreate it with default `normal_dark`.
 - TUI command flows are runtime-local: they must not send WSL target selector options and rely on runtime identity defaults.
@@ -293,4 +295,4 @@ Defined in `commands/style_constants.py`:
 
 ## 8. Special commands — explicit non-application of §2
 
-`install` (including `install tool`, `install database`, `install alias`) is **not** bound by §2 unless a bullet is added here for a specific case.
+`install` (including `install tool`, `install database`, `install alias`, `install update`) is **not** bound by §2 unless a bullet is added here for a specific case.

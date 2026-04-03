@@ -10,7 +10,8 @@ import sqlite3
 import sys
 
 APP_DIR = Path(__file__).resolve().parent.parent
-DDBB_DIR = APP_DIR / "ddbb"
+CONF_DIR = APP_DIR.parent / "conf"
+DDBB_DIR = CONF_DIR / "ddbb"
 MAN_DIR = APP_DIR / "man"
 DB_PATH = DDBB_DIR / "wsl4ai.db"
 
@@ -21,7 +22,7 @@ def load_local_env_paths() -> tuple[str, str]:
     Reads ``HOST_PROJECTS`` and ``WSL_PROJECTS``; converts Windows paths (``C:/...``) to ``/mnt/...``.
     Returns empty strings if the file is missing or keys are absent.
     """
-    env_file = APP_DIR / "local.env"
+    env_file = APP_DIR.parent / "conf" / "local.env"
     env: dict[str, str] = {}
     if env_file.is_file():
         try:
