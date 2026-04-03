@@ -239,20 +239,8 @@ if [[ ! -f "${BASHRC}" ]]; then
   : >"${BASHRC}"
   chown "${WSL4AI_USER}:${WSL4AI_USER}" "${BASHRC}"
 fi
-if ! grep -qF '.local/bin' "${BASHRC}" 2>/dev/null; then
-  printf '\n# WSL4AI: pip --user scripts\nexport PATH="${HOME}/.local/bin:${PATH}"\n' >>"${BASHRC}"
-fi
-if ! grep -qF '# WSL4AI: start in home' "${BASHRC}" 2>/dev/null; then
-  printf '\n# WSL4AI: start in home\ncd ~\n' >>"${BASHRC}"
-fi
-if ! grep -qF '# WSL4AI: alias' "${BASHRC}" 2>/dev/null; then
-  printf '\n# WSL4AI: alias\nalias wsl4ai="python3 %swsl4ai.py"\n' "${WSL_TOOL}" >>"${BASHRC}"
-fi
-if ! grep -qF '# WSL4AI: safety disableall' "${BASHRC}" 2>/dev/null; then
-  printf '\n# WSL4AI: safety disableall\nwsl4ai use disableall --quiet\n' >>"${BASHRC}"
-fi
-if ! grep -qF '# WSL4AI: welcome' "${BASHRC}" 2>/dev/null; then
-  printf '\n# WSL4AI: welcome\necho ""\necho "WSL4AI ready"\necho "  cli: wsl4ai <command>"\necho "  tui: wsl4ai tui"\necho ""\n' >>"${BASHRC}"
+if ! grep -qF '# Custom WSL4AI startup scripts' "${BASHRC}" 2>/dev/null; then
+  printf '\n# Custom WSL4AI startup scripts\ncd ~\nsource ~/.startup-wsl4ai.sh\n' >>"${BASHRC}"
 fi
 chown "${WSL4AI_USER}:${WSL4AI_USER}" "${BASHRC}"
 
@@ -300,6 +288,25 @@ if ! grep -qF "${WSL_PROJECTS}" /etc/fstab 2>/dev/null; then
     echo "${FSTAB_LINE_PROJECTS}"
   } >>/etc/fstab
 fi
+
+# ─── PHASE 8b: COPY .startup-wsl4ai.sh → HOME ───────────────────────────────
+
+STARTUP_SRC="${SCRIPT_DIR}/.startup-wsl4ai.sh"
+STARTUP_DST="/home/${WSL4AI_USER}/.startup-wsl4ai.sh"
+if [[ ! -f "${STARTUP_SRC}" ]]; then
+  echo "install.sh: missing ${STARTUP_SRC}" >&2
+  exit 1
+fi
+sed \
+  -e "s|__WSL_DDBB__|${WSL_DDBB}|g" \
+  -e "s|__WSL_PROJECTS__|${WSL_PROJECTS}|g" \
+  -e "s|__HOST_BASE_WSL__|${HOST_BASE_WSL}|g" \
+  -e "s|__HOST_PROJECTS_WSL__|${HOST_PROJECTS_WSL}|g" \
+  -e "s|__WSL_TOOL__|${WSL_TOOL}|g" \
+  "${STARTUP_SRC}" > "${STARTUP_DST}"
+chmod +x "${STARTUP_DST}"
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "${STARTUP_DST}"
+echo -e "${C_STEP}       .startup-wsl4ai.sh → ${STARTUP_DST}${C_R}"
 
 # ─── PHASE 9: conf/ (local.env, wsl4ai-update.py, config.json) ──────────────
 
