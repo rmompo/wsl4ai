@@ -43,7 +43,7 @@ The script downloads any missing files (`defaults.env`, `tool/`, `conf/`) automa
 7. Writes `conf/local.env` with `HOST_DDBB`, `WSL_DDBB`, `HOST_PROJECTS`, `WSL_PROJECTS`.
 8. Runs `wsl4ai install database` to create the SQLite database.
 
-After installation, exit WSL and run `wsl --shutdown` from Windows to apply all changes.
+After installation, exit WSL and run `wsl --terminate <distro>` from Windows (where `<distro>` is your WSL distribution name) to apply all changes.
 
 ---
 

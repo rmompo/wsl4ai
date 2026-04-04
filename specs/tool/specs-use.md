@@ -122,7 +122,7 @@ Output contract:
 
 ## 6. `use disable`
 
-Deactivates one `uses` link: unmounts and removes the WSL directory.
+Deactivates one `uses` link: unmounts. **The WSL directory is not removed** — it is preserved as the mount point for future `enable` calls.
 
 **Precondition:** `mounted = 1`. If `mounted = 0` → error (not mounted).
 
@@ -149,7 +149,7 @@ Output contract:
 
 ## 7. `use disableall`
 
-Applies `use disable` logic to **all** `uses` rows of the runtime WSL, regardless of their `mounted` state.
+Applies `use disable` logic to **all `mounted=1`** `uses` rows of the runtime WSL.
 
 **Behavior:**
 1. Resolve `wsl_uuid` from runtime identity (no WSL selector options).

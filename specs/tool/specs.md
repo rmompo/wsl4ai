@@ -225,9 +225,9 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | `wsl4ai use list`          | `ul`     | List `uses` links (default: runtime WSL; filter by WSL or use `-a/--all` for global list).               |
 | `wsl4ai use add …`         | `ua`     | Link `wsls` + `registries` in `uses` (`mounted=0`); create `wsls` if needed (`cli_command` NULL).         |
 | `wsl4ai use remove …`      | `ur`     | Remove a `uses` row if `mounted=0`.                                                                       |
-| `wsl4ai use enable …`      | `ue`     | Create WSL directory + bind-mount host path; then set `uses.mounted = 1`.                                 |
-| `wsl4ai use disable …`     | `ud`     | Unmount + remove WSL directory; then set `uses.mounted = 0`.                                              |
-| `wsl4ai use disableall`    | `uda`    | Disable (umount + rmdir + DB update) all `uses` of the runtime WSL regardless of `mounted` state. Supports `-q/--quiet`. |
+| `wsl4ai use enable …`      | `ue`     | Bind-mount host path onto existing WSL directory; then set `uses.mounted = 1`.                            |
+| `wsl4ai use disable …`     | `ud`     | Unmount WSL directory (directory preserved for future `enable`); then set `uses.mounted = 0`.             |
+| `wsl4ai use disableall`    | `uda`    | Unmount all `mounted=1` uses of the runtime WSL; update DB. Supports `-q/--quiet`.                       |
 | `wsl4ai wsl list`          | `wl`     | List all known `wsls` rows and their `cli_command` values.                                                |
 | `wsl4ai wsl set …`         | `ws`     | Set `wsls.cli_command` (row must exist).                                                                  |
 | `wsl4ai whoami`            | `wai`    | Print the current `machine` and `user` runtime identity.                                                  |
@@ -287,12 +287,51 @@ Defined in `commands/style_constants.py`:
 | `GENERAL_OK`                        | Core command success messages.                        |
 | `GENERAL_ERROR`                     | Core command error messages.                          |
 | `tty_styled(text, style, stream=…)` | Apply style when TTY and `NO_COLOR` unset.            |
+| `HELP_SECTION`                      | Help section headers (`Usage:`, `commands:`, `subcommands:`, `Optional:`). Bold yellow. Defined in `commands/cli_help.py`. |
+| `HELP_NAME`                         | Help option/command/subcommand names. Bold cyan. Defined in `commands/cli_help.py`. |
 
 
 **Colors:** standard ANSI SGR only — **bright white** foreground (`97`) **before** **red** (`41`) or **green** (`42`) background in the same sequence (e.g. `\x1b[97;42m`), so Windows consoles that mishandle `42;97` still show white on green.
 
 ---
 
-## 8. Special commands — explicit non-application of §2
+## 8. CLI help and error formatting
+
+Implemented in `commands/cli_help.py`. Applies to all parsers (`Wsl4aiArgumentParser` + `Wsl4aiHelpFormatter`).
+
+### 8.1 Usage label
+
+- All `Usage:` labels (in `-h` output and error output) are **capitalized** and colored with `HELP_SECTION` (bold yellow).
+- Applies to root help, router help, and leaf command help.
+
+### 8.2 Section headings
+
+Section headings (`commands:`, `subcommands:`, `Optional:`, `Required:`) are normalized and colored with `HELP_SECTION`.
+
+### 8.3 Option/command names
+
+Option flags and command/subcommand names in help listings are colored with `HELP_NAME` (bold cyan), with ANSI overhead compensated in column alignment.
+
+### 8.4 Error output
+
+On parse error (unknown command, missing required option, etc.), the parser prints a **minimal usage line only** — no list of choices:
+
+| Context | Error output |
+| ------- | ------------ |
+| Root parser | `Usage: wsl4ai [-h] <command> [<subcommand>] [options]` |
+| Router subparser | `Usage: wsl4ai <command> [-h] <subcommand> [options]` |
+| Leaf subparser | `Usage: wsl4ai <command> <subcommand> [-h] [options]` |
+
+All output to `stderr`; exit code `2`.
+
+### 8.5 Footer
+
+Root `-h` shows one footer line: `Per-command help: wsl4ai <command> --help`.  
+Router `-h` shows: `Per-subcommand help: wsl4ai <command> <subcommand> --help`.  
+No redundant "Per-command options" line.
+
+---
+
+## 9. Special commands — explicit non-application of §2
 
 `install` (including `install tool`, `install database`, `install alias`, `install update`) is **not** bound by §2 unless a bullet is added here for a specific case.

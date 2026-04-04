@@ -110,6 +110,17 @@ For any TUI action:
 - `install alias` in TUI must offer actions `list`, `add`, `remove`. The `--type` (shell type) option must not be exposed; shell type is always resolved from the runtime platform.
 - `install update` must not appear in TUI; it is CLI-only.
 
+### 5.1.b TUI picker model for `use` operations
+
+For `use add`, `use remove`, `use enable`, and `use disable`, the TUI presents a **registry picker** (populated from `registry list`, filtered to registry-only rows). The WSL context is always the runtime identity; only the registry UUID is selected by the user.
+
+- `use add`: picker shows all registries (the command will reject those already linked).
+- `use enable`: picker shows all registries (command errors if no `mounted=0` link exists for the selected registry + runtime WSL).
+- `use disable`: picker shows all registries (command errors if no `mounted=1` link exists).
+- `use remove`: picker shows all registries (command errors if link does not exist or is `mounted=1`).
+- `use disableall`: no picker; applies to all `mounted=1` links for the runtime WSL.
+- `start`: picker is populated from the **use list** filtered to `mounted=1` entries for the runtime WSL.
+
 ### 5.2 Output contract
 
 - `output.result` is always required
