@@ -11,8 +11,29 @@ import sys
 
 APP_DIR = Path(__file__).resolve().parent.parent
 CONF_DIR = APP_DIR.parent / "conf"
-DDBB_DIR = CONF_DIR / "ddbb"
 MAN_DIR = APP_DIR / "man"
+
+
+def _resolve_ddbb_dir() -> Path:
+    """Return DDBB directory from WSL_DDBB in local.env; fallback to file-relative path."""
+    env_file = CONF_DIR / "local.env"
+    if env_file.is_file():
+        try:
+            for raw in env_file.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                if key.strip() == "WSL_DDBB":
+                    p = val.strip().rstrip("/")
+                    if p:
+                        return Path(p)
+        except OSError:
+            pass
+    return CONF_DIR / "ddbb"
+
+
+DDBB_DIR = _resolve_ddbb_dir()
 DB_PATH = DDBB_DIR / "wsl4ai.db"
 
 
