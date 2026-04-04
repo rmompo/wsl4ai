@@ -27,14 +27,9 @@ while [ ! -d /mnt/c ]; do
     sleep 0.1
 done
 
-# Mount 1: ddbb directory
+# Mount ddbb directory
 if ! mountpoint -q "${WSL_DDBB}"; then
     sudo mount --bind "$(_wsl_mnt "${HOST_DDBB}")" "${WSL_DDBB}"
-fi
-
-# Mount 2: projects directory
-if ! mountpoint -q "${WSL_PROJECTS}"; then
-    sudo mount --bind "$(_wsl_mnt "${HOST_PROJECTS}")" "${WSL_PROJECTS}"
 fi
 
 ###############################################

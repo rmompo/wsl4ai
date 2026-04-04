@@ -274,10 +274,6 @@ if ! mountpoint -q "${WSL_DDBB%/}"; then
   mount --bind "${HOST_DDBB_WSL}" "${WSL_DDBB%/}"
   echo -e "${C_STEP}       bind-mounted ${HOST_DDBB_WSL} → ${WSL_DDBB%/}${C_R}"
 fi
-if ! mountpoint -q "${WSL_PROJECTS%/}"; then
-  mount --bind "${HOST_PROJECTS_WSL}" "${WSL_PROJECTS%/}"
-  echo -e "${C_STEP}       bind-mounted ${HOST_PROJECTS_WSL} → ${WSL_PROJECTS%/}${C_R}"
-fi
 
 # ─── PHASE 8b: COPY .startup-wsl4ai.sh → HOME ───────────────────────────────
 
@@ -301,10 +297,13 @@ SUDOERS_FILE="/etc/sudoers.d/wsl4ai-mount"
 _MOUNT_BIN="$(command -v mount)"
 # HOST_DDBB_WSL has no trailing slash (from win_path_to_wsl_mnt)
 # WSL_DDBB / WSL_PROJECTS have trailing slash (from ensure_trailing_slash)
+_UMOUNT_BIN="$(command -v umount)"
 cat > "${SUDOERS_FILE}" <<EOF
-# WSL4AI: allow ${WSL4AI_USER} to bind-mount shared directories without a password
+# WSL4AI: allow ${WSL4AI_USER} to bind-mount the ddbb directory without a password
 ${WSL4AI_USER} ALL=(root) NOPASSWD: ${_MOUNT_BIN} --bind ${HOST_DDBB_WSL} ${WSL_DDBB}
-${WSL4AI_USER} ALL=(root) NOPASSWD: ${_MOUNT_BIN} --bind ${HOST_PROJECTS_WSL} ${WSL_PROJECTS}
+# WSL4AI: allow ${WSL4AI_USER} to mount/umount under WSL_PROJECTS
+${WSL4AI_USER} ALL=(root) NOPASSWD: ${_MOUNT_BIN} --bind * ${WSL_PROJECTS}*
+${WSL4AI_USER} ALL=(root) NOPASSWD: ${_UMOUNT_BIN} ${WSL_PROJECTS}*
 EOF
 chmod 440 "${SUDOERS_FILE}"
 echo -e "${C_STEP}       sudoers written → ${SUDOERS_FILE}${C_R}"

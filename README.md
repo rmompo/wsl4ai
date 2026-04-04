@@ -77,12 +77,23 @@ wsl4ai -v              # Show version
 
 ## Update
 
+Check whether a newer version is available:
+
 ```bash
-wsl4ai install update          # apply update if a newer version exists
-wsl4ai install update --check  # check without applying
+wsl4ai install update --check
+wsl4ai iu --check              # shorthand
 ```
 
-The updater (`conf/wsl4ai-update.py`) is a standalone script that is never replaced by updates. It downloads `wsl4ai.py` from GitHub to compare versions, then clones the repository and replaces `tool/` atomically. `conf/` is never touched.
+Check and apply the update if a newer version exists:
+
+```bash
+wsl4ai install update
+wsl4ai iu                      # shorthand
+```
+
+The updater (`conf/wsl4ai-update.py`) is a standalone script that is **never replaced by updates**. It downloads `wsl4ai.py` from GitHub to compare versions, then clones the repository and replaces `tool/` atomically. `conf/` is never touched.
+
+> **Note:** `install update` is a CLI-only command — it is not available in the TUI.
 
 ---
 
