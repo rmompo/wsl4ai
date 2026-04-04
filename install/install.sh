@@ -12,9 +12,11 @@ C_R='\e[0m'         # reset
 
 WORK_DIR="/tmp/wsl4ai"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TOOL_SRC="${WORK_DIR}/tool"
-CONF_SRC="${WORK_DIR}/conf"
-DEFAULTS_FILE="${WORK_DIR}/defaults.env"
+REPO_DIR="${WORK_DIR}/repo"
+TOOL_SRC="${REPO_DIR}/tool"
+CONF_SRC="${REPO_DIR}/conf"
+DEFAULTS_FILE="${REPO_DIR}/install/defaults.env"
+STARTUP_FILE="${REPO_DIR}/install/.startup-wsl4ai.sh"
 DEFAULTS_URL="https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/defaults.env"
 REPO_URL="https://github.com/rmompo/wsl4ai.git"
 
@@ -28,49 +30,51 @@ if [[ "${EUID:-0}" -ne 0 ]]; then
   exit 1
 fi
 
-ensure_defaults_env() {
-  if [[ -f "${DEFAULTS_FILE}" ]]; then
-    return 0
-  fi
-  echo "install.sh: ${DEFAULTS_FILE} not found; downloading from GitHub..." >&2
+_download() {
+  local url="$1" dest="$2"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "${DEFAULTS_URL}" -o "${DEFAULTS_FILE}"
+    curl -fsSL "${url}" -o "${dest}"
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO "${DEFAULTS_FILE}" "${DEFAULTS_URL}"
+    wget -qO "${dest}" "${url}"
   else
-    echo "install.sh: need curl or wget to fetch defaults.env." >&2
-    exit 1
-  fi
-  if [[ ! -s "${DEFAULTS_FILE}" ]]; then
-    echo "install.sh: failed to download defaults.env (empty or missing)." >&2
-    rm -f "${DEFAULTS_FILE}"
+    echo "install.sh: need curl or wget to download files." >&2
     exit 1
   fi
 }
 
-ensure_tool_dir() {
-  if [[ -d "${TOOL_SRC}" ]]; then
+ensure_repo() {
+  if [[ -d "${REPO_DIR}/tool" ]]; then
     return 0
   fi
-  echo "install.sh: tool/ not found; downloading via git..." >&2
-
   if ! command -v git >/dev/null 2>&1; then
-    echo "install.sh: git not available yet; will be installed in apt step." >&2
     return 1
   fi
-
-  git clone --depth=1 --branch main "${REPO_URL}" "${WORK_DIR}/tmp"
-
-  if [[ ! -d "${WORK_DIR}/tmp/tool" ]]; then
+  echo -e "${C_STEP}install.sh: cloning repository to ${REPO_DIR}...${C_R}"
+  git clone --depth=1 --branch main "${REPO_URL}" "${REPO_DIR}"
+  if [[ ! -d "${REPO_DIR}/tool" ]]; then
     echo "install.sh: tool/ not found inside cloned repository." >&2
-    rm -rf "${WORK_DIR}/tmp"
     exit 1
   fi
+  echo -e "${C_STEP}install.sh: repository ready at ${REPO_DIR}${C_R}"
+}
 
-  mv "${WORK_DIR}/tmp/tool" "${TOOL_SRC}"
-  [[ -d "${WORK_DIR}/tmp/conf" ]] && mv "${WORK_DIR}/tmp/conf" "${CONF_SRC}"
-  rm -rf "${WORK_DIR}/tmp"
-  echo -e "${C_STEP}install.sh: tool/ downloaded at ${TOOL_SRC}${C_R}"
+ensure_defaults_env() {
+  # Use repo if already cloned; otherwise download only defaults.env as fallback
+  if [[ -f "${DEFAULTS_FILE}" ]]; then
+    return 0
+  fi
+  local fallback="${WORK_DIR}/defaults.env"
+  DEFAULTS_FILE="${fallback}"
+  if [[ -f "${fallback}" ]]; then
+    return 0
+  fi
+  echo "install.sh: defaults.env not found; downloading from GitHub..." >&2
+  _download "${DEFAULTS_URL}" "${fallback}"
+  if [[ ! -s "${fallback}" ]]; then
+    echo "install.sh: failed to download defaults.env (empty or missing)." >&2
+    rm -f "${fallback}"
+    exit 1
+  fi
 }
 
 ensure_trailing_slash() {
@@ -112,6 +116,7 @@ valid_linux_username() {
 
 # ─── PHASE 1: ALL PROMPTS ────────────────────────────────────────────────────
 
+ensure_repo
 ensure_defaults_env
 # shellcheck disable=SC1090
 set -a
@@ -171,9 +176,13 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-# ─── PHASE 3: DOWNLOAD tool/ ─────────────────────────────────────────────────
+# ─── PHASE 3: CLONE REPOSITORY ──────────────────────────────────────────────
 
-ensure_tool_dir
+ensure_repo
+if [[ ! -d "${REPO_DIR}/tool" ]]; then
+  echo "install.sh: repository not available after apt install; aborting." >&2
+  exit 1
+fi
 
 # ─── PHASE 4: CREATE USER ────────────────────────────────────────────────────
 
@@ -260,7 +269,7 @@ mkdir -p "${HOST_PROJECTS_WSL}"
 
 # ─── PHASE 8b: COPY .startup-wsl4ai.sh → HOME ───────────────────────────────
 
-STARTUP_SRC="${SCRIPT_DIR}/.startup-wsl4ai.sh"
+STARTUP_SRC="${STARTUP_FILE}"
 STARTUP_DST="/home/${WSL4AI_USER}/.startup-wsl4ai.sh"
 if [[ ! -f "${STARTUP_SRC}" ]]; then
   echo "install.sh: missing ${STARTUP_SRC}" >&2
