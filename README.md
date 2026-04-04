@@ -97,6 +97,20 @@ The updater (`conf/wsl4ai-update.py`) is a standalone script that is **never rep
 
 ---
 
+## WSL configuration guides
+
+Step-by-step setup guides for WSL distros dedicated to specific AI tools:
+
+| Guide | Tool | Method |
+| ----- | ---- | ------ |
+| [`wsls/wsl4codex.md`](wsls/wsl4codex.md) | OpenAI Codex CLI | Homebrew |
+| [`wsls/wsl4claudecode.md`](wsls/wsl4claudecode.md) | Anthropic Claude Code | Native installer |
+| [`wsls/wsl4copilot.md`](wsls/wsl4copilot.md) | GitHub Copilot CLI | Homebrew + gh extension |
+
+Each guide covers prerequisites, installation, authentication, and startup script configuration.
+
+---
+
 ## Documentation
 
 | Area | Location |
