@@ -151,6 +151,17 @@ def cmd_use_remove(args: Namespace) -> int:
             return emit_envelope(args=args, command="use", subcommand="remove", options=opts, status=1, message="use remove: link not found")
         if int(row[0]) != 0:
             return emit_envelope(args=args, command="use", subcommand="remove", options=opts, status=1, message="use remove: mounted=1; use disable first")
+        rel_wsl = con.execute(
+            "SELECT rel_path_wsl FROM registries WHERE uuid = ?", (reg_id,)
+        ).fetchone()
+        if rel_wsl:
+            _, wsl_root = load_local_env_paths()
+            if wsl_root:
+                wsl_full = os.path.normpath(os.path.join(expand_path_template(wsl_root), rel_wsl[0]))
+                try:
+                    shutil.rmtree(wsl_full)
+                except OSError as exc:
+                    return emit_envelope(args=args, command="use", subcommand="remove", options=opts, status=1, message=f"use remove: could not remove directory {wsl_full}: {exc}")
         con.execute(
             "DELETE FROM uses WHERE wsl_uuid = ? AND registry_uuid = ?",
             (wsl_id, reg_id),
@@ -233,11 +244,6 @@ def _disable_one(wsl_id: str, reg_id: str, rel_host: str, rel_wsl: str) -> tuple
     except subprocess.CalledProcessError as exc:
         return False, f"use disable: umount failed: {exc.stderr.decode().strip() if exc.stderr else exc}"
 
-    try:
-        shutil.rmtree(wsl_path)
-    except OSError as exc:
-        return False, f"use disable: could not remove directory {wsl_path}: {exc}"
-
     with connect_db(DB_PATH) as con:
         con.execute("UPDATE uses SET mounted = 0 WHERE wsl_uuid = ? AND registry_uuid = ?", (wsl_id, reg_id))
 
@@ -311,7 +317,7 @@ def cmd_use_disableall(args: Namespace) -> int:
             SELECT u.registry_uuid, r.rel_path_host, r.rel_path_wsl
             FROM uses u
             JOIN registries r ON r.uuid = u.registry_uuid
-            WHERE u.wsl_uuid = ?
+            WHERE u.wsl_uuid = ? AND u.mounted = 1
             """,
             (wsl_id,),
         ).fetchall()

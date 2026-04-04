@@ -13,13 +13,13 @@ The lifecycle of a use link follows a strict state machine. Each step owns speci
 | 1 | `registry add` | none | insert registry | — |
 | 2 | `use add` | `mkdir -p WSL_PROJECTS/rel_wsl` | insert use (`mounted=0`) | registry exists |
 | 3 | `use enable` | `sudo mount --bind host wsl` | set `mounted=1` | `mounted=0` |
-| 4 | `use disable` | `sudo umount wsl` → `rmtree wsl` | set `mounted=0` | `mounted=1` |
-| 5 | `use remove` | none | delete use row | `mounted=0` |
+| 4 | `use disable` | `sudo umount wsl` | set `mounted=0` | `mounted=1` |
+| 5 | `use remove` | `rmtree WSL_PROJECTS/rel_wsl` | delete use row | `mounted=0` |
 | 6 | `registry remove` | none | delete registry row | no use links |
 
-> **CRITICAL — data loss prevention:** `use disable` must always run `umount` **before** `rmtree`. If `rmtree` runs while the host is still mounted, it will delete content on the **Windows host** irreversibly. This order must never be changed.
+> **`disable` does not remove the directory.** The WSL mount point is preserved so `enable` can be called again. Only `use remove` deletes the directory.
 
-> **Directory scope:** `mkdir -p` creates all intermediate directories. `rmtree` removes only the final mount point directory and its contents (after unmount, the directory is empty). Parent directories are never removed.
+> **CRITICAL — data loss prevention:** `use remove` calls `rmtree` only when `mounted=0`. If called while mounted, it would delete content on the **Windows host** irreversibly. The `mounted=1` guard must never be bypassed.
 
 ---
 
@@ -76,10 +76,12 @@ Output contract:
 
 ## 4. `use remove`
 
+**Execution order (strict):**
 1. Resolve `wsl_uuid` (**no** auto-create) and `registry_uuid`.
 2. If no **`uses`** row → error.
 3. If **`mounted = 1`** → error (`use disable` first).
-4. Else **`DELETE`** that **`uses`** row.
+4. **Remove WSL directory**: `shutil.rmtree(WSL_PROJECTS/rel_path_wsl)` — removes the mount point directory created by `use add`.
+5. **`DELETE`** that **`uses`** row from DB.
 
 WSL target selectors are optional.
 
@@ -124,15 +126,14 @@ Deactivates one `uses` link: unmounts and removes the WSL directory.
 
 **Precondition:** `mounted = 1`. If `mounted = 0` → error (not mounted).
 
-**Execution order (strict — order is critical to prevent data loss):**
+**Execution order (strict):**
 1. Resolve `wsl_uuid` and `registry_uuid`; fetch `rel_path_wsl` from `registries`.
 2. If `mounted = 0` → error.
 3. Resolve full WSL path from **`local.env`** (`WSL_PROJECTS` + `rel_path_wsl`).
 4. **Unmount**: `sudo umount <wsl_path>`. If unmount fails → error (stop, directory and DB unchanged).
-5. **Remove directory**: `shutil.rmtree(wsl_path)` — removes the WSL mount point and any subdirectories recursively. Only the final path segment created by `use add` is removed; parent directories are not touched.
-6. **Update DB**: `UPDATE uses SET mounted = 0` — only when both steps succeed.
+5. **Update DB**: `UPDATE uses SET mounted = 0` — only on unmount success.
 
-> **Data-safety rule — CRITICAL:** step 4 (unmount) **must** complete before step 5 (rmtree). If rmtree were executed while the host is still mounted, it would delete content on the **Windows host**, causing irreversible data loss. The implementation must never skip or reorder these steps.
+The WSL directory is **not removed** by `disable` — it remains as the mount point for future `enable` calls. Directory removal happens in `use remove`.
 
 If no `uses` row → error.
 
@@ -152,8 +153,8 @@ Applies `use disable` logic to **all** `uses` rows of the runtime WSL, regardles
 
 **Behavior:**
 1. Resolve `wsl_uuid` from runtime identity (no WSL selector options).
-2. Query **all** `uses` rows for that `wsl_uuid` (no `mounted` filter).
-3. For each row, call `_disable_one` (umount → rmdir → update DB).
+2. Query **only `mounted=1`** `uses` rows for that `wsl_uuid`.
+3. For each row, call `_disable_one` (umount → rmtree → update DB).
 4. Continue processing remaining rows even if one fails.
 5. Report total disabled and any errors.
 
