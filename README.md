@@ -99,6 +99,32 @@ The updater (`conf/wsl4ai-update.py`) is a standalone script that is **never rep
 
 ## WSL configuration guides
 
+General WSL commands you may need before following a tool-specific guide:
+
+Create a WSL distribution with a specific name from a specific image:
+
+```bash
+wsl --import <image name> c:\wsl2data\<image name> C:\tools\ubuntu24.tar.gz
+```
+
+Start a specific WSL distribution:
+
+```bash
+wsl --distribution <image name>
+```
+
+Terminate a specific WSL distribution so it fully stops and reloads `wsl.conf` on the next start:
+
+```bash
+wsl --terminate <image name>
+```
+
+Completely remove a specific WSL distribution:
+
+```bash
+wsl --unregister <image name>
+```
+
 Step-by-step setup guides for WSL distros dedicated to specific AI tools:
 
 | Guide | Tool | Method |
