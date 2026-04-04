@@ -160,6 +160,8 @@ def cmd_use_remove(args: Namespace) -> int:
                 wsl_full = os.path.normpath(os.path.join(expand_path_template(wsl_root), rel_wsl[0]))
                 try:
                     shutil.rmtree(wsl_full)
+                except FileNotFoundError:
+                    pass
                 except OSError as exc:
                     return emit_envelope(args=args, command="use", subcommand="remove", options=opts, status=1, message=f"use remove: could not remove directory {wsl_full}: {exc}")
         con.execute(
