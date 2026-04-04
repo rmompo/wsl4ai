@@ -60,8 +60,14 @@ wsl4ai() {
 # WSL4AI: Welcome banner
 ###############################################
 
+C_TITLE='\e[1;36m'   # bold cyan  — module title
+C_USAGE='\e[1;33m'   # bold yellow — usage hints
+C_R='\e[0m'          # reset
+
 python3 __INSTALL_BASE__/tool/wsl4ai.py use disableall --quiet
-python3 __INSTALL_BASE__/tool/wsl4ai.py -v
-echo "cli: wsl4ai <command>"
-echo "tui: wsl4ai tui"
+echo -e "${C_TITLE}[WSL4AI]${C_R}"
+python3 __INSTALL_BASE__/tool/wsl4ai.py install update --check
+echo ""
+echo -e "${C_USAGE}cli: wsl4ai <command>${C_R}"
+echo -e "${C_USAGE}tui: wsl4ai tui${C_R}"
 echo ""
