@@ -256,6 +256,10 @@ def register_add_command(
         help=help_line,
         description=desc,
     )
+    base_host, base_wsl = load_local_env_paths()
+    host_base_hint = base_host if base_host else "(HOST_PROJECTS not set)"
+    wsl_base_hint = base_wsl if base_wsl else "(WSL_PROJECTS not set)"
+
     req = add.add_argument_group("required arguments")
     req.add_argument("-n", "--name", dest="name", required=True, help="Name for this mount definition")
     req.add_argument(
@@ -263,14 +267,14 @@ def register_add_command(
         "--host",
         dest="host",
         required=True,
-        help="Host-side folder segment for the definition",
+        help=f"Host-side folder segment appended to HOST_PROJECTS ({host_base_hint})",
     )
     req.add_argument(
         "-w",
         "--wsl",
         dest="wsl",
         required=True,
-        help="WSL-side folder segment for the definition",
+        help=f"WSL-side folder segment appended to WSL_PROJECTS ({wsl_base_hint})",
     )
     add.add_argument(
         "-f",
