@@ -267,6 +267,18 @@ mkdir -p "${HOST_DDBB_WSL}"
 sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_PROJECTS}"
 mkdir -p "${HOST_PROJECTS_WSL}"
 
+# Bind-mount now (as root) so Phase 10 writes the database to the host path.
+# Without this, the DB would be created in the local dir and hidden by the
+# mount on the next WSL startup.
+if ! mountpoint -q "${WSL_DDBB%/}"; then
+  mount --bind "${HOST_DDBB_WSL}" "${WSL_DDBB%/}"
+  echo -e "${C_STEP}       bind-mounted ${HOST_DDBB_WSL} → ${WSL_DDBB%/}${C_R}"
+fi
+if ! mountpoint -q "${WSL_PROJECTS%/}"; then
+  mount --bind "${HOST_PROJECTS_WSL}" "${WSL_PROJECTS%/}"
+  echo -e "${C_STEP}       bind-mounted ${HOST_PROJECTS_WSL} → ${WSL_PROJECTS%/}${C_R}"
+fi
+
 # ─── PHASE 8b: COPY .startup-wsl4ai.sh → HOME ───────────────────────────────
 
 STARTUP_SRC="${STARTUP_FILE}"
@@ -281,6 +293,21 @@ sed \
 chmod +x "${STARTUP_DST}"
 chown "${WSL4AI_USER}:${WSL4AI_USER}" "${STARTUP_DST}"
 echo -e "${C_STEP}       .startup-wsl4ai.sh → ${STARTUP_DST}${C_R}"
+
+# ─── PHASE 8c: SUDOERS FOR BIND-MOUNTS ──────────────────────────────────────
+
+echo -e "${C_STEP}Step 8c: writing sudoers rule for bind-mounts (NOPASSWD for exact paths)...${C_R}"
+SUDOERS_FILE="/etc/sudoers.d/wsl4ai-mount"
+_MOUNT_BIN="$(command -v mount)"
+# HOST_DDBB_WSL has no trailing slash (from win_path_to_wsl_mnt)
+# WSL_DDBB / WSL_PROJECTS have trailing slash (from ensure_trailing_slash)
+cat > "${SUDOERS_FILE}" <<EOF
+# WSL4AI: allow ${WSL4AI_USER} to bind-mount shared directories without a password
+${WSL4AI_USER} ALL=(root) NOPASSWD: ${_MOUNT_BIN} --bind ${HOST_DDBB_WSL} ${WSL_DDBB}
+${WSL4AI_USER} ALL=(root) NOPASSWD: ${_MOUNT_BIN} --bind ${HOST_PROJECTS_WSL} ${WSL_PROJECTS}
+EOF
+chmod 440 "${SUDOERS_FILE}"
+echo -e "${C_STEP}       sudoers written → ${SUDOERS_FILE}${C_R}"
 
 # ─── PHASE 9: conf/ (local.env, wsl4ai-update.py, config.json) ──────────────
 
@@ -312,9 +339,15 @@ fi
 
 echo -e "${C_STEP}Step 10: wsl4ai install database (as ${WSL4AI_USER})...${C_R}"
 sudo -u "${WSL4AI_USER}" -H env HOME="${_USER_HOME}" INSTALL_TOOL="${INSTALL_TOOL}" bash -lc 'cd "$INSTALL_TOOL" && python3 wsl4ai.py install database'
+echo -e "${C_STEP}       database location:${C_R}"
+echo -e "${C_STEP}         WSL:     ${WSL_DDBB}wsl4ai.db${C_R}"
+echo -e "${C_STEP}         Windows: ${HOST_DDBB}wsl4ai.db${C_R}"
 
 echo ""
-echo -e "${C_OK}Done: user ${WSL4AI_USER}; tool copied; conf copied (wsl4ai-update.py, config.json); Python (system); pip deps (--user); ddbb mounted from HOST_DDBB; SQLite DB created; password equals username.${C_R}"
+echo -e "${C_OK}Installation complete.${C_R}"
 echo ""
-echo -e "${C_PROMPT}IMPORTANT: exit this WSL session and run the following command from Windows to apply all changes:${C_R}"
-echo -e "${C_PROMPT}  wsl --shutdown${C_R}"
+echo -e "${C_PROMPT}IMPORTANT: to apply the default user you must:${C_R}"
+echo -e "${C_PROMPT}  1. Exit this session:  exit${C_R}"
+echo -e "${C_PROMPT}  2. From Windows, shut down ALL WSL machines: wsl --shutdown${C_R}"
+echo -e "${C_PROMPT}     WARNING: this will stop every running WSL distribution.${C_R}"
+echo -e "${C_PROMPT}  3. Re-enter the distro: wsl -d ${WSL_DISTRO_NAME:-<distro-name>}${C_R}"

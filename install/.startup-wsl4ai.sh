@@ -29,12 +29,12 @@ done
 
 # Mount 1: ddbb directory
 if ! mountpoint -q "${WSL_DDBB}"; then
-    mount --bind "$(_wsl_mnt "${HOST_DDBB}")" "${WSL_DDBB}"
+    sudo mount --bind "$(_wsl_mnt "${HOST_DDBB}")" "${WSL_DDBB}"
 fi
 
 # Mount 2: projects directory
 if ! mountpoint -q "${WSL_PROJECTS}"; then
-    mount --bind "$(_wsl_mnt "${HOST_PROJECTS}")" "${WSL_PROJECTS}"
+    sudo mount --bind "$(_wsl_mnt "${HOST_PROJECTS}")" "${WSL_PROJECTS}"
 fi
 
 ###############################################
