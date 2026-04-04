@@ -30,3 +30,8 @@ def tty_styled(text: str, style: str, *, stream=None) -> str:
     if os.environ.get("NO_COLOR") or not out.isatty():
         return text
     return f"{style}{text}{RST}"
+
+
+# Help formatting colors
+HELP_SECTION = "\x1b[1;33m"   # bold yellow — Required / Optional / commands / subcommands
+HELP_NAME = "\x1b[1;36m"      # bold cyan   — command / subcommand / option names

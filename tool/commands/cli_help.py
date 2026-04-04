@@ -9,8 +9,24 @@ import sys
 import textwrap
 
 from commands.help_md import strip_subcommand_boilerplate, synthetic_blurb
+from commands.style_constants import HELP_NAME, HELP_SECTION, RST
 
 _HELP_FLAGS = frozenset(("-h", "--help"))
+
+# Normalized section heading titles
+_SECTION_ALIASES: dict[str, str] = {
+    "required arguments": "Required",
+    "optional arguments": "Optional",
+    "options": "Optional",
+    "positional arguments": "Positional",
+}
+
+
+def _help_styled(text: str, style: str) -> str:
+    """Color ``text`` for help output when stdout is a TTY and NO_COLOR is unset."""
+    if os.environ.get("NO_COLOR") or not sys.stdout.isatty():
+        return text
+    return f"{style}{text}{RST}"
 
 # Extra indent (spaces) for wrapped continuation lines (listings + argparse option help).
 HELP_DESCRIPTION_CONTINUATION_EXTRA = 2
@@ -22,32 +38,52 @@ class Wsl4aiArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("formatter_class", Wsl4aiHelpFormatter)
         super().__init__(*args, **kwargs)
-        # Argparse 3.x+ labels the default flag group "options"; we standardize on "optional arguments".
-        self._optionals.title = "optional arguments"
+        self._optionals.title = "Optional"
 
 
 class Wsl4aiHelpFormatter(argparse.RawDescriptionHelpFormatter):
-    """argparse help: wrapped ``help=`` text continues with +2 spaces vs. the first line."""
+    """argparse help: section headers and option names colored; continuation lines indented +2."""
+
+    def _format_action_invocation(self, action) -> str:
+        if not action.option_strings:
+            default = self._get_default_metavar_for_positional(action)
+            metavar, = self._metavar_formatter(action, default)(1)
+            return metavar
+        short = sorted(s for s in action.option_strings if not s.startswith("--"))
+        long_ = sorted(s for s in action.option_strings if s.startswith("--"))
+        if action.nargs == 0:
+            return ", ".join(short + long_)
+        default = self._get_default_metavar_for_optional(action)
+        args_string = self._format_args(action, default)
+        parts = list(short)
+        parts.extend(f"{s} {args_string}" for s in long_)
+        return ", ".join(parts)
+
+    def start_section(self, heading: str) -> None:
+        normalized = _SECTION_ALIASES.get((heading or "").lower(), (heading or "").title())
+        colored = _help_styled(normalized, HELP_SECTION)
+        super().start_section(colored)
 
     def _format_action(self, action):
         help_position = min(self._action_max_length + 2, self._max_help_position)
         help_width = max(self._width - help_position, 11)
         action_width = help_position - self._current_indent - 2
-        action_header = self._format_action_invocation(action)
+        plain_invocation = self._format_action_invocation(action)
+        colored_invocation = _help_styled(plain_invocation, HELP_NAME)
+        ansi_extra = len(colored_invocation) - len(plain_invocation)
         x = HELP_DESCRIPTION_CONTINUATION_EXTRA
 
         if not action.help:
-            tup = self._current_indent, "", action_header
-            action_header = "%*s%s\n" % tup
+            action_header = "%*s%s\n" % (self._current_indent, "", colored_invocation)
 
-        elif len(action_header) <= action_width:
-            tup = self._current_indent, "", action_width, action_header
-            action_header = "%*s%-*s  " % tup
+        elif len(plain_invocation) <= action_width:
+            action_header = "%*s%-*s  " % (
+                self._current_indent, "", action_width + ansi_extra, colored_invocation
+            )
             indent_first = 0
 
         else:
-            tup = self._current_indent, "", action_header
-            action_header = "%*s%s\n" % tup
+            action_header = "%*s%s\n" % (self._current_indent, "", colored_invocation)
             indent_first = help_position
 
         parts = [action_header]
@@ -224,6 +260,7 @@ def _print_wrapped_label_desc_rows(
     line_prefix: str = "    ",
     label_pad_min: int = 0,
     gap: int = 4,
+    color_labels: bool = True,
 ) -> None:
     """Print two columns: fixed label width, description wrapped with hanging indent."""
     if not rows:
@@ -237,9 +274,12 @@ def _print_wrapped_label_desc_rows(
     x = HELP_DESCRIPTION_CONTINUATION_EXTRA
 
     for label, desc_raw in rows:
+        plain_label = label
+        display_label = _help_styled(label, HELP_NAME) if color_labels else label
+        ansi_extra = len(display_label) - len(plain_label)
         desc = " ".join(str(desc_raw).split())
         if not desc:
-            print(f"{line_prefix}{label}")
+            print(f"{line_prefix}{display_label}")
             continue
         lines = textwrap.wrap(
             desc,
@@ -248,7 +288,7 @@ def _print_wrapped_label_desc_rows(
             break_on_hyphens=True,
         )
         pad = label_w + gap
-        first = f"{line_prefix}{label:<{label_w}}{' ' * gap}{lines[0]}"
+        first = f"{line_prefix}{display_label:<{label_w + ansi_extra}}{' ' * gap}{lines[0]}"
         print(first)
         hang = line_prefix + (" " * (pad + x))
         if len(lines) > 1:
@@ -314,7 +354,7 @@ def _print_root_help_long_only(root: argparse.ArgumentParser) -> None:
     if root.description:
         print(root.description + "\n")
 
-    print("commands:")
+    print(_help_styled("commands:", HELP_SECTION))
     root_rows: list[tuple[str, str]] = []
     for name in _ROOT_LONG_COMMANDS:
         sub = act.choices.get(name)
@@ -330,6 +370,8 @@ def _print_root_help_long_only(root: argparse.ArgumentParser) -> None:
         desc = desc + _actions_suffix_for_root_child(name, sub)
         root_rows.append((name, desc))
     _print_wrapped_label_desc_rows(root_rows, label_pad_min=12)
+
+    print(f"\n{_help_styled('Per-command help:', HELP_SECTION)} {root.prog} <command> --help")
 
     if root.epilog:
         print("\n" + root.epilog)
@@ -350,10 +392,10 @@ def _print_router_help(parser: argparse.ArgumentParser) -> None:
     if desc:
         print(desc + "\n")
 
-    print("subcommands:")
+    print(_help_styled("subcommands:", HELP_SECTION))
     router_rows: list[tuple[str, str]] = []
     for primary, aliases, sub in _unique_subparsers(act):
-        label = f"{primary} ({', '.join(aliases)})" if aliases else primary
+        label = f"{', '.join(aliases)}, {primary}" if aliases else primary
         h = _choice_help_for_primary(act, primary)
         if not h:
             h = getattr(sub, "description", None) or getattr(sub, "help", None) or ""
@@ -363,6 +405,8 @@ def _print_router_help(parser: argparse.ArgumentParser) -> None:
         h = synthetic_blurb(h, max_chars=85, prefer_sentence_under=95, fallback="")
         router_rows.append((label, h))
     _print_wrapped_label_desc_rows(router_rows)
+
+    print(f"\n{_help_styled('Per-subcommand help:', HELP_SECTION)} {parser.prog} <subcommand> --help")
 
     if parser.epilog:
         print("\n" + parser.epilog)

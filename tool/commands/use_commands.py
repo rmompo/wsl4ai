@@ -214,10 +214,6 @@ def cmd_use_enable(args: Namespace) -> int:
     try:
         subprocess.run(["sudo", "mount", "--bind", host_path, wsl_path], check=True, capture_output=True)
     except subprocess.CalledProcessError as exc:
-        try:
-            os.rmdir(wsl_path)
-        except OSError:
-            pass
         return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message=f"use enable: mount failed: {exc.stderr.decode().strip() if exc.stderr else exc}")
 
     # 3. update DB
