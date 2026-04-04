@@ -41,6 +41,19 @@ class Wsl4aiArgumentParser(argparse.ArgumentParser):
         super().__init__(*args, **kwargs)
         self._optionals.title = "Optional"
 
+    def error(self, message: str) -> None:
+        has_sub = any(isinstance(a, argparse._SubParsersAction) for a in self._actions)
+        is_root = " " not in self.prog
+        if is_root:
+            usage_tail = "<command> [<subcommand>] [options]"
+        elif has_sub:
+            usage_tail = "<subcommand> [options]"
+        else:
+            usage_tail = "[options]"
+        label = _help_styled("Usage:", HELP_SECTION)
+        print(f"{label} {self.prog} [-h] {usage_tail}", file=sys.stderr)
+        self.exit(2)
+
 
 class Wsl4aiHelpFormatter(argparse.RawDescriptionHelpFormatter):
     """argparse help: section headers and option names colored; continuation lines indented +2."""
@@ -351,7 +364,7 @@ def _print_root_help_long_only(root: argparse.ArgumentParser) -> None:
         root.print_help()
         return
 
-    print(f"usage: {root.prog} [-h] <command> [<subcommand>] [options]\n")
+    print(f"{_help_styled('Usage:', HELP_SECTION)} {root.prog} [-h] <command> [<subcommand>] [options]\n")
     if root.description:
         print(root.description + "\n")
 
@@ -385,7 +398,7 @@ def _print_router_help(parser: argparse.ArgumentParser) -> None:
         parser.print_help()
         return
 
-    print(f"usage: {parser.prog} [-h] <subcommand> [options]\n")
+    print(f"{_help_styled('Usage:', HELP_SECTION)} {parser.prog} [-h] <subcommand> [options]\n")
     desc = getattr(parser, "description", None) or getattr(parser, "help", None) or ""
     desc = " ".join(str(desc).split())
     desc = desc.replace("list|rl", "list").replace("add|ra", "add").replace("remove|rr", "remove")

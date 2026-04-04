@@ -1,3 +1,4 @@
 *.pyc
 ddbb/
 tmp/
+.claude/settings.local.json

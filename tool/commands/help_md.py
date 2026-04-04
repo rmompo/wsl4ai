@@ -157,5 +157,5 @@ def root_description_short() -> str:
 
 def root_epilog_short() -> str:
     """Short footer after the command list on ``wsl4ai -h``."""
-    return "Per-command options: wsl4ai <command> [subcommand] --help"
+    return ""
 
