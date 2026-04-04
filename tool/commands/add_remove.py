@@ -50,18 +50,13 @@ def _absolute_under_param(base_raw: str, rel_segment: str) -> Path:
 
 
 def _paths_under_param_exist(host_rel: str, wsl_rel: str) -> tuple[bool, str]:
-    """Ensure paths under HOST_PROJECTS and WSL_PROJECTS from local.env exist on disk."""
-    host_root, wsl_root = load_local_env_paths()
+    """Ensure the HOST path exists. WSL path is created later by `use add`."""
+    host_root, _ = load_local_env_paths()
     if not host_root:
         return False, "add: missing HOST_PROJECTS in local.env"
-    if not wsl_root:
-        return False, "add: missing WSL_PROJECTS in local.env"
     host_full = _absolute_under_param(host_root, host_rel)
-    wsl_full = _absolute_under_param(wsl_root, wsl_rel)
     if not host_full.exists():
         return False, f"add: host path not found: {host_full}"
-    if not wsl_full.exists():
-        return False, f"add: wsl path not found: {wsl_full}"
     return True, ""
 
 
