@@ -61,8 +61,9 @@ Rules:
 
 - Required values must be non-empty after trim.
 - Name uniqueness is case-insensitive.
-- Without `--force`, resolved host and wsl absolute paths must exist.
+- Without `--force`, the resolved host absolute path (`HOST_PROJECTS/rel_path_host`) must exist on disk.
 - Insert target table: `registries` (`uuid`, `name`, `rel_path_host`, `rel_path_wsl`).
+- **No filesystem changes**: `registry add` only writes to the database. Directory creation happens in `use add`.
 
 ---
 
@@ -85,6 +86,7 @@ Purpose: remove one registry row when no active links exist.
 
 Rules:
 
-- If linked rows exist in `uses` for the target registry, removal is rejected.
+- If linked rows exist in `uses` for the target registry, removal is rejected. Run `use disable` + `use remove` for all linked uses first.
 - If not linked, delete from `registries`.
+- **No filesystem changes**: `registry remove` only deletes from the database. Directory removal happens in `use disable`.
 

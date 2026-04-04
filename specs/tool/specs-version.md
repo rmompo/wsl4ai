@@ -9,7 +9,7 @@ Report the installed version of WSL4AI without requiring a database or layout ch
 `__version__` string embedded in `tool/wsl4ai.py`:
 
 ```python
-__version__ = "1.3.4"
+__version__ = "1.3.6"
 ```
 
 ## 3. CLI flag
@@ -22,7 +22,7 @@ wsl4ai --version
 Output format (argparse default):
 
 ```
-wsl4ai 1.3.4
+wsl4ai 1.3.6
 ```
 
 ## 4. Rules

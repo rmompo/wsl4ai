@@ -4,6 +4,25 @@ Core (non-special) commands. Align with **[`specs.md`](specs.md)** §2. Implemen
 
 ---
 
+## 0. Lifecycle and filesystem ownership
+
+The lifecycle of a use link follows a strict state machine. Each step owns specific filesystem and DB operations. **Order is critical — incorrect order can cause irreversible data loss on the Windows host.**
+
+| Step | Command | Filesystem | DB | Precondition |
+|------|---------|------------|-----|--------------|
+| 1 | `registry add` | none | insert registry | — |
+| 2 | `use add` | `mkdir -p WSL_PROJECTS/rel_wsl` | insert use (`mounted=0`) | registry exists |
+| 3 | `use enable` | `sudo mount --bind host wsl` | set `mounted=1` | `mounted=0` |
+| 4 | `use disable` | `sudo umount wsl` → `rmtree wsl` | set `mounted=0` | `mounted=1` |
+| 5 | `use remove` | none | delete use row | `mounted=0` |
+| 6 | `registry remove` | none | delete registry row | no use links |
+
+> **CRITICAL — data loss prevention:** `use disable` must always run `umount` **before** `rmtree`. If `rmtree` runs while the host is still mounted, it will delete content on the **Windows host** irreversibly. This order must never be changed.
+
+> **Directory scope:** `mkdir -p` creates all intermediate directories. `rmtree` removes only the final mount point directory and its contents (after unmount, the directory is empty). Parent directories are never removed.
+
+---
+
 ## 1. Shared flags
 
 - **Registry (required** for `add`, `remove`, `enable`, `disable`**):** exactly one of **`--registry-uuid`** or **`--registry-name`** (case-insensitive name).
@@ -37,11 +56,15 @@ Query all usage links (`uses` rows) with joined registry/WSL context.
 
 ## 3. `use add`
 
+**Execution order (strict):**
 1. Resolve `registry_uuid`. Resolve `wsl_uuid` via `resolve_wsl_uuid` with **`create_if_missing=True`**: insert **`wsls`** (`cli_command NULL`) if missing.
 2. If **`uses`** already has `(wsl_uuid, registry_uuid)` → error.
-3. Else **`INSERT INTO uses (wsl_uuid, registry_uuid, mounted)`** with **`mounted = 0`**.
+3. **Create WSL directory**: `os.makedirs(WSL_PROJECTS/rel_path_wsl, exist_ok=True)` — creates all intermediate directories (`mkdir -p` semantics). This is a WSL-local directory that will serve as the mount point.
+4. **`INSERT INTO uses (wsl_uuid, registry_uuid, mounted)`** with **`mounted = 0`**.
 
 WSL target selectors are optional; if omitted, target WSL is resolved from runtime identity.
+
+> **Data-safety rule:** the directory created here is a local WSL path only. No host (Windows) path is touched at this stage.
 
 **Shortcuts:** `wsl4ai ua`.
 
@@ -70,14 +93,18 @@ Output contract:
 
 ## 5. `use enable`
 
-Activates one `uses` link: creates the WSL directory and bind-mounts the host path onto it.
+Activates one `uses` link: bind-mounts the host path onto the existing WSL directory.
+
+**Precondition:** `mounted = 0`. If `mounted = 1` → error (already mounted).
 
 **Execution order (strict):**
 1. Resolve `wsl_uuid` and `registry_uuid`; fetch `rel_path_host` and `rel_path_wsl` from `registries`.
-2. Resolve full paths from **`local.env`** (`HOST_PROJECTS` + `rel_path_host`, `WSL_PROJECTS` + `rel_path_wsl`).
-3. **Create directory**: `os.makedirs(wsl_path, exist_ok=True)`.
-4. **Mount**: `sudo mount --bind <host_path> <wsl_path>`. If mount fails, remove the created directory and return error.
+2. If `mounted = 1` → error.
+3. Resolve full paths from **`local.env`** (`HOST_PROJECTS` + `rel_path_host`, `WSL_PROJECTS` + `rel_path_wsl`).
+4. **Mount**: `sudo mount --bind <host_path> <wsl_path>`. If mount fails → error (stop, DB unchanged).
 5. **Update DB**: `UPDATE uses SET mounted = 1` — only on mount success.
+
+> **Note:** the WSL directory must already exist (created by `use add`). `use enable` does **not** create directories.
 
 If no `uses` row → error. Path resolution errors (missing `local.env` keys) → error.
 
@@ -95,12 +122,17 @@ Output contract:
 
 Deactivates one `uses` link: unmounts and removes the WSL directory.
 
-**Execution order (strict):**
+**Precondition:** `mounted = 1`. If `mounted = 0` → error (not mounted).
+
+**Execution order (strict — order is critical to prevent data loss):**
 1. Resolve `wsl_uuid` and `registry_uuid`; fetch `rel_path_wsl` from `registries`.
-2. Resolve full WSL path from **`local.env`** (`WSL_PROJECTS` + `rel_path_wsl`).
-3. **Unmount**: `sudo umount <wsl_path>`. If unmount fails → error (stop).
-4. **Remove directory**: `os.rmdir(wsl_path)`. If removal fails → error (stop).
-5. **Update DB**: `UPDATE uses SET mounted = 0` — only when both steps succeed.
+2. If `mounted = 0` → error.
+3. Resolve full WSL path from **`local.env`** (`WSL_PROJECTS` + `rel_path_wsl`).
+4. **Unmount**: `sudo umount <wsl_path>`. If unmount fails → error (stop, directory and DB unchanged).
+5. **Remove directory**: `shutil.rmtree(wsl_path)` — removes the WSL mount point and any subdirectories recursively. Only the final path segment created by `use add` is removed; parent directories are not touched.
+6. **Update DB**: `UPDATE uses SET mounted = 0` — only when both steps succeed.
+
+> **Data-safety rule — CRITICAL:** step 4 (unmount) **must** complete before step 5 (rmtree). If rmtree were executed while the host is still mounted, it would delete content on the **Windows host**, causing irreversible data loss. The implementation must never skip or reorder these steps.
 
 If no `uses` row → error.
 

@@ -96,20 +96,20 @@ def cmd_add(args: Namespace) -> int:
             status=1,
             message="add: --name, --host and --wsl must be non-empty",
         )
+    if not getattr(args, "force", False):
+        ok_paths, err_paths = _paths_under_param_exist(host_rel, wsl_rel)
+        if not ok_paths:
+            return emit_envelope(
+                args=args,
+                command="registry",
+                subcommand="add",
+                options=opts,
+                status=1,
+                message=err_paths,
+            )
     uid = _new_uuid()
     try:
         with connect_db(DB_PATH) as con:
-            if not getattr(args, "force", False):
-                ok_paths, err_paths = _paths_under_param_exist(host_rel, wsl_rel)
-                if not ok_paths:
-                    return emit_envelope(
-                        args=args,
-                        command="registry",
-                        subcommand="add",
-                        options=opts,
-                        status=1,
-                        message=err_paths,
-                    )
             taken = con.execute(
                 "SELECT name FROM registries WHERE LOWER(name) = LOWER(?) LIMIT 1",
                 (name,),
@@ -220,10 +220,7 @@ def cmd_remove(args: Namespace) -> int:
                 subcommand="remove",
                 options=opts,
                 status=1,
-                message=(
-                    "remove: registry still has use links; remove them with "
-                    "'wsl4ai use remove' (after use disable if mounted) first"
-                ),
+                message="remove: registry still has use links; run 'use disable' + 'use remove' first",
             )
         con.execute("DELETE FROM registries WHERE uuid = ?", (rid,))
     return emit_envelope(

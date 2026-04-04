@@ -1,6 +1,7 @@
 """``wsl4ai use`` subcommands and top-level shortcuts (``ua``, ``ur``, …)."""
 
 import os
+import shutil
 import subprocess
 from argparse import Namespace, _SubParsersAction
 from collections.abc import Callable
@@ -71,6 +72,24 @@ def cmd_use_add(args: Namespace) -> int:
                 status=1,
                 message="use add: link already exists for this wsl and registry",
             )
+        rel_wsl = con.execute(
+            "SELECT rel_path_wsl FROM registries WHERE uuid = ?", (reg_id,)
+        ).fetchone()
+        if rel_wsl:
+            _, wsl_root = load_local_env_paths()
+            if wsl_root:
+                wsl_full = os.path.normpath(os.path.join(expand_path_template(wsl_root), rel_wsl[0]))
+                try:
+                    os.makedirs(wsl_full, exist_ok=True)
+                except OSError as exc:
+                    return emit_envelope(
+                        args=args,
+                        command="use",
+                        subcommand="add",
+                        options=opts,
+                        status=1,
+                        message=f"use add: could not create wsl path {wsl_full}: {exc}",
+                    )
         con.execute(
             "INSERT INTO uses (wsl_uuid, registry_uuid, mounted) VALUES (?, ?, 0)",
             (wsl_id, reg_id),
@@ -170,19 +189,15 @@ def cmd_use_enable(args: Namespace) -> int:
         ).fetchone()
         if not row:
             return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message="use enable: link not found")
+        if int(row[0]) == 1:
+            return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message="use enable: already mounted")
         _, rel_host, rel_wsl = row
 
     host_path, wsl_path, path_err = _resolve_full_paths(rel_host, rel_wsl)
     if path_err:
         return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message=f"use enable: {path_err}")
 
-    # 1. create folder
-    try:
-        os.makedirs(wsl_path, exist_ok=True)
-    except OSError as exc:
-        return emit_envelope(args=args, command="use", subcommand="enable", options=opts, status=1, message=f"use enable: could not create directory {wsl_path}: {exc}")
-
-    # 2. mount
+    # mount
     try:
         subprocess.run(["sudo", "mount", "--bind", host_path, wsl_path], check=True, capture_output=True)
     except subprocess.CalledProcessError as exc:
@@ -219,14 +234,14 @@ def _disable_one(wsl_id: str, reg_id: str, rel_host: str, rel_wsl: str) -> tuple
         return False, f"use disable: umount failed: {exc.stderr.decode().strip() if exc.stderr else exc}"
 
     try:
-        os.rmdir(wsl_path)
+        shutil.rmtree(wsl_path)
     except OSError as exc:
         return False, f"use disable: could not remove directory {wsl_path}: {exc}"
 
     with connect_db(DB_PATH) as con:
         con.execute("UPDATE uses SET mounted = 0 WHERE wsl_uuid = ? AND registry_uuid = ?", (wsl_id, reg_id))
 
-    return True, f"use disable: unmounted and removed {wsl_path}"
+    return True, f"use disable: unmounted {wsl_path}"
 
 
 def cmd_use_disable(args: Namespace) -> int:
@@ -252,6 +267,8 @@ def cmd_use_disable(args: Namespace) -> int:
         ).fetchone()
         if not row:
             return emit_envelope(args=args, command="use", subcommand="disable", options=opts, status=1, message="use disable: link not found")
+        if int(row[0]) == 0:
+            return emit_envelope(args=args, command="use", subcommand="disable", options=opts, status=1, message="use disable: not mounted")
         _, rel_host, rel_wsl = row
 
     ok, msg = _disable_one(wsl_id, reg_id, rel_host, rel_wsl)
