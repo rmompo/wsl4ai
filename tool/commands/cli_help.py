@@ -58,6 +58,11 @@ class Wsl4aiArgumentParser(argparse.ArgumentParser):
 class Wsl4aiHelpFormatter(argparse.RawDescriptionHelpFormatter):
     """argparse help: section headers and option names colored; continuation lines indented +2."""
 
+    def _format_usage(self, usage, actions, groups, prefix):
+        if prefix is None:
+            prefix = _help_styled("Usage:", HELP_SECTION) + " "
+        return super()._format_usage(usage, actions, groups, prefix)
+
     def _format_action_invocation(self, action) -> str:
         if not action.option_strings:
             default = self._get_default_metavar_for_positional(action)
