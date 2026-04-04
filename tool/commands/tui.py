@@ -477,12 +477,18 @@ def _install_menu(root_args: Namespace) -> None:
             _run_and_print(root_args, cmd_install_database, "install", "database", force=force)
             _wait()
             continue
-        action = _select("Alias action", ["add", "remove"])
-        shell_type = _select("Alias type", ["ps", "bash"])
+        action = _select("Alias action", ["list", "add", "remove"])
+        if not action:
+            _wait()
+            continue
+        if action == "list":
+            _run_and_print(root_args, cmd_install_alias, "install", "alias", alias_action="list", alias_names=[])
+            _wait()
+            continue
         names_raw = (_text("Alias names (comma-separated)") or "").strip()
         names = [x.strip() for x in names_raw.split(",") if x.strip()]
-        if not action or not shell_type or not names:
-            _emit(tty_styled("ERROR: action, type, and at least one alias name are required", GENERAL_ERROR))
+        if not names:
+            _emit(tty_styled("ERROR: at least one alias name is required", GENERAL_ERROR))
             _wait()
             continue
         if action == "remove":
@@ -497,7 +503,6 @@ def _install_menu(root_args: Namespace) -> None:
             "install",
             "alias",
             alias_action=action,
-            alias_type=shell_type,
             alias_names=names,
         )
         _wait()

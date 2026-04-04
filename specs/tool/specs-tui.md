@@ -107,6 +107,8 @@ For any TUI action:
 - Any command needing WSL context in TUI relies on runtime-default resolution (`RuntimeIdentity`).
 - TUI must not expose global-scope WSL actions such as `use list -a/--all`; that scope is CLI-only.
 - `Start` in TUI is runtime-local and executes in foreground in the same terminal session (not detached).
+- `install alias` in TUI must offer actions `list`, `add`, `remove`. The `--type` (shell type) option must not be exposed; shell type is always resolved from the runtime platform.
+- `install update` must not appear in TUI; it is CLI-only.
 
 ### 5.2 Output contract
 

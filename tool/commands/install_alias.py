@@ -182,6 +182,7 @@ def cmd_install_alias(args: Namespace) -> int:
             status=0,
             message="install alias: list completed",
             rows=rows,
+            include_data=True,
         )
 
     # Treat each alias name as one logical unit across all target profiles.
