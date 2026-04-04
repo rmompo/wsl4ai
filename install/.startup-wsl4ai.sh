@@ -60,8 +60,8 @@ wsl4ai() {
 # WSL4AI: Welcome banner
 ###############################################
 
-python3 __INSTALL_BASE__/tool/wsl4ai.py -v
 python3 __INSTALL_BASE__/tool/wsl4ai.py use disableall --quiet
+python3 __INSTALL_BASE__/tool/wsl4ai.py -v
 echo "cli: wsl4ai <command>"
 echo "tui: wsl4ai tui"
 echo ""
