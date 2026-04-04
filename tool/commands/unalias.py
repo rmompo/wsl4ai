@@ -72,7 +72,7 @@ def _cmd_unalias_bash(_: Namespace) -> int:
     bashrc.write_text(updated, encoding="utf-8")
     state = "removed" if removed else "not found"
     print(f"Bash alias block {state}: {bashrc}")
-    print("Restart shell or run: source ~/.bashrc")
+    print("Restart shell or run: source ~/.startup-wsl4ai.sh")
     return 0
 
 
@@ -82,7 +82,7 @@ def cmd_unalias(args: Namespace) -> int:
     Args:
         args (Namespace): Parsed arguments with mutually exclusive flags:
             - `args.ps` (bool): Remove aliases from PowerShell profiles.
-            - `args.bash` (bool): Remove alias from `~/.bashrc`.
+            - `args.bash` (bool): Remove alias from `~/.startup-wsl4ai.sh`.
 
     Returns:
         int: Exit code from selected target.

@@ -9,12 +9,15 @@ BASH_END = "# <<< WSL4AI END <<<"
 
 
 def bashrc_path() -> Path:
-    """Return the default Bash profile path for the current user.
+    """Return the WSL4AI startup script path for the current user.
+
+    Aliases are managed inside `~/.startup-wsl4ai.sh` (not `~/.bashrc`)
+    between the ``# >>> WSL4AI BEGIN >>>`` / ``# <<< WSL4AI END <<<`` markers.
 
     Returns:
-        Path: `~/.bashrc`.
+        Path: `~/.startup-wsl4ai.sh`.
     """
-    return Path.home() / ".bashrc"
+    return Path.home() / ".startup-wsl4ai.sh"
 
 
 def wsl4ai_block() -> str:
@@ -77,5 +80,5 @@ def cmd_alias_bash(_: Namespace) -> int:
     bashrc.write_text(updated, encoding="utf-8")
     state = "installed" if created else "updated"
     print(f"Bash profile {state}: {bashrc}")
-    print("Restart shell or run: source ~/.bashrc")
+    print("Restart shell or run: source ~/.startup-wsl4ai.sh")
     return 0

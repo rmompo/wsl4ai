@@ -36,15 +36,22 @@ Command group for setup and shell integration tasks.
 
 ## 4. `install alias`
 
-- Purpose: add/remove aliases in shell profile targets.
+- Purpose: add/remove/list aliases in shell profile targets.
+- Target file: `~/.startup-wsl4ai.sh` (Linux) or PowerShell profile (Windows); auto-detected from OS — no `--type` option.
 - Required options:
-  - `-a` / `--action` -> `add|remove`
-  - `-t` / `--type` -> `ps|bash`
-  - `-n` / `--name` -> repeatable alias names
+  - `-a` / `--action` -> `add|remove|list`
+  - `-n` / `--name` -> repeatable alias names (required only for `add` and `remove`)
 - Validation rules:
-  - `add`: existing alias -> error
-  - `remove`: missing alias -> error
+  - `add`: existing alias → error
+  - `remove`: missing alias → error
+  - `list`: no `--name` required; returns all aliases in the managed block
   - Alias status is treated as one logical unit per alias name.
+- Aliases are managed inside the markers block:
+  ```
+  # >>> WSL4AI BEGIN >>>
+  ...
+  # <<< WSL4AI END <<<
+  ```
 - Output contract:
   - Always `output.result`
   - No `output.data` (non-query operation)

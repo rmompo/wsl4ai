@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import platform
 import re
 import sys
 from argparse import Namespace
@@ -120,21 +121,29 @@ def _apply_alias_change(
 def cmd_install_alias(args: Namespace) -> int:
     names = [str(x).strip() for x in (getattr(args, "alias_names", []) or []) if str(x).strip()]
     action = (getattr(args, "alias_action", "") or "").strip().lower()
-    shell_type = (getattr(args, "alias_type", "") or "").strip().lower()
+    shell_type = "ps" if platform.system() == "Windows" else "bash"
     specs = [
         OptionSpec("--action", "alias_action"),
-        OptionSpec("--type", "alias_type"),
         OptionSpec("--name", "alias_names"),
     ]
     options = options_from_args(args, specs)
-    if not names or not action or not shell_type:
+    if not action or not shell_type:
         return emit_envelope(
             args=args,
             command="install",
             subcommand="alias",
             options=options,
             status=1,
-            message="install alias: --name, --action and --type are required",
+            message="install alias: --action is required",
+        )
+    if action in ("add", "remove") and not names:
+        return emit_envelope(
+            args=args,
+            command="install",
+            subcommand="alias",
+            options=options,
+            status=1,
+            message="install alias: --name is required for add/remove actions",
         )
     script_path, python_exe = _script_and_python()
     rows: list[dict[str, list[dict[str, str]]]] = []
@@ -148,6 +157,32 @@ def cmd_install_alias(args: Namespace) -> int:
     else:
         targets = [bashrc_path()]
         begin, end = BASH_BEGIN, BASH_END
+
+    if action == "list":
+        for target_path in targets:
+            existing = target_path.read_text(encoding="utf-8") if target_path.exists() else ""
+            _, block, _ = _extract_block(existing, begin, end)
+            current_names = _ps_names_from_block(block) if shell_type == "ps" else _bash_names_from_block(block)
+            for alias_name in current_names:
+                rows.append(
+                    row_from_pairs(
+                        [
+                            ("type", shell_type),
+                            ("name", alias_name),
+                            ("action", "list"),
+                            ("status", "ok"),
+                        ]
+                    )
+                )
+        return emit_envelope(
+            args=args,
+            command="install",
+            subcommand="alias",
+            options=options,
+            status=0,
+            message="install alias: list completed",
+            rows=rows,
+        )
 
     # Treat each alias name as one logical unit across all target profiles.
     profile_state: list[tuple[Path, str, list[str]]] = []
@@ -226,7 +261,7 @@ def cmd_install_alias(args: Namespace) -> int:
         if shell_type == "ps":
             message = "install alias: completed; reload PowerShell profile (. $PROFILE) or open a new console"
         else:
-            message = "install alias: completed; reload shell (source ~/.bashrc) or open a new terminal"
+            message = "install alias: completed; reload shell (source ~/.startup-wsl4ai.sh) or open a new terminal"
     else:
         message = "install alias: one or more aliases failed"
     return emit_envelope(

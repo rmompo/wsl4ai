@@ -21,30 +21,22 @@ def register_install_command(subparsers: _SubParsersAction) -> None:
     p_db.add_argument("-f", "--force", action="store_true", help="Overwrite existing database")
     p_db.set_defaults(func=cmd_install_database)
 
-    p_alias = install_sub.add_parser("alias", help="Add/remove aliases for PowerShell or Bash")
+    p_alias = install_sub.add_parser("alias", help="Add/remove/list aliases for PowerShell or Bash")
     p_alias.add_argument(
         "-a",
         "--action",
         dest="alias_action",
         required=True,
-        choices=["add", "remove"],
+        choices=["add", "remove", "list"],
         help="Alias action",
-    )
-    p_alias.add_argument(
-        "-t",
-        "--type",
-        dest="alias_type",
-        required=True,
-        choices=["ps", "bash"],
-        help="Target shell profile type",
     )
     p_alias.add_argument(
         "-n",
         "--name",
         dest="alias_names",
-        required=True,
+        required=False,
         action="append",
-        help="Alias name (repeatable)",
+        help="Alias name (repeatable; required for add/remove)",
     )
     p_alias.set_defaults(func=cmd_install_alias)
 
@@ -65,24 +57,16 @@ def register_install_command(subparsers: _SubParsersAction) -> None:
         "--action",
         dest="alias_action",
         required=True,
-        choices=["add", "remove"],
+        choices=["add", "remove", "list"],
         help="Alias action",
-    )
-    p_ia.add_argument(
-        "-t",
-        "--type",
-        dest="alias_type",
-        required=True,
-        choices=["ps", "bash"],
-        help="Target shell profile type",
     )
     p_ia.add_argument(
         "-n",
         "--name",
         dest="alias_names",
-        required=True,
+        required=False,
         action="append",
-        help="Alias name (repeatable)",
+        help="Alias name (repeatable; required for add/remove)",
     )
     p_ia.set_defaults(func=cmd_install_alias)
 

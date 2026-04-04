@@ -140,18 +140,15 @@ if id -u "${WSL4AI_USER}" &>/dev/null; then
 fi
 
 _USER_HOME="/home/${WSL4AI_USER}"
-WSL_BASE="${WSL_BASE//${HOME}/${_USER_HOME}}"
+WSL_DDBB="${WSL_DDBB//${HOME}/${_USER_HOME}}"
 WSL_PROJECTS="${WSL_PROJECTS//${HOME}/${_USER_HOME}}"
-WSL_PROJECTS_SUFFIX="${WSL_PROJECTS#${WSL_BASE}}"
-WSL_PROJECTS_SUFFIX="${WSL_PROJECTS_SUFFIX:-projects/}"
-WSL_BASE_DEFAULT="${WSL_BASE:-${_USER_HOME}/wsl4ai}"
-WSL_BASE="$(ensure_trailing_slash "$(prompt "WSL_BASE" "${WSL_BASE_DEFAULT}")")"
-WSL_CONF="${WSL_BASE}conf/"
-WSL_DDBB="${WSL_CONF}ddbb/"
-WSL_TOOL="${WSL_BASE}tool/"
-WSL_PROJECTS="${WSL_BASE}${WSL_PROJECTS_SUFFIX}"
-HOST_BASE="$(ensure_trailing_slash "$(prompt "HOST_BASE" "${HOST_BASE}")")"
+WSL_DDBB="$(ensure_trailing_slash "$(prompt "WSL_DDBB" "${WSL_DDBB:-${_USER_HOME}/wsl4ai/conf/ddbb}")")"
+WSL_PROJECTS="$(ensure_trailing_slash "$(prompt "WSL_PROJECTS" "${WSL_PROJECTS:-${_USER_HOME}/wsl4ai/proyectos}")")"
+HOST_DDBB="$(ensure_trailing_slash "$(prompt "HOST_DDBB" "${HOST_DDBB}")")"
 HOST_PROJECTS="$(ensure_trailing_slash "$(prompt "HOST_PROJECTS" "${HOST_PROJECTS}")")"
+INSTALL_BASE="$(dirname "$(dirname "${WSL_DDBB%/}")")"
+INSTALL_CONF="${INSTALL_BASE}/conf/"
+INSTALL_TOOL="${INSTALL_BASE}/tool/"
 
 echo ""
 echo -e "${C_STEP}Configuration collected. Starting installation...${C_R}"
@@ -210,19 +207,19 @@ echo -e "${C_STEP}  (restart WSL from Windows if needed: wsl --shutdown)${C_R}"
 
 # ─── PHASE 6: COPY tool/ ─────────────────────────────────────────────────────
 
-echo -e "${C_STEP}Step 6: copying tool/ to ${WSL_TOOL}${C_R}"
-sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_TOOL}"
+echo -e "${C_STEP}Step 6: copying tool/ to ${INSTALL_TOOL}${C_R}"
+sudo -u "${WSL4AI_USER}" -H mkdir -p "${INSTALL_TOOL}"
 shopt -s dotglob nullglob
 for _src in "${TOOL_SRC}"/*; do
   [[ -e "${_src}" ]] || continue
   case "$(basename "${_src}")" in
     .gitkeep) continue ;;
   esac
-  cp -a "${_src}" "${WSL_TOOL}/"
-  chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_TOOL}/$(basename "${_src}")"
+  cp -a "${_src}" "${INSTALL_TOOL}/"
+  chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_TOOL}/$(basename "${_src}")"
 done
 
-REQ="${WSL_TOOL}requirements.txt"
+REQ="${INSTALL_TOOL}requirements.txt"
 if [[ ! -f "${REQ}" ]]; then
   echo "install.sh: missing ${REQ}" >&2
   exit 1
@@ -231,7 +228,7 @@ fi
 # ─── PHASE 7: PIP INSTALL ────────────────────────────────────────────────────
 
 echo -e "${C_STEP}Step 7: pip install --user — requirements from tool/ as ${WSL4AI_USER}...${C_R}"
-sudo -u "${WSL4AI_USER}" -H env HOME="/home/${WSL4AI_USER}" REQ="${REQ}" bash -lc \
+sudo -u "${WSL4AI_USER}" -H env HOME="${_USER_HOME}" REQ="${REQ}" bash -lc \
   'python3 -m pip install --user --upgrade pip --break-system-packages && python3 -m pip install --user --break-system-packages -r "$REQ"'
 
 BASHRC="/home/${WSL4AI_USER}/.bashrc"
@@ -252,42 +249,14 @@ if [[ ! -d /mnt/c ]]; then
 fi
 
 echo -e "${C_STEP}Step 8: bind-mount shared host directories (host → WSL)...${C_R}"
-HOST_BASE_WSL="$(win_path_to_wsl_mnt "${HOST_BASE}")"
+HOST_DDBB_WSL="$(win_path_to_wsl_mnt "${HOST_DDBB}")"
 HOST_PROJECTS_WSL="$(win_path_to_wsl_mnt "${HOST_PROJECTS}")"
 
 sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_DDBB}"
-mkdir -p "${HOST_BASE_WSL}"
-if command -v mountpoint >/dev/null 2>&1 && mountpoint -q "${WSL_DDBB}" 2>/dev/null; then
-  echo "install.sh: ${WSL_DDBB} is already a mount point; skipping mount." >&2
-else
-  mount --bind "${HOST_BASE_WSL}" "${WSL_DDBB}"
-fi
-chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_DDBB}"
-FSTAB_LINE_DDBB="${HOST_BASE_WSL} ${WSL_DDBB} none bind 0 0"
-if ! grep -qF "${WSL_DDBB}" /etc/fstab 2>/dev/null; then
-  {
-    echo ""
-    echo "# WSL4AI shared database directory (install.sh)"
-    echo "${FSTAB_LINE_DDBB}"
-  } >>/etc/fstab
-fi
+mkdir -p "${HOST_DDBB_WSL}"
 
 sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_PROJECTS}"
 mkdir -p "${HOST_PROJECTS_WSL}"
-if command -v mountpoint >/dev/null 2>&1 && mountpoint -q "${WSL_PROJECTS}" 2>/dev/null; then
-  echo "install.sh: ${WSL_PROJECTS} is already a mount point; skipping mount." >&2
-else
-  mount --bind "${HOST_PROJECTS_WSL}" "${WSL_PROJECTS}"
-fi
-chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_PROJECTS}"
-FSTAB_LINE_PROJECTS="${HOST_PROJECTS_WSL} ${WSL_PROJECTS} none bind 0 0"
-if ! grep -qF "${WSL_PROJECTS}" /etc/fstab 2>/dev/null; then
-  {
-    echo ""
-    echo "# WSL4AI shared projects directory (install.sh)"
-    echo "${FSTAB_LINE_PROJECTS}"
-  } >>/etc/fstab
-fi
 
 # ─── PHASE 8b: COPY .startup-wsl4ai.sh → HOME ───────────────────────────────
 
@@ -298,11 +267,7 @@ if [[ ! -f "${STARTUP_SRC}" ]]; then
   exit 1
 fi
 sed \
-  -e "s|__WSL_DDBB__|${WSL_DDBB}|g" \
-  -e "s|__WSL_PROJECTS__|${WSL_PROJECTS}|g" \
-  -e "s|__HOST_BASE_WSL__|${HOST_BASE_WSL}|g" \
-  -e "s|__HOST_PROJECTS_WSL__|${HOST_PROJECTS_WSL}|g" \
-  -e "s|__WSL_TOOL__|${WSL_TOOL}|g" \
+  -e "s|__INSTALL_BASE__|${INSTALL_BASE}|g" \
   "${STARTUP_SRC}" > "${STARTUP_DST}"
 chmod +x "${STARTUP_DST}"
 chown "${WSL4AI_USER}:${WSL4AI_USER}" "${STARTUP_DST}"
@@ -310,38 +275,37 @@ echo -e "${C_STEP}       .startup-wsl4ai.sh → ${STARTUP_DST}${C_R}"
 
 # ─── PHASE 9: conf/ (local.env, wsl4ai-update.py, config.json) ──────────────
 
-# WSL_CONF already exists (created by mkdir -p WSL_DDBB in phase 8)
-CONF_LOCAL="${WSL_CONF}local.env"
+# INSTALL_CONF already exists (created by mkdir -p WSL_DDBB in phase 8)
+CONF_LOCAL="${INSTALL_CONF}local.env"
 echo -e "${C_STEP}Step 9: writing local.env → ${CONF_LOCAL}...${C_R}"
 {
   printf '%s\n' '# Generated by WSL4AI install.sh — edit or re-run install to change.'
   printf '%s\n' "# Created: $(date -Iseconds 2>/dev/null || date)"
   printf '%s\n' ''
-  printf '%s\n' "WSL_BASE=${WSL_BASE}"
-  printf '%s\n' "WSL_TOOL=${WSL_TOOL}"
-  printf '%s\n' "WSL_PROJECTS=${WSL_PROJECTS}"
-  printf '%s\n' "HOST_BASE=${HOST_BASE}"
+  printf '%s\n' "HOST_DDBB=${HOST_DDBB}"
+  printf '%s\n' "WSL_DDBB=${WSL_DDBB}"
   printf '%s\n' "HOST_PROJECTS=${HOST_PROJECTS}"
+  printf '%s\n' "WSL_PROJECTS=${WSL_PROJECTS}"
 } >"${CONF_LOCAL}"
 chown "${WSL4AI_USER}:${WSL4AI_USER}" "${CONF_LOCAL}"
 
-echo -e "${C_STEP}       copying wsl4ai-update.py → ${WSL_CONF}${C_R}"
-cp -a "${CONF_SRC}/wsl4ai-update.py" "${WSL_CONF}wsl4ai-update.py"
-chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_CONF}wsl4ai-update.py"
+echo -e "${C_STEP}       copying wsl4ai-update.py → ${INSTALL_CONF}${C_R}"
+cp -a "${CONF_SRC}/wsl4ai-update.py" "${INSTALL_CONF}wsl4ai-update.py"
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_CONF}wsl4ai-update.py"
 
-if [[ ! -f "${WSL_CONF}config.json" ]]; then
-  echo -e "${C_STEP}       copying config.json → ${WSL_CONF}${C_R}"
-  cp -a "${CONF_SRC}/config.json" "${WSL_CONF}config.json"
-  chown "${WSL4AI_USER}:${WSL4AI_USER}" "${WSL_CONF}config.json"
+if [[ ! -f "${INSTALL_CONF}config.json" ]]; then
+  echo -e "${C_STEP}       copying config.json → ${INSTALL_CONF}${C_R}"
+  cp -a "${CONF_SRC}/config.json" "${INSTALL_CONF}config.json"
+  chown "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_CONF}config.json"
 fi
 
 # ─── PHASE 10: INSTALL DATABASE ─────────────────────────────────────────────
 
 echo -e "${C_STEP}Step 10: wsl4ai install database (as ${WSL4AI_USER})...${C_R}"
-sudo -u "${WSL4AI_USER}" -H env HOME="/home/${WSL4AI_USER}" WSL_TOOL="${WSL_TOOL}" bash -lc 'cd "$WSL_TOOL" && python3 wsl4ai.py install database'
+sudo -u "${WSL4AI_USER}" -H env HOME="${_USER_HOME}" INSTALL_TOOL="${INSTALL_TOOL}" bash -lc 'cd "$INSTALL_TOOL" && python3 wsl4ai.py install database'
 
 echo ""
-echo -e "${C_OK}Done: user ${WSL4AI_USER}; tool copied; conf copied (wsl4ai-update.py, config.json); Python (system); pip deps (--user); conf/ddbb mounted from HOST_BASE; SQLite DB created; password equals username.${C_R}"
+echo -e "${C_OK}Done: user ${WSL4AI_USER}; tool copied; conf copied (wsl4ai-update.py, config.json); Python (system); pip deps (--user); ddbb mounted from HOST_DDBB; SQLite DB created; password equals username.${C_R}"
 echo ""
 echo -e "${C_PROMPT}IMPORTANT: exit this WSL session and run the following command from Windows to apply all changes:${C_R}"
 echo -e "${C_PROMPT}  wsl --shutdown${C_R}"

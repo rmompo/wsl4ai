@@ -32,16 +32,16 @@ wget -qO /tmp/wsl4ai/install.sh https://raw.githubusercontent.com/rmompo/wsl4ai/
 sudo bash /tmp/wsl4ai/install.sh
 ```
 
-The script downloads any missing files (`defaults.env`, `tool/`, `conf/`) automatically. Follow the prompts (Linux user, `WSL_BASE`, `HOST_BASE`, `HOST_PROJECTS`). The installer:
+The script downloads any missing files (`defaults.env`, `tool/`, `conf/`) automatically. Follow the prompts (Linux user, `WSL_DDBB`, `WSL_PROJECTS`, `HOST_DDBB`, `HOST_PROJECTS`). The installer:
 
 1. Installs Python 3, pip, and git via apt.
 2. Creates the Linux user; sets it as default WSL login user.
-3. Copies `tool/` and `conf/` into `~/wsl4ai/`.
+3. Copies `tool/` into `~/wsl4ai/tool/`.
 4. Installs pip dependencies (`--user`).
-5. Bind-mounts `HOST_BASE` → `conf/ddbb/` and `HOST_PROJECTS` → `projects/`.
-6. Writes `conf/local.env` with path configuration.
-7. Runs `wsl4ai install database` to create the SQLite database.
-8. Configures `.bashrc`: alias, safety `disableall --quiet`, welcome message.
+5. Creates mount point directories for `WSL_DDBB` and `WSL_PROJECTS`.
+6. Installs `~/.startup-wsl4ai.sh`; configures `.bashrc` to source it on start.
+7. Writes `conf/local.env` with `HOST_DDBB`, `WSL_DDBB`, `HOST_PROJECTS`, `WSL_PROJECTS`.
+8. Runs `wsl4ai install database` to create the SQLite database.
 
 After installation, exit WSL and run `wsl --shutdown` from Windows to apply all changes.
 
@@ -50,14 +50,16 @@ After installation, exit WSL and run `wsl --shutdown` from Windows to apply all 
 ## Directory layout
 
 ```
+~/.startup-wsl4ai.sh       — startup script (sourced by .bashrc; manages mounts and aliases)
+
 ~/wsl4ai/
 ├── tool/              — Python application (replaced on update)
-├── projects/          — bind-mount → HOST_PROJECTS (Windows)
+├── proyectos/         — bind-mount → HOST_PROJECTS (Windows)
 └── conf/              — persistent config (never replaced on update)
-    ├── local.env
+    ├── local.env      — HOST_DDBB, WSL_DDBB, HOST_PROJECTS, WSL_PROJECTS
     ├── config.json
     ├── wsl4ai-update.py
-    └── ddbb/          — bind-mount → HOST_BASE (Windows)
+    └── ddbb/          — bind-mount → HOST_DDBB (Windows)
         └── wsl4ai.db
 ```
 
