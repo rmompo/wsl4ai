@@ -237,14 +237,17 @@ def _disable_one(wsl_id: str, reg_id: str, rel_host: str, rel_wsl: str) -> tuple
     if path_err:
         return False, f"use disable: {path_err}"
 
+    umount_err = None
     try:
         subprocess.run(["sudo", "umount", wsl_path], check=True, capture_output=True)
     except subprocess.CalledProcessError as exc:
-        return False, f"use disable: umount failed: {exc.stderr.decode().strip() if exc.stderr else exc}"
+        umount_err = exc.stderr.decode().strip() if exc.stderr else str(exc)
 
     with connect_db(DB_PATH) as con:
         con.execute("UPDATE uses SET mounted = 0 WHERE wsl_uuid = ? AND registry_uuid = ?", (wsl_id, reg_id))
 
+    if umount_err:
+        return False, f"use disable: umount failed (state reset to 0): {umount_err}"
     return True, f"use disable: unmounted {wsl_path}"
 
 
@@ -300,8 +303,8 @@ def cmd_use_disableall(args: Namespace) -> int:
     with connect_db(DB_PATH) as con:
         wsl_id, err_w = resolve_wsl_uuid(
             con,
-            wsl_uuid="",
-            wsl_name="",
+            wsl_uuid=getattr(args, "use_wsl_uuid", ""),
+            wsl_name=getattr(args, "use_wsl_name", ""),
             runtime_user=ri.user,
             runtime_wsl_name=ri.wsl_name,
             create_if_missing=False,

@@ -47,15 +47,9 @@ def cmd_list(_: Namespace) -> int:
             )
         for reg_uuid, name, host_rel, wsl_rel in rows:
             in_use = con.execute(
-                """
-                SELECT w.uuid, w.name, w.user, s.mounted
-                FROM uses s
-                JOIN wsls w ON w.uuid = s.wsl_uuid
-                WHERE s.registry_uuid = ?
-                ORDER BY w.name COLLATE NOCASE, w.user COLLATE NOCASE
-                """,
+                "SELECT 1 FROM uses WHERE registry_uuid = ? LIMIT 1",
                 (reg_uuid,),
-            ).fetchall()
+            ).fetchone()
             host_path = _resolved_path_line(param_host, host_rel)
             wsl_path = _resolved_path_line(param_local, wsl_rel)
             out_rows.append(
@@ -69,25 +63,12 @@ def cmd_list(_: Namespace) -> int:
                     ]
                 )
             )
-            for w_uuid, w_name, w_user, mounted in in_use:
-                out_rows.append(
-                    row_from_pairs(
-                        [
-                            ("registryUuid", reg_uuid),
-                            ("registryName", name),
-                            ("wslUuid", w_uuid),
-                            ("wslName", w_name),
-                            ("wslUser", w_user),
-                            ("mounted", str(int(mounted))),
-                        ]
-                    )
-                )
     return emit_envelope(
         args=_,
         command="registry",
         subcommand="list",
         status=0,
-        message=f"listed {len(out_rows)} row(s)",
+        message=f"listed {len(out_rows)} registry(ies)",
         rows=out_rows,
     )
 
