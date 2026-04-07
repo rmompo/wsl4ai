@@ -25,16 +25,22 @@ _APP_VERSION: str = ""          # set by cmd_tui before launching the app
 _BANNER_MAGENTA = "#ff00ff"     # fixed bright magenta for octopus body
 
 BANNER_BODY = [
-    "  ▄███▄",
-    "  █▀◉◉▀█",
-    "  ▀█▄▄█▀",
-    "  ▄▀▄▄▄▀",
+    "▄███▄",
+    "█▀◉◉▀█",
+    "▀█▄▄█▀",
+    "▄▀▄▄▄▀",
 ]
 BANNER_TENTACLES = [
     "",
     "",
     "▃▄▂▂▁",
     "▄▃▄▂▃▂▂▁",
+]
+BANNER_LABELS = [
+    "",
+    "wsl4ai",
+    "v{version}",
+    "https://github.com/rmompo/wsl4ai",
 ]
 
 # ─── Theme ────────────────────────────────────────────────────────────────────
@@ -346,18 +352,20 @@ if _HAS_TEXTUAL:
 
         def render(self) -> "Text":
             w = self.size.width or 80
-            right = {0: ("wsl4ai", _S["label"]), 2: (f"v{_APP_VERSION}", _S["text"])}
+            label_styles = [_S["text"], _S["label"], _S["text"], _S["lines"]]
             t = Text()
-            for i, (body, tent) in enumerate(zip(BANNER_BODY, BANNER_TENTACLES)):
+            for i, (body, tent, lbl_tmpl) in enumerate(
+                zip(BANNER_BODY, BANNER_TENTACLES, BANNER_LABELS)
+            ):
+                lbl = lbl_tmpl.replace("{version}", _APP_VERSION)
                 line = Text()
                 line.append(body, style=_BANNER_MAGENTA)
                 line.append(tent, style=_S["lines"])
-                if i in right:
-                    lbl, sty = right[i]
+                if lbl:
                     pad = w - len(body) - len(tent) - len(lbl)
                     if pad > 0:
                         line.append(" " * pad)
-                    line.append(lbl, style=sty)
+                    line.append(lbl, style=label_styles[i])
                 t.append_text(line)
                 t.append("\n")
             return t
