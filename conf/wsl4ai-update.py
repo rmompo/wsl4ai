@@ -64,31 +64,13 @@ def _print_summary(
     download: str,
     pip: str,
 ) -> None:
-    """Print a formatted summary box."""
-    rows = [
-        ("Branch",      branch),
-        ("Version",     f"{version_from} → {version_to}"),
-        ("Download",    download),
-        ("pip install", pip),
-    ]
-    label_w = max(len(r[0]) for r in rows)
-    value_w = max(len(r[1]) for r in rows)
-    inner_w = label_w + 3 + value_w   # "label : value"
-    title = "WSL4AI Update Summary"
-    inner_w = max(inner_w, len(title) + 2)
-
-    sep   = f"├{'─' * (inner_w + 2)}┤"
-    top   = f"┌{'─' * (inner_w + 2)}┐"
-    bot   = f"└{'─' * (inner_w + 2)}┘"
-
+    """Print a plain text update summary."""
     print()
-    print(top)
-    print(f"│ {title:<{inner_w}} │")
-    print(sep)
-    for label, value in rows:
-        line = f"{label:<{label_w}} : {value}"
-        print(f"│ {line:<{inner_w}} │")
-    print(bot)
+    print("WSL4AI Update Summary")
+    print(f"  Branch      : {branch}")
+    print(f"  Version     : {version_from} -> {version_to}")
+    print(f"  Download    : {download}")
+    print(f"  pip install : {pip}")
 
 
 def main() -> int:
@@ -186,14 +168,14 @@ def main() -> int:
     req_file = APP_DIR / "requirements.txt"
     if req_file.is_file():
         print("Installing dependencies...")
-        pip_result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", str(req_file)],
-            capture_output=True,
-        )
+        pip_cmd = [sys.executable, "-m", "pip", "install", "-r", str(req_file)]
+        pip_result = subprocess.run(pip_cmd, capture_output=True)
         if pip_result.returncode != 0:
-            pip_status = f"WARNING: {pip_result.stderr.decode().strip()[:60]}"
-        else:
-            pip_status = "OK"
+            # Retry with --break-system-packages for PEP 668 managed environments
+            pip_result = subprocess.run(
+                pip_cmd + ["--break-system-packages"], capture_output=True
+            )
+        pip_status = "OK" if pip_result.returncode == 0 else "ERROR"
 
     # Step 5g: cleanup
     _cleanup()
