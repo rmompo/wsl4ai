@@ -380,9 +380,6 @@ if _HAS_TEXTUAL:
             self._dd_iw: int = 0
             self._stack: list[DropdownMenu] = []
 
-        def on_mount(self) -> None:
-            self.dark = _THEME_DARK
-
         def compose(self) -> ComposeResult:
             yield MenuBar()
 
@@ -507,5 +504,6 @@ def cmd_tui(args: Namespace) -> int:
         print("ERROR: textual is required; run pip install -r requirements.txt")
         return 1
     _load_theme()
+    Wsl4aiApp.DARK = _THEME_DARK  # must be set before instantiation
     Wsl4aiApp(args).run()
     return 0
