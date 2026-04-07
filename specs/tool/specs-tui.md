@@ -146,16 +146,9 @@ For `use add`, `use remove`, `use enable`, and `use disable`, the TUI presents a
 
 ## 7. Theme definition
 
-TUI must use a centralized theme token map (no scattered hardcoded colors in screens).
-
-Required semantic tokens:
-
-- `accent` (active selection/focus)
-- `success` (successful state)
-- `error` (error state)
-- `warning` (destructive confirmations, cautions)
-- `muted` (secondary text)
-- `selection` (selected menu row highlight)
+TUI must use a centralized theme token map (no scattered hardcoded colors in screens).  
+All color values use Rich style format: `#rrggbb` for foreground, `#rrggbb on #rrggbb` for foreground + background.  
+The `fg:` questionary prefix is not valid in theme files.
 
 ### 7.0 Theme menu options
 
@@ -171,23 +164,69 @@ The `Theme` menu option in the TUI main menu must offer:
 
 `High Contrast` is a standalone theme (no Light variant).
 
-### 7.1 Theme baseline mapping
+### 7.1 Style token reference
+
+Each theme file defines a `styles` object with the following tokens:
+
+| # | Token | FC | BC | Description |
+|---|---|---|---|---|
+| 1 | `lines` | required | — | Box-drawing border and separator characters |
+| 2 | `item` | required | — | Menu item text (not selected) |
+| 3 | `item_sel` | auto | auto | Selected menu item — **never stored in theme file** |
+| 4 | `label` | required | required | Section labels and headers |
+| 5 | `button` | required | required | Button (not selected) |
+| 6 | `button_sel` | auto/override | auto/override | Selected button |
+| 7 | `text` | required | — | General body text |
+| 8 | `text_hl` | required | — | Highlighted/emphasized text |
+| 9 | `text_ok` | required | — | Success message (green or equivalent) |
+| 10 | `text_err` | required | — | Error message (red or equivalent) |
+| 11 | `input` | required | — | Input field text |
+
+**Auto-computation rules:**
+
+- `item_sel` is always computed as `item + reverse` (FC becomes BC, terminal background becomes FC). It must never appear in theme files.
+- `button_sel` defaults to `button + reverse`. An explicit override may be stored in the theme file when the auto-inversion is insufficient (e.g. `high_contrast`).
+
+**Background policy:**
+
+- TUI renders on a transparent surface — the terminal's native background is not overridden.
+- Tokens that define only FC rely on the terminal background for contrast.
+- The user is responsible for selecting a theme that matches their terminal (dark/light).
+- `label`, `button`, and `button_sel` always carry explicit BC because they are rendered as colored blocks independent of the terminal background.
+
+### 7.2 High Contrast exception
+
+`high_contrast` is the only theme that must define BC on **all** tokens, including those that are FC-only in other themes.  
+The required BC for all FC-only tokens is `#000000` (black).
+
+Rationale: `high_contrast` must guarantee maximum contrast regardless of the user's terminal configuration. It cannot rely on the terminal background color being known or compatible.
+
+Example — `lines` in other themes vs `high_contrast`:
+
+```
+normal_dark  →  "lines": "#ff7de9 bold"              (FC only, relies on terminal bg)
+high_contrast → "lines": "#ffffff on #000000 bold"   (FC + BC, self-contained)
+```
+
+This rule applies to: `lines`, `item`, `text`, `text_hl`, `text_ok`, `text_err`, `input`.
+
+### 7.3 Theme baseline mapping
 
 Semantic alignment with existing CLI styles:
 
-- `success` -> same semantic as `general_ok`
-- `error` -> same semantic as `general_error`
+- `text_ok` → same semantic as `general_ok`
+- `text_err` → same semantic as `general_error`
 
-### 7.2 Accessibility and compatibility
+### 7.4 Accessibility and compatibility
 
 - Respect `NO_COLOR` when present
 - Provide non-color semantic prefixes (`OK`, `ERROR`, `WARNING`) so meaning is not color-only
 - Use fallback monochrome rendering for unsupported terminals
 
-### 7.3 Theme persistence
+### 7.5 Theme persistence
 
-- Theme definitions are stored as external files (JSON) in the app theme directory.
-- Selected TUI theme is persisted in `config.json` next to the main script (`wsl4ai.py`).
+- Theme definitions are stored as external JSON files in `tool/tui_themes/`.
+- Selected TUI theme is persisted in `conf/config.json`.
 - Config schema is strict: `{ "tui": { "theme": "<theme_id>" } }`.
 - The saved theme must be loaded automatically on next `wsl4ai tui` startup.
 - If `config.json` is missing/invalid/unknown theme, TUI must rewrite it with default `normal_dark`.

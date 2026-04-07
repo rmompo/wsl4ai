@@ -1,15 +1,14 @@
 {
   "name": "Normal (Dark)",
   "styles": {
-    "background":   "#0d1117",
-    "lines":        "#ff7de9 bold",
-    "item":         "#f8fbff",
-    "label":        "#6ee7ff bold",
-    "button":       "#ffd166 bold",
-    "text":         "#f8fbff",
-    "text_hl":      "#6ee7ff bold",
-    "text_ok":      "#7dff9b bold",
-    "text_err":     "#ff6f91 bold",
-    "input":        "#f5e960"
+    "lines":    "#ff7de9 bold",
+    "item":     "#f8fbff",
+    "label":    "#001a1a on #6ee7ff",
+    "button":   "#0d1117 on #ffd166",
+    "text":     "#f8fbff",
+    "text_hl":  "#ffffff bold",
+    "text_ok":  "#7dff9b bold",
+    "text_err": "#ff6f91 bold",
+    "input":    "#f5e960"
   }
 }
