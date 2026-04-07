@@ -16,37 +16,6 @@ WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manage
 
 ---
 
-## Install
-
-Place `install.sh` in `/tmp/wsl4ai/` and run it as root:
-
-```bash
-mkdir -p /tmp/wsl4ai
-curl -fsSL https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh -o /tmp/wsl4ai/install.sh
-sudo bash /tmp/wsl4ai/install.sh
-```
-
-```bash
-mkdir -p /tmp/wsl4ai
-wget -qO /tmp/wsl4ai/install.sh https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh
-sudo bash /tmp/wsl4ai/install.sh
-```
-
-The script downloads any missing files (`defaults.env`, `tool/`, `conf/`) automatically. Follow the prompts (Linux user, `WSL_DDBB`, `WSL_PROJECTS`, `HOST_DDBB`, `HOST_PROJECTS`). The installer:
-
-1. Installs Python 3, pip, and git via apt.
-2. Creates the Linux user; sets it as default WSL login user.
-3. Copies `tool/` into `~/wsl4ai/tool/`.
-4. Installs pip dependencies (`--user`).
-5. Creates mount point directories for `WSL_DDBB` and `WSL_PROJECTS`.
-6. Installs `~/.startup-wsl4ai.sh`; configures `.bashrc` to source it on start.
-7. Writes `conf/local.env` with `HOST_DDBB`, `WSL_DDBB`, `HOST_PROJECTS`, `WSL_PROJECTS`.
-8. Runs `wsl4ai install database` to create the SQLite database.
-
-After installation, exit WSL and run `wsl --terminate <distro>` from Windows (where `<distro>` is your WSL distribution name) to apply all changes.
-
----
-
 ## Directory layout
 
 ```
@@ -65,19 +34,215 @@ After installation, exit WSL and run `wsl --terminate <distro>` from Windows (wh
 
 ---
 
-## Usage
+## Installation
+
+### Assisted
+
+Place `install.sh` in `/tmp/wsl4ai/` and run it as root. Use `curl` or `wget`:
 
 ```bash
-wsl4ai <command>       # CLI mode
-wsl4ai tui             # Text User Interface
-wsl4ai -v              # Show version
+mkdir -p /tmp/wsl4ai
+curl -fsSL https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh -o /tmp/wsl4ai/install.sh
+sudo bash /tmp/wsl4ai/install.sh
 ```
+
+```bash
+mkdir -p /tmp/wsl4ai
+wget -qO /tmp/wsl4ai/install.sh https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh
+sudo bash /tmp/wsl4ai/install.sh
+```
+
+The script clones the repository and downloads any missing files automatically. Follow the prompts for `WSL4AI_USER`, `WSL_DDBB`, `WSL_PROJECTS`, `HOST_DDBB`, and `HOST_PROJECTS`.
+
+After installation, exit WSL and run `wsl --terminate <distro>` from Windows to apply all changes.
+
+---
+
+### Manual
+
+Perform the following steps **as root** (`sudo -i` or prefix each command with `sudo`).
+
+**Variables** — set these to match your environment before running the commands below:
+
+```bash
+WSL4AI_USER="wsl4ai"                            # Linux account to create
+INSTALL_BASE="/home/${WSL4AI_USER}/wsl4ai"      # application root
+WSL_DDBB="${INSTALL_BASE}/conf/ddbb/"           # WSL path for the database bind-mount
+WSL_PROJECTS="${INSTALL_BASE}/proyectos/"       # WSL path for the projects bind-mount
+HOST_DDBB="C:/wsl2data/wsl4ai/ddbb/"           # Windows path for the database
+HOST_PROJECTS="C:/LocalFiles/proyectos/"        # Windows path for projects
+```
+
+---
+
+**Step 1 — system packages**
+
+```bash
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get upgrade -y
+apt-get install -y git python3 python3-pip
+```
+
+---
+
+**Step 2 — clone repository**
+
+```bash
+mkdir -p /tmp/wsl4ai
+git clone --depth=1 --branch main https://github.com/rmompo/wsl4ai.git /tmp/wsl4ai/repo
+```
+
+---
+
+**Step 3 — create Linux user**
+
+Password is set to the username; change it after first login.
+
+```bash
+useradd -m -s /bin/bash "${WSL4AI_USER}"
+echo "${WSL4AI_USER}:${WSL4AI_USER}" | chpasswd
+usermod -aG sudo "${WSL4AI_USER}"
+```
+
+---
+
+**Step 4 — set default WSL login user**
+
+```bash
+printf '[user]\ndefault=%s\n' "${WSL4AI_USER}" > /etc/wsl.conf
+```
+
+If `/etc/wsl.conf` already exists, add or update the `default=` line under `[user]` instead of overwriting the file.
+
+---
+
+**Step 5 — copy tool/**
+
+```bash
+mkdir -p "${INSTALL_BASE}/tool"
+cp -a /tmp/wsl4ai/repo/tool/. "${INSTALL_BASE}/tool/"
+chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_BASE}/tool"
+```
+
+---
+
+**Step 6 — install pip dependencies**
+
+```bash
+sudo -u "${WSL4AI_USER}" -H env HOME="/home/${WSL4AI_USER}" bash -lc \
+  'python3 -m pip install --user --upgrade pip --break-system-packages && \
+   python3 -m pip install --user --break-system-packages -r ~/wsl4ai/tool/requirements.txt'
+```
+
+---
+
+**Step 7 — configure .bashrc**
+
+```bash
+BASHRC="/home/${WSL4AI_USER}/.bashrc"
+[[ -f "${BASHRC}" ]] || { touch "${BASHRC}"; chown "${WSL4AI_USER}:${WSL4AI_USER}" "${BASHRC}"; }
+printf '\n# Custom WSL4AI startup scripts\ncd ~\nsource ~/.startup-wsl4ai.sh\n' >> "${BASHRC}"
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "${BASHRC}"
+```
+
+---
+
+**Step 8 — create mount point directories**
+
+Convert Windows paths to WSL mount paths (`C:/foo/bar` → `/mnt/c/foo/bar`):
+
+```bash
+HOST_DDBB_WSL="/mnt/c/wsl2data/wsl4ai/ddbb"      # adjust drive letter / path
+HOST_PROJECTS_WSL="/mnt/c/LocalFiles/proyectos"   # adjust drive letter / path
+
+sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_DDBB}" "${WSL_PROJECTS}"
+mkdir -p "${HOST_DDBB_WSL}" "${HOST_PROJECTS_WSL}"
+```
+
+Apply the bind-mount immediately so the database is written to the host path:
+
+```bash
+mount --bind "${HOST_DDBB_WSL}" "${WSL_DDBB%/}"
+```
+
+---
+
+**Step 9 — install .startup-wsl4ai.sh**
+
+```bash
+sed "s|__INSTALL_BASE__|${INSTALL_BASE}|g" \
+    /tmp/wsl4ai/repo/install/.startup-wsl4ai.sh \
+    > "/home/${WSL4AI_USER}/.startup-wsl4ai.sh"
+chmod +x "/home/${WSL4AI_USER}/.startup-wsl4ai.sh"
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "/home/${WSL4AI_USER}/.startup-wsl4ai.sh"
+```
+
+---
+
+**Step 10 — configure sudoers for bind-mounts**
+
+```bash
+MOUNT_BIN="$(command -v mount)"
+UMOUNT_BIN="$(command -v umount)"
+cat > /etc/sudoers.d/wsl4ai-mount <<EOF
+${WSL4AI_USER} ALL=(root) NOPASSWD: ${MOUNT_BIN} --bind ${HOST_DDBB_WSL} ${WSL_DDBB}
+${WSL4AI_USER} ALL=(root) NOPASSWD: ${MOUNT_BIN} --bind * ${WSL_PROJECTS}*
+${WSL4AI_USER} ALL=(root) NOPASSWD: ${UMOUNT_BIN} ${WSL_PROJECTS}*
+EOF
+chmod 440 /etc/sudoers.d/wsl4ai-mount
+```
+
+---
+
+**Step 11 — write conf/**
+
+```bash
+INSTALL_CONF="${INSTALL_BASE}/conf/"
+mkdir -p "${INSTALL_CONF}"
+
+# local.env
+cat > "${INSTALL_CONF}local.env" <<EOF
+# Generated manually — edit to change.
+HOST_DDBB=${HOST_DDBB}
+WSL_DDBB=${WSL_DDBB}
+HOST_PROJECTS=${HOST_PROJECTS}
+WSL_PROJECTS=${WSL_PROJECTS}
+EOF
+
+# updater script and default config
+cp -a /tmp/wsl4ai/repo/conf/wsl4ai-update.py "${INSTALL_CONF}wsl4ai-update.py"
+[[ -f "${INSTALL_CONF}config.json" ]] || cp -a /tmp/wsl4ai/repo/conf/config.json "${INSTALL_CONF}config.json"
+
+chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_CONF}"
+```
+
+---
+
+**Step 12 — create the SQLite database**
+
+```bash
+sudo -u "${WSL4AI_USER}" -H env HOME="/home/${WSL4AI_USER}" bash -lc \
+  "cd ${INSTALL_BASE}/tool && python3 wsl4ai.py install database"
+```
+
+---
+
+**Step 13 — restart WSL**
+
+From Windows PowerShell or CMD:
+
+```powershell
+wsl --terminate <distro-name>
+```
+
+Then re-open the distro. The startup script runs automatically, mounts the directories, and makes the `wsl4ai` alias available.
 
 ---
 
 ## Update
 
-Check whether a newer version is available:
+Check whether a newer version is available without applying it:
 
 ```bash
 wsl4ai install update --check
@@ -94,6 +259,16 @@ wsl4ai iu                      # shorthand
 The updater (`conf/wsl4ai-update.py`) is a standalone script that is **never replaced by updates**. It downloads `wsl4ai.py` from GitHub to compare versions, then clones the repository and replaces `tool/` atomically. `conf/` is never touched.
 
 > **Note:** `install update` is a CLI-only command — it is not available in the TUI.
+
+---
+
+## Usage
+
+```bash
+wsl4ai <command>       # CLI mode
+wsl4ai tui             # Text User Interface
+wsl4ai -v              # Show version
+```
 
 ---
 
