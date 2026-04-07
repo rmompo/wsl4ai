@@ -26,6 +26,22 @@ _DEFAULT_THEME = "normal_dark"
 _S: dict[str, str] = {"sep": "dim", "txt": "", "hl": "bold reverse"}
 
 
+def _qs_to_rich(style: str) -> str:
+    """Convert questionary style tokens to Rich format.
+
+    questionary uses ``fg:#rrggbb`` / ``bg:#rrggbb``; Rich expects ``#rrggbb`` / ``on #rrggbb``.
+    """
+    parts = []
+    for token in style.split():
+        if token.startswith("fg:"):
+            parts.append(token[3:])
+        elif token.startswith("bg:"):
+            parts.append("on " + token[3:])
+        else:
+            parts.append(token)
+    return " ".join(parts)
+
+
 def _load_theme() -> None:
     """Read config.json and load the configured theme into _S (in-place)."""
     theme_id = _DEFAULT_THEME
@@ -40,9 +56,9 @@ def _load_theme() -> None:
         raw = data.get("styles", {}) if isinstance(data, dict) else {}
     except Exception:
         pass
-    _S["sep"] = raw.get("separator", "dim")
-    _S["txt"] = raw.get("text", "")
-    _S["hl"]  = raw.get("highlighted", "bold reverse")
+    _S["sep"] = _qs_to_rich(raw.get("separator", "dim"))
+    _S["txt"] = _qs_to_rich(raw.get("text", ""))
+    _S["hl"]  = _qs_to_rich(raw.get("highlighted", "bold reverse"))
 
 
 # ─── Menu definition ──────────────────────────────────────────────────────────
