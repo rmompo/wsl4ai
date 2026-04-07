@@ -345,7 +345,7 @@ if _HAS_TEXTUAL:
     class Banner(Widget):
         DEFAULT_CSS = """
         Banner {
-            height: 4;
+            height: 5;
             width: 1fr;
         }
         """
@@ -354,15 +354,17 @@ if _HAS_TEXTUAL:
             w = self.size.width or 80
             label_styles = [_S["text"], _S["label"], _S["text"], _S["lines"]]
             t = Text()
+            t.append("\n")   # empty line above banner
             for i, (body, tent, lbl_tmpl) in enumerate(
                 zip(BANNER_BODY, BANNER_TENTACLES, BANNER_LABELS)
             ):
                 lbl = lbl_tmpl.replace("{version}", _APP_VERSION)
                 line = Text()
+                line.append(" ")                              # left padding
                 line.append(body, style=_BANNER_MAGENTA)
                 line.append(tent, style=_S["lines"])
                 if lbl:
-                    pad = w - len(body) - len(tent) - len(lbl)
+                    pad = (w - 1) - len(body) - len(tent) - len(lbl) - 1  # -1 left, -1 right
                     if pad > 0:
                         line.append(" " * pad)
                     line.append(lbl, style=label_styles[i])
@@ -503,7 +505,7 @@ if _HAS_TEXTUAL:
             layout = _bar_layout()
             lx, _ = layout[idx]
             x = lx - 1   # dropdown left │ aligns with bar ┌ (ox+1 for Others, lx-1 for all)
-            dd = DropdownMenu(kids, x, 7, cascade=False)  # 4 banner rows + 3 bar rows
+            dd = DropdownMenu(kids, x, 8, cascade=False)  # 5 banner rows + 3 bar rows
             self._open_top_idx = idx
             self._dd_iw = dd.iw
             self._stack = [dd]
