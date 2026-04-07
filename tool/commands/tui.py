@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from argparse import Namespace
 from pathlib import Path
+
+_LOG = Path("/tmp/wsl4ai_tui.log")
+logging.basicConfig(filename=_LOG, level=logging.DEBUG, format="%(asctime)s %(message)s", filemode="w")
 
 try:
     from textual.app import App, ComposeResult
@@ -57,6 +61,8 @@ def _load_theme() -> None:
     except Exception:
         pass
     _THEME_DARK = bool(raw.get("dark", True))
+    logging.debug("_load_theme: theme_id=%s  dark_key_in_file=%r  _THEME_DARK=%s", theme_id, raw.get("dark", "MISSING"), _THEME_DARK)
+    logging.debug("_load_theme: item=%r  lines=%r", raw.get("item"), raw.get("lines"))
     _S["lines"]  = raw.get("lines",  "dim")
     _S["item"]   = raw.get("item",   "")
     _S["label"]  = raw.get("label",  "bold")
@@ -381,7 +387,10 @@ if _HAS_TEXTUAL:
             self._stack: list[DropdownMenu] = []
 
         def on_mount(self) -> None:
-            self.theme = "textual-light" if not _THEME_DARK else "textual-dark"
+            target = "textual-light" if not _THEME_DARK else "textual-dark"
+            logging.debug("on_mount: _THEME_DARK=%s  setting theme=%s", _THEME_DARK, target)
+            self.theme = target
+            logging.debug("on_mount: self.theme after set=%s  current_theme.dark=%s", self.theme, self.current_theme.dark)
 
         def compose(self) -> ComposeResult:
             yield MenuBar()
