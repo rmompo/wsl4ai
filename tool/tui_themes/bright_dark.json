@@ -1,18 +1,14 @@
 {
   "name": "Bright (Dark)",
   "styles": {
-    "qmark": "fg:#00ffff bold",
-    "question": "fg:#00ffff bold",
-    "question-mark": "fg:#00ffff bold",
-    "answer": "fg:#ffea00 bold",
-    "pointer": "fg:#ffff00 bold",
-    "highlighted": "fg:#ffff00 bold underline",
-    "selected": "fg:#00ff66 bold",
-    "separator": "fg:#ff44ff bold",
-    "instruction": "fg:#ffffff bold",
-    "text": "fg:#ffffff bold",
-    "disabled": "fg:#ff8080 bold",
-    "search_success": "fg:#00ff00 bold",
-    "search_none": "fg:#ff3366 bold"
+    "lines":        "#ff44ff bold",
+    "item":         "#ffffff bold",
+    "label":        "#00ffff bold",
+    "button":       "#ffea00 bold",
+    "text":         "#ffffff bold",
+    "text_hl":      "#00ffff bold",
+    "text_ok": "#00ff66 bold",
+    "text_err":   "#ff3366 bold",
+    "input":        "#ffff00 bold"
   }
 }

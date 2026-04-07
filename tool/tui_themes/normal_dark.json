@@ -1,18 +1,14 @@
 {
   "name": "Normal (Dark)",
   "styles": {
-    "qmark": "fg:#6ee7ff bold",
-    "question": "fg:#6ee7ff bold",
-    "question-mark": "fg:#6ee7ff bold",
-    "answer": "fg:#ffd166 bold",
-    "pointer": "fg:#f5e960 bold",
-    "highlighted": "fg:#f5e960 bold",
-    "selected": "fg:#7dff9b bold",
-    "separator": "fg:#ff7de9 bold",
-    "instruction": "fg:#e8f0ff",
-    "text": "fg:#f8fbff",
-    "disabled": "fg:#ff9b9b",
-    "search_success": "fg:#8bff6a bold",
-    "search_none": "fg:#ff6f91 bold"
+    "lines":        "#ff7de9 bold",
+    "item":         "#f8fbff",
+    "label":        "#6ee7ff bold",
+    "button":       "#ffd166 bold",
+    "text":         "#f8fbff",
+    "text_hl":      "#6ee7ff bold",
+    "text_ok": "#7dff9b bold",
+    "text_err":   "#ff6f91 bold",
+    "input":        "#f5e960"
   }
 }

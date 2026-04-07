@@ -1,18 +1,15 @@
 {
   "name": "High Contrast",
   "styles": {
-    "qmark": "fg:#ffffff bg:#000000 bold",
-    "question": "fg:#ffffff bg:#000000 bold",
-    "question-mark": "fg:#ffffff bg:#000000 bold",
-    "answer": "fg:#000000 bg:#ffff00 bold",
-    "pointer": "fg:#000000 bg:#ffff00 bold",
-    "highlighted": "fg:#000000 bg:#ffff00 bold",
-    "selected": "fg:#000000 bg:#00ff00 bold",
-    "separator": "fg:#ffffff bg:#000000 bold",
-    "instruction": "fg:#ffffff bg:#000000 bold",
-    "text": "fg:#ffffff bg:#000000 bold",
-    "disabled": "fg:#000000 bg:#ff7f7f bold",
-    "search_success": "fg:#000000 bg:#00ff00 bold",
-    "search_none": "fg:#ffffff bg:#ff0000 bold"
+    "lines":        "#ffffff on #000000 bold",
+    "item":         "#ffffff on #000000 bold",
+    "label":        "#ffffff on #000000 bold",
+    "button":       "#000000 on #ffff00 bold",
+    "button_sel":   "#000000 on #00ff00 bold",
+    "text":         "#ffffff on #000000 bold",
+    "text_hl":      "#ffff00 on #000000 bold",
+    "text_ok": "#000000 on #00ff00 bold",
+    "text_err":   "#ffffff on #ff0000 bold",
+    "input":        "#ffff00 on #000000 bold"
   }
 }

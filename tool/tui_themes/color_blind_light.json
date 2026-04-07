@@ -1,18 +1,14 @@
 {
   "name": "Color Blind (Light)",
   "styles": {
-    "qmark": "fg:#005f8a bold",
-    "question": "fg:#005f8a bold",
-    "question-mark": "fg:#005f8a bold",
-    "answer": "fg:#a05a00 bold",
-    "pointer": "fg:#a05a00 bold",
-    "highlighted": "fg:#a05a00 bold underline",
-    "selected": "fg:#2a7f62 bold",
-    "separator": "fg:#7c3aed bold",
-    "instruction": "fg:#1f2937",
-    "text": "fg:#111827",
-    "disabled": "fg:#b45309 bold",
-    "search_success": "fg:#2a7f62 bold",
-    "search_none": "fg:#b45309 bold"
+    "lines":        "#7c3aed bold",
+    "item":         "#111827",
+    "label":        "#005f8a bold",
+    "button":       "#a05a00 bold",
+    "text":         "#111827",
+    "text_hl":      "#005f8a bold",
+    "text_ok": "#2a7f62 bold",
+    "text_err":   "#b45309 bold",
+    "input":        "#1f2937"
   }
 }

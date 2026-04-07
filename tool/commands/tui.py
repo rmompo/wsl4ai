@@ -23,23 +23,21 @@ _THEME_CFG   = _TOOL_DIR.parent / "conf" / "config.json"
 _DEFAULT_THEME = "normal_dark"
 
 # Active styles — populated by _load_theme()
-_S: dict[str, str] = {"sep": "dim", "txt": "", "hl": "bold reverse"}
-
-
-def _qs_to_rich(style: str) -> str:
-    """Convert questionary style tokens to Rich format.
-
-    questionary uses ``fg:#rrggbb`` / ``bg:#rrggbb``; Rich expects ``#rrggbb`` / ``on #rrggbb``.
-    """
-    parts = []
-    for token in style.split():
-        if token.startswith("fg:"):
-            parts.append(token[3:])
-        elif token.startswith("bg:"):
-            parts.append("on " + token[3:])
-        else:
-            parts.append(token)
-    return " ".join(parts)
+# item_sel is always auto-computed as the inverse of item (not stored in theme files).
+# button_sel can be overridden per-theme; defaults to the inverse of button.
+_S: dict[str, str] = {
+    "lines":          "dim",
+    "item":           "",
+    "item_sel":       "bold reverse",
+    "label":          "bold",
+    "button":         "bold",
+    "button_sel":     "bold reverse",
+    "text":           "",
+    "text_hl":        "bold",
+    "text_ok":        "green bold",
+    "text_err":       "red bold",
+    "input":          "",
+}
 
 
 def _load_theme() -> None:
@@ -56,9 +54,24 @@ def _load_theme() -> None:
         raw = data.get("styles", {}) if isinstance(data, dict) else {}
     except Exception:
         pass
-    _S["sep"] = _qs_to_rich(raw.get("separator", "dim"))
-    _S["txt"] = _qs_to_rich(raw.get("text", ""))
-    _S["hl"]  = _qs_to_rich(raw.get("highlighted", "bold reverse"))
+    _S["lines"]  = raw.get("lines",  "dim")
+    _S["item"]   = raw.get("item",   "")
+    _S["label"]  = raw.get("label",  "bold")
+    _S["button"] = raw.get("button", "bold")
+    _S["text"]         = raw.get("text",         "")
+    _S["text_hl"]      = raw.get("text_hl",      "bold")
+    _S["text_ok"]  = raw.get("text_ok",  "green bold")
+    _S["text_err"] = raw.get("text_err", "red bold")
+    _S["input"]        = raw.get("input",        "")
+    # item_sel: always the inverse of item (UX spec — not stored in theme)
+    item = _S["item"]
+    _S["item_sel"] = (item + " reverse").strip() if item else "bold reverse"
+    # button_sel: explicit theme override or auto-invert from button
+    if "button_sel" in raw:
+        _S["button_sel"] = raw["button_sel"]
+    else:
+        btn = _S["button"]
+        _S["button_sel"] = (btn + " reverse").strip() if btn else "bold reverse"
 
 
 # ─── Menu definition ──────────────────────────────────────────────────────────
@@ -179,25 +192,25 @@ def _render_bar(total_w: int, focused: int, open_idx: int, dd_iw: int) -> "Text"
             if gap > 0:
                 t2.append(" " * gap)
             if hl:
-                t2.append("│", style=_S["sep"])
-                t2.append(f" {label} ", style=_S["hl"])
-                t2.append("│", style=_S["sep"])
+                t2.append("│", style=_S["lines"])
+                t2.append(f" {label} ", style=_S["item_sel"])
+                t2.append("│", style=_S["lines"])
             else:
-                t2.append("│ ", style=_S["sep"])
-                t2.append(label, style=_S["txt"])
-                t2.append(" │", style=_S["sep"])
+                t2.append("│ ", style=_S["lines"])
+                t2.append(label, style=_S["item"])
+                t2.append(" │", style=_S["lines"])
             pos = lx + lw + 2
         else:
             gap = lx - pos
             if hl:
                 if gap > 1:
                     t2.append(" " * (gap - 1))
-                t2.append(f" {label} ", style=_S["hl"])
+                t2.append(f" {label} ", style=_S["item_sel"])
                 pos = lx + lw + 1
             else:
                 if gap > 0:
                     t2.append(" " * gap)
-                t2.append(label, style=_S["txt"])
+                t2.append(label, style=_S["item"])
                 pos = lx + lw
     if pos < total_w:
         t2.append(" " * (total_w - pos))
@@ -218,11 +231,11 @@ def _render_bar(total_w: int, focused: int, open_idx: int, dd_iw: int) -> "Text"
             r3[dr] = "┬"
 
     result = Text()
-    result.append("".join(r1), style=_S["sep"])
+    result.append("".join(r1), style=_S["lines"])
     result.append("\n")
     result.append_text(t2)
     result.append("\n")
-    result.append("".join(r3), style=_S["sep"])
+    result.append("".join(r3), style=_S["lines"])
     return result
 
 
@@ -233,20 +246,20 @@ def _render_dropdown_body(items: list, cursor: int, iw: int) -> "Text":
     bot = f"└{'─' * (iw + 2)}┘"
     for i, it in enumerate(items):
         if it is None:
-            t.append(sep + "\n", style=_S["sep"])
+            t.append(sep + "\n", style=_S["lines"])
             continue
         label = _label(it)
         display = f"{label} »" if _kids(it) is not None else label
         cell = f"{display:<{iw}}"
         if i == cursor:
-            t.append("│", style=_S["sep"])
-            t.append(f" {cell} ", style=_S["hl"])
-            t.append("│\n", style=_S["sep"])
+            t.append("│", style=_S["lines"])
+            t.append(f" {cell} ", style=_S["item_sel"])
+            t.append("│\n", style=_S["lines"])
         else:
-            t.append("│", style=_S["sep"])
-            t.append(f" {cell} ", style=_S["txt"])
-            t.append("│\n", style=_S["sep"])
-    t.append(bot, style=_S["sep"])
+            t.append("│", style=_S["lines"])
+            t.append(f" {cell} ", style=_S["item"])
+            t.append("│\n", style=_S["lines"])
+    t.append(bot, style=_S["lines"])
     return t
 
 
@@ -256,23 +269,23 @@ def _render_cascade(items: list, cursor: int, iw: int) -> "Text":
     top = f"├{'─' * (iw + 2)}┐"
     sep = f"├{'─' * (iw + 2)}┤"
     bot = f"└{'─' * (iw + 2)}┘"
-    t.append(top + "\n", style=_S["sep"])
+    t.append(top + "\n", style=_S["lines"])
     for i, it in enumerate(items):
         if it is None:
-            t.append(sep + "\n", style=_S["sep"])
+            t.append(sep + "\n", style=_S["lines"])
             continue
         label = _label(it)
         display = f"{label} »" if _kids(it) is not None else label
         cell = f"{display:<{iw}}"
         if i == cursor:
-            t.append("│", style=_S["sep"])
-            t.append(f" {cell} ", style=_S["hl"])
-            t.append("│\n", style=_S["sep"])
+            t.append("│", style=_S["lines"])
+            t.append(f" {cell} ", style=_S["item_sel"])
+            t.append("│\n", style=_S["lines"])
         else:
-            t.append("│", style=_S["sep"])
-            t.append(f" {cell} ", style=_S["txt"])
-            t.append("│\n", style=_S["sep"])
-    t.append(bot, style=_S["sep"])
+            t.append("│", style=_S["lines"])
+            t.append(f" {cell} ", style=_S["item"])
+            t.append("│\n", style=_S["lines"])
+    t.append(bot, style=_S["lines"])
     return t
 
 
