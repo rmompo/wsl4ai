@@ -4,6 +4,8 @@
 Can be run directly if wsl4ai.py is corrupt or unavailable:
     python3 ~/wsl4ai/tool/wsl4ai-update.py
     python3 ~/wsl4ai/tool/wsl4ai-update.py --check
+    python3 ~/wsl4ai/tool/wsl4ai-update.py --branch feature/TUI-Textual
+    python3 ~/wsl4ai/tool/wsl4ai-update.py --check --branch feature/TUI-Textual
 """
 
 import argparse
@@ -14,8 +16,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
-REPO_RAW_BASE = "https://raw.githubusercontent.com/rmompo/wsl4ai/main/tool"
+REPO_RAW_BASE = "https://raw.githubusercontent.com/rmompo/wsl4ai/{branch}/tool"
 REPO_CLONE_URL = "https://github.com/rmompo/wsl4ai.git"
+DEFAULT_BRANCH = "main"
 _VERSION_RE = re.compile(r'^__version__\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 
 CONF_DIR = Path(__file__).resolve().parent   # ~/.../wsl4ai/conf/
@@ -54,6 +57,40 @@ def _cleanup() -> None:
     shutil.rmtree(TMP_DIR, ignore_errors=True)
 
 
+def _print_summary(
+    branch: str,
+    version_from: str,
+    version_to: str,
+    download: str,
+    pip: str,
+) -> None:
+    """Print a formatted summary box."""
+    rows = [
+        ("Branch",      branch),
+        ("Version",     f"{version_from} → {version_to}"),
+        ("Download",    download),
+        ("pip install", pip),
+    ]
+    label_w = max(len(r[0]) for r in rows)
+    value_w = max(len(r[1]) for r in rows)
+    inner_w = label_w + 3 + value_w   # "label : value"
+    title = "WSL4AI Update Summary"
+    inner_w = max(inner_w, len(title) + 2)
+
+    sep   = f"├{'─' * (inner_w + 2)}┤"
+    top   = f"┌{'─' * (inner_w + 2)}┐"
+    bot   = f"└{'─' * (inner_w + 2)}┘"
+
+    print()
+    print(top)
+    print(f"│ {title:<{inner_w}} │")
+    print(sep)
+    for label, value in rows:
+        line = f"{label:<{label_w}} : {value}"
+        print(f"│ {line:<{inner_w}} │")
+    print(bot)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="wsl4ai-update",
@@ -64,18 +101,26 @@ def main() -> int:
         action="store_true",
         help="Check for a new version without applying the update",
     )
+    parser.add_argument(
+        "-b", "--branch",
+        default=DEFAULT_BRANCH,
+        metavar="BRANCH",
+        help=f"Repository branch to check and download from (default: {DEFAULT_BRANCH})",
+    )
     args = parser.parse_args()
 
     local_v, local_str = _local_version()
     print(f"Local version : {local_str}")
+    print(f"Branch        : {args.branch}")
 
     # Prepare .tmp/
     _cleanup()
     TMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Step 2: download remote wsl4ai.py
-    url = f"{REPO_RAW_BASE}/wsl4ai.py"
-    print(f"Checking remote version...")
+    # Step 2: download remote wsl4ai.py to check version
+    raw_base = REPO_RAW_BASE.format(branch=args.branch)
+    url = f"{raw_base}/wsl4ai.py"
+    print("Checking remote version...")
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
             remote_content = resp.read().decode("utf-8", errors="ignore")
@@ -94,7 +139,7 @@ def main() -> int:
     remote_str = _version_str(remote_v)
     print(f"Remote version: {remote_str}")
 
-    # Step 4: compare — if not superior, goto cleanup (5.g)
+    # Step 4: compare
     if local_v is not None and remote_v <= local_v:
         print("Already up to date.")
         _cleanup()
@@ -110,7 +155,7 @@ def main() -> int:
     # Step 5a: git clone
     print("Cloning repository...")
     result = subprocess.run(
-        ["git", "clone", "--depth=1", "--branch", "main", REPO_CLONE_URL, str(TMP_REPO_DIR)],
+        ["git", "clone", "--depth=1", "--branch", args.branch, REPO_CLONE_URL, str(TMP_REPO_DIR)],
         capture_output=True,
     )
     if result.returncode != 0:
@@ -126,13 +171,8 @@ def main() -> int:
 
     try:
         # conf/ is never touched during update (local.env, config.json, wsl4ai-update.py, ddbb/ are safe)
-
-        # Step 5a: move current tool/ to .tmp/old/
         shutil.move(str(APP_DIR), str(TMP_OLD_DIR))
-
-        # Step 5b: move new tool/ into place
         shutil.move(str(new_tool), str(APP_DIR))
-
     except Exception as exc:
         if TMP_OLD_DIR.is_dir() and not APP_DIR.is_dir():
             print("Restoring previous version...", file=sys.stderr)
@@ -141,9 +181,30 @@ def main() -> int:
         _cleanup()
         return 1
 
+    # Step 5c: install/update dependencies
+    pip_status = "skipped (no requirements.txt)"
+    req_file = APP_DIR / "requirements.txt"
+    if req_file.is_file():
+        print("Installing dependencies...")
+        pip_result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(req_file)],
+            capture_output=True,
+        )
+        if pip_result.returncode != 0:
+            pip_status = f"WARNING: {pip_result.stderr.decode().strip()[:60]}"
+        else:
+            pip_status = "OK"
+
     # Step 5g: cleanup
     _cleanup()
-    print(f"WSL4AI updated successfully to {remote_str}.")
+
+    _print_summary(
+        branch=args.branch,
+        version_from=local_str,
+        version_to=remote_str,
+        download="OK",
+        pip=pip_status,
+    )
     return 0
 
 
