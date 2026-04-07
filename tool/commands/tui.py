@@ -410,11 +410,16 @@ if _HAS_TEXTUAL:
         def _key_bar(self, key: str) -> None:
             n = len(MENU)
             if key == "left":
-                self._bar_focus = (self._bar_focus - 1) % n
-                self._refresh_bar()
+                if self._bar_focus > 0:
+                    self._bar_focus -= 1
+                    self._refresh_bar()
             elif key == "right":
-                self._bar_focus = (self._bar_focus + 1) % n
-                self._refresh_bar()
+                if self._bar_focus < n - 1:
+                    self._bar_focus += 1
+                    self._refresh_bar()
+            elif key == "down":
+                if _kids(MENU[self._bar_focus]) is not None:
+                    self._open_from_bar(self._bar_focus)
             elif key == "enter":
                 self._open_from_bar(self._bar_focus)
             elif key == "escape":
