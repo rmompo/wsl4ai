@@ -38,7 +38,7 @@ BANNER_TENTACLES = [
 ]
 BANNER_LABELS = [
     "",
-    "wsl4ai",
+    "WSL4AI",
     "v{version}",
     "https://github.com/rmompo/wsl4ai",
 ]
