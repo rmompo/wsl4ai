@@ -231,13 +231,15 @@ def _render_bar(total_w: int, focused: int, open_idx: int, dd_iw: int) -> "Text"
     # ── Row 3: bottom border ─────────────────────────────────────────────────
     r3 = ["─"] * total_w
     if open_idx >= 0 and dd_iw > 0 and open_idx == _OTHERS_IDX:
-        # Others dropdown: replace box bottom corners with dropdown top corners
+        # Others dropdown open: left box corner becomes ┌ (dropdown starts here),
+        # right box corner keeps ┴ (closes the Others top border connector).
         dr = ox + dd_iw + 3
         if 0 <= ox < total_w:
             r3[ox] = "┌"
+        if 0 <= oe < total_w:
+            r3[oe] = "┴"
         if 0 < dr < total_w:
             r3[dr] = "┐"
-        # oe falls inside the dropdown span → stays "─"
     else:
         # No dropdown open, or non-Others dropdown: draw Others box bottom
         if 0 <= ox < total_w:
