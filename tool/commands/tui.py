@@ -90,7 +90,7 @@ def _bar_layout() -> list[tuple[int, int]]:
             x += lw + 5               # │+space+label+space+│ + 1-cell gap
         else:
             out.append((x, lw))
-            x += lw + 1               # label + 1-cell gap
+            x += lw + 2               # label + 2-cell gap
     return out
 
 
@@ -373,7 +373,7 @@ if _HAS_TEXTUAL:
                     self._push_cascade(top, kids)
                 else:
                     path = self._path() + [_label(item)]
-                    self._close_all()
+                    self._dismiss_all()
                     self._dispatch(path)
             elif key == "escape":
                 self._pop()
@@ -399,7 +399,7 @@ if _HAS_TEXTUAL:
                 self._dd_iw = 0
                 self._refresh_bar()
 
-        def _close_all(self) -> None:
+        def _dismiss_all(self) -> None:
             for dd in self._stack:
                 dd.remove()
             self._stack.clear()
