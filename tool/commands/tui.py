@@ -121,23 +121,34 @@ def _render_bar(total_w: int, focused: int, open_idx: int, dd_iw: int) -> "Text"
     for i, item in enumerate(MENU):
         lx, lw = layout[i]
         label = _label(item)
+        # Item is highlighted when it has focus (bar mode) or its dropdown is open
+        hl = (i == open_idx) or (open_idx < 0 and i == focused)
         if i == _OTHERS_IDX:
             gap = (lx - 2) - pos
             if gap > 0:
                 t2.append(" " * gap)
-            t2.append("│ ", style="dim")
-            pos = lx
+            if hl:
+                t2.append("│", style="dim")
+                t2.append(f" {label} ", style="bold reverse")
+                t2.append("│", style="dim")
+            else:
+                t2.append("│ ", style="dim")
+                t2.append(label)
+                t2.append(" │", style="dim")
+            pos = lx + lw + 2
         else:
             gap = lx - pos
-            if gap > 0:
-                t2.append(" " * gap)
-            pos = lx
-        style = "bold reverse" if i == open_idx else ("bold" if i == focused else "")
-        t2.append(label, style=style)
-        pos += lw
-        if i == _OTHERS_IDX:
-            t2.append(" │", style="dim")
-            pos += 2
+            if hl:
+                # Consume 1 gap cell as prefix space for the reverse highlight
+                if gap > 1:
+                    t2.append(" " * (gap - 1))
+                t2.append(f" {label} ", style="bold reverse")
+                pos = lx + lw + 1
+            else:
+                if gap > 0:
+                    t2.append(" " * gap)
+                t2.append(label)
+                pos = lx + lw
     if pos < total_w:
         t2.append(" " * (total_w - pos))
 
@@ -324,10 +335,10 @@ if _HAS_TEXTUAL:
             elif key == "right":
                 self._bar_focus = (self._bar_focus + 1) % n
                 self._refresh_bar()
-            elif key in ("enter", "down", "space"):
+            elif key == "enter":
                 self._open_from_bar(self._bar_focus)
-            elif key == "q":
-                self.exit()
+            elif key == "escape":
+                self._dispatch(["Exit"])
 
         def _open_from_bar(self, idx: int) -> None:
             item = MENU[idx]
@@ -364,7 +375,7 @@ if _HAS_TEXTUAL:
                     path = self._path() + [_label(item)]
                     self._close_all()
                     self._dispatch(path)
-            elif key in ("escape", "left"):
+            elif key == "escape":
                 self._pop()
             elif key == "q":
                 self.exit()
