@@ -230,18 +230,28 @@ def _render_bar(total_w: int, focused: int, open_idx: int, dd_iw: int) -> "Text"
 
     # ── Row 3: bottom border ─────────────────────────────────────────────────
     r3 = ["─"] * total_w
-    if 0 <= ox < total_w:
-        r3[ox] = "┴"
-    if 0 <= oe < total_w:
-        r3[oe] = "┴"
-    if open_idx >= 0 and dd_iw > 0:
-        lx, _ = layout[open_idx]
-        dl = ox if open_idx == _OTHERS_IDX else lx - 1
-        dr = dl + dd_iw + 3
-        if 0 <= dl < total_w:
-            r3[dl] = "┼" if open_idx == _OTHERS_IDX else "┬"
+    if open_idx >= 0 and dd_iw > 0 and open_idx == _OTHERS_IDX:
+        # Others dropdown: replace box bottom corners with dropdown top corners
+        dr = ox + dd_iw + 3
+        if 0 <= ox < total_w:
+            r3[ox] = "┌"
         if 0 < dr < total_w:
-            r3[dr] = "┬"
+            r3[dr] = "┐"
+        # oe falls inside the dropdown span → stays "─"
+    else:
+        # No dropdown open, or non-Others dropdown: draw Others box bottom
+        if 0 <= ox < total_w:
+            r3[ox] = "┴"
+        if 0 <= oe < total_w:
+            r3[oe] = "┴"
+        if open_idx >= 0 and dd_iw > 0:
+            lx, _ = layout[open_idx]
+            dl = lx - 1
+            dr = dl + dd_iw + 3
+            if 0 <= dl < total_w:
+                r3[dl] = "┌"
+            if 0 < dr < total_w:
+                r3[dr] = "┐"
 
     result = Text()
     result.append("".join(r1), style=_S["lines"])
@@ -262,8 +272,7 @@ def _render_dropdown_body(items: list, cursor: int, iw: int) -> "Text":
             t.append(sep + "\n", style=_S["lines"])
             continue
         label = _label(it)
-        display = f"{label} »" if _kids(it) is not None else label
-        cell = f"{display:<{iw}}"
+        cell = f"{label:<{iw - 2}} »" if _kids(it) is not None else f"{label:<{iw}}"
         if i == cursor:
             t.append("│", style=_S["lines"])
             t.append(f" {cell} ", style=_S["item_sel"])
@@ -277,9 +286,9 @@ def _render_dropdown_body(items: list, cursor: int, iw: int) -> "Text":
 
 
 def _render_cascade(items: list, cursor: int, iw: int) -> "Text":
-    """Cascading submenu with connecting top border (├──...──┐)."""
+    """Cascading submenu that opens to the right of the parent item."""
     t = Text()
-    top = f"├{'─' * (iw + 2)}┐"
+    top = f"┌{'─' * (iw + 2)}┐"
     sep = f"├{'─' * (iw + 2)}┤"
     bot = f"└{'─' * (iw + 2)}┘"
     t.append(top + "\n", style=_S["lines"])
@@ -288,8 +297,7 @@ def _render_cascade(items: list, cursor: int, iw: int) -> "Text":
             t.append(sep + "\n", style=_S["lines"])
             continue
         label = _label(it)
-        display = f"{label} »" if _kids(it) is not None else label
-        cell = f"{display:<{iw}}"
+        cell = f"{label:<{iw - 2}} »" if _kids(it) is not None else f"{label:<{iw}}"
         if i == cursor:
             t.append("│", style=_S["lines"])
             t.append(f" {cell} ", style=_S["item_sel"])
@@ -328,6 +336,7 @@ if _HAS_TEXTUAL:
         DropdownMenu {
             layer: above;
             background: $surface;
+            border: none;
         }
         """
 
