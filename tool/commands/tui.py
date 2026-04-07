@@ -19,6 +19,24 @@ except ImportError:
     _HAS_TEXTUAL = False
 
 
+# ─── Banner ───────────────────────────────────────────────────────────────────
+
+_APP_VERSION: str = ""          # set by cmd_tui before launching the app
+_BANNER_MAGENTA = "#ff00ff"     # fixed bright magenta for octopus body
+
+BANNER_BODY = [
+    "  ▄███▄",
+    "  █▀◉◉▀█",
+    "  ▀█▄▄█▀",
+    "  ▄▀▄▄▄▀▄",
+]
+BANNER_TENTACLES = [
+    " ▁▂▄▃▅▂▃▆▁▄▂▅▃▄▁",
+    " ▅▄▇▆▃▅▄▂▆▇▅▃▄▆▅",
+    " ▂▃▁▄▂▅▃▆▂▄▁▃▅▂▃",
+    " ▇▅▃▁▄▆▂▅▇▃▁▄▆▅▂",
+]
+
 # ─── Theme ────────────────────────────────────────────────────────────────────
 
 _TOOL_DIR    = Path(__file__).resolve().parent.parent   # tool/
@@ -55,17 +73,18 @@ def _load_theme() -> None:
     except Exception:
         pass
     raw: dict = {}
+    data: dict = {}
     try:
         data = json.loads((_THEMES_DIR / f"{theme_id}.json").read_text(encoding="utf-8"))
         raw = data.get("styles", {}) if isinstance(data, dict) else {}
     except Exception:
         pass
-    # "dark" key is authoritative; fall back to name-based detection if missing
-    if "dark" in raw:
-        _THEME_DARK = bool(raw["dark"])
+    # "dark" key is at top level of the theme JSON (not inside "styles")
+    if "dark" in data:
+        _THEME_DARK = bool(data["dark"])
     else:
         _THEME_DARK = "light" not in theme_id.lower()
-    logging.debug("_load_theme: theme_id=%s  dark_key_in_file=%r  _THEME_DARK=%s", theme_id, raw.get("dark", "MISSING"), _THEME_DARK)
+    logging.debug("_load_theme: theme_id=%s  dark_key_in_file=%r  _THEME_DARK=%s", theme_id, data.get("dark", "MISSING"), _THEME_DARK)
     logging.debug("_load_theme: item=%r  lines=%r", raw.get("item"), raw.get("lines"))
     _S["lines"]  = raw.get("lines",  "dim")
     _S["item"]   = raw.get("item",   "")
@@ -317,6 +336,32 @@ def _render_cascade(items: list, cursor: int, iw: int) -> "Text":
 
 if _HAS_TEXTUAL:
 
+    class Banner(Widget):
+        DEFAULT_CSS = """
+        Banner {
+            height: 4;
+            width: 1fr;
+        }
+        """
+
+        def render(self) -> "Text":
+            w = self.size.width or 80
+            right = {0: ("wsl4ai", _S["label"]), 2: (f"v{_APP_VERSION}", _S["text"])}
+            t = Text()
+            for i, (body, tent) in enumerate(zip(BANNER_BODY, BANNER_TENTACLES)):
+                line = Text()
+                line.append(body, style=_BANNER_MAGENTA)
+                line.append(tent, style=_S["lines"])
+                if i in right:
+                    lbl, sty = right[i]
+                    pad = w - len(body) - len(tent) - len(lbl)
+                    if pad > 0:
+                        line.append(" " * pad)
+                    line.append(lbl, style=sty)
+                t.append_text(line)
+                t.append("\n")
+            return t
+
     class MenuBar(Widget):
         DEFAULT_CSS = """
         MenuBar {
@@ -412,6 +457,7 @@ if _HAS_TEXTUAL:
             logging.debug("on_mount: self.theme after set=%s  current_theme.dark=%s", self.theme, self.current_theme.dark)
 
         def compose(self) -> ComposeResult:
+            yield Banner()
             yield MenuBar()
 
         def on_key(self, event: events.Key) -> None:
@@ -449,7 +495,7 @@ if _HAS_TEXTUAL:
             layout = _bar_layout()
             lx, _ = layout[idx]
             x = lx - 1   # dropdown left │ aligns with bar ┌ (ox+1 for Others, lx-1 for all)
-            dd = DropdownMenu(kids, x, 3, cascade=False)
+            dd = DropdownMenu(kids, x, 7, cascade=False)  # 4 banner rows + 3 bar rows
             self._open_top_idx = idx
             self._dd_iw = dd.iw
             self._stack = [dd]
@@ -570,9 +616,11 @@ if _HAS_TEXTUAL:
 
 def cmd_tui(args: Namespace) -> int:
     """Launch the WSL4AI interactive Text User Interface."""
+    global _APP_VERSION
     if not _HAS_TEXTUAL:
         print("ERROR: textual is required; run pip install -r requirements.txt")
         return 1
+    _APP_VERSION = getattr(args, "app_version", "")
     _load_theme()
     Wsl4aiApp(args).run()
     return 0
