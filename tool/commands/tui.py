@@ -1,7 +1,9 @@
 """Textual-based Text User Interface for WSL4AI."""
 from __future__ import annotations
 
+import json
 from argparse import Namespace
+from pathlib import Path
 
 try:
     from textual.app import App, ComposeResult
@@ -11,6 +13,36 @@ try:
     _HAS_TEXTUAL = True
 except ImportError:
     _HAS_TEXTUAL = False
+
+
+# ─── Theme ────────────────────────────────────────────────────────────────────
+
+_TOOL_DIR    = Path(__file__).resolve().parent.parent   # tool/
+_THEMES_DIR  = _TOOL_DIR / "tui_themes"
+_THEME_CFG   = _TOOL_DIR.parent / "conf" / "config.json"
+_DEFAULT_THEME = "normal_dark"
+
+# Active styles — populated by _load_theme()
+_S: dict[str, str] = {"sep": "dim", "txt": "", "hl": "bold reverse"}
+
+
+def _load_theme() -> None:
+    """Read config.json and load the configured theme into _S (in-place)."""
+    theme_id = _DEFAULT_THEME
+    try:
+        cfg = json.loads(_THEME_CFG.read_text(encoding="utf-8"))
+        theme_id = str(cfg.get("tui", {}).get("theme", _DEFAULT_THEME)).strip() or _DEFAULT_THEME
+    except Exception:
+        pass
+    raw: dict = {}
+    try:
+        data = json.loads((_THEMES_DIR / f"{theme_id}.json").read_text(encoding="utf-8"))
+        raw = data.get("styles", {}) if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    _S["sep"] = raw.get("separator", "dim")
+    _S["txt"] = raw.get("text", "")
+    _S["hl"]  = raw.get("highlighted", "bold reverse")
 
 
 # ─── Menu definition ──────────────────────────────────────────────────────────
@@ -90,7 +122,10 @@ def _bar_layout() -> list[tuple[int, int]]:
             x += lw + 5               # │+space+label+space+│ + 1-cell gap
         else:
             out.append((x, lw))
-            x += lw + 2               # label + 2-cell gap
+            # 2-cell gap between consecutive normal items, 1-cell at group boundary
+            next_i = i + 1
+            gap = 2 if (next_i < len(MENU) and next_i != _OTHERS_IDX) else 1
+            x += lw + gap
     return out
 
 
@@ -128,53 +163,50 @@ def _render_bar(total_w: int, focused: int, open_idx: int, dd_iw: int) -> "Text"
             if gap > 0:
                 t2.append(" " * gap)
             if hl:
-                t2.append("│", style="dim")
-                t2.append(f" {label} ", style="bold reverse")
-                t2.append("│", style="dim")
+                t2.append("│", style=_S["sep"])
+                t2.append(f" {label} ", style=_S["hl"])
+                t2.append("│", style=_S["sep"])
             else:
-                t2.append("│ ", style="dim")
-                t2.append(label)
-                t2.append(" │", style="dim")
+                t2.append("│ ", style=_S["sep"])
+                t2.append(label, style=_S["txt"])
+                t2.append(" │", style=_S["sep"])
             pos = lx + lw + 2
         else:
             gap = lx - pos
             if hl:
-                # Consume 1 gap cell as prefix space for the reverse highlight
                 if gap > 1:
                     t2.append(" " * (gap - 1))
-                t2.append(f" {label} ", style="bold reverse")
+                t2.append(f" {label} ", style=_S["hl"])
                 pos = lx + lw + 1
             else:
                 if gap > 0:
                     t2.append(" " * gap)
-                t2.append(label)
+                t2.append(label, style=_S["txt"])
                 pos = lx + lw
     if pos < total_w:
         t2.append(" " * (total_w - pos))
 
     # ── Row 3: bottom border ─────────────────────────────────────────────────
     r3 = ["─"] * total_w
-    # Others box: ┴ normally; ┼ when Others itself is open
     if 0 <= ox < total_w:
         r3[ox] = "┴"
     if 0 <= oe < total_w:
         r3[oe] = "┴"
-    # Active dropdown opening
     if open_idx >= 0 and dd_iw > 0:
         lx, _ = layout[open_idx]
         dl = ox if open_idx == _OTHERS_IDX else lx - 1
-        dr = dl + dd_iw + 3   # dl + │+space+content+space+│ - 1 = dl + iw+3
+        dr = dl + dd_iw + 3
         if 0 <= dl < total_w:
             r3[dl] = "┼" if open_idx == _OTHERS_IDX else "┬"
         if 0 < dr < total_w:
             r3[dr] = "┬"
 
     result = Text()
-    result.append("".join(r1), style="dim")
+    result.append("".join(r1), style=_S["sep"])
     result.append("\n")
     result.append_text(t2)
     result.append("\n")
-    result.append("".join(r3), style="dim")
+    result.append("".join(r3), style=_S["sep"])
     return result
 
 
@@ -185,20 +217,20 @@ def _render_dropdown_body(items: list, cursor: int, iw: int) -> "Text":
     bot = f"└{'─' * (iw + 2)}┘"
     for i, it in enumerate(items):
         if it is None:
-            t.append(sep + "\n", style="dim")
+            t.append(sep + "\n", style=_S["sep"])
             continue
         label = _label(it)
         display = f"{label} »" if _kids(it) is not None else label
         cell = f"{display:<{iw}}"
         if i == cursor:
-            t.append("│", style="dim")
-            t.append(f" {cell} ", style="bold reverse")
-            t.append("│\n", style="dim")
+            t.append("│", style=_S["sep"])
+            t.append(f" {cell} ", style=_S["hl"])
+            t.append("│\n", style=_S["sep"])
         else:
-            t.append("│", style="dim")
-            t.append(f" {cell} ")
-            t.append("│\n", style="dim")
-    t.append(bot, style="dim")
+            t.append("│", style=_S["sep"])
+            t.append(f" {cell} ", style=_S["txt"])
+            t.append("│\n", style=_S["sep"])
+    t.append(bot, style=_S["sep"])
     return t
 
 
@@ -208,23 +240,23 @@ def _render_cascade(items: list, cursor: int, iw: int) -> "Text":
     top = f"├{'─' * (iw + 2)}┐"
     sep = f"├{'─' * (iw + 2)}┤"
     bot = f"└{'─' * (iw + 2)}┘"
-    t.append(top + "\n", style="dim")
+    t.append(top + "\n", style=_S["sep"])
     for i, it in enumerate(items):
         if it is None:
-            t.append(sep + "\n", style="dim")
+            t.append(sep + "\n", style=_S["sep"])
             continue
         label = _label(it)
         display = f"{label} »" if _kids(it) is not None else label
         cell = f"{display:<{iw}}"
         if i == cursor:
-            t.append("│", style="dim")
-            t.append(f" {cell} ", style="bold reverse")
-            t.append("│\n", style="dim")
+            t.append("│", style=_S["sep"])
+            t.append(f" {cell} ", style=_S["hl"])
+            t.append("│\n", style=_S["sep"])
         else:
-            t.append("│", style="dim")
-            t.append(f" {cell} ")
-            t.append("│\n", style="dim")
-    t.append(bot, style="dim")
+            t.append("│", style=_S["sep"])
+            t.append(f" {cell} ", style=_S["txt"])
+            t.append("│\n", style=_S["sep"])
+    t.append(bot, style=_S["sep"])
     return t
 
 
@@ -439,5 +471,6 @@ def cmd_tui(args: Namespace) -> int:
     if not _HAS_TEXTUAL:
         print("ERROR: textual is required; run pip install -r requirements.txt")
         return 1
+    _load_theme()
     Wsl4aiApp(args).run()
     return 0
