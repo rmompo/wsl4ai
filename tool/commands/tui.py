@@ -60,7 +60,11 @@ def _load_theme() -> None:
         raw = data.get("styles", {}) if isinstance(data, dict) else {}
     except Exception:
         pass
-    _THEME_DARK = bool(raw.get("dark", True))
+    # "dark" key is authoritative; fall back to name-based detection if missing
+    if "dark" in raw:
+        _THEME_DARK = bool(raw["dark"])
+    else:
+        _THEME_DARK = "light" not in theme_id.lower()
     logging.debug("_load_theme: theme_id=%s  dark_key_in_file=%r  _THEME_DARK=%s", theme_id, raw.get("dark", "MISSING"), _THEME_DARK)
     logging.debug("_load_theme: item=%r  lines=%r", raw.get("item"), raw.get("lines"))
     _S["lines"]  = raw.get("lines",  "dim")
