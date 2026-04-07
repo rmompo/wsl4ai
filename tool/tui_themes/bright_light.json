@@ -1,5 +1,6 @@
 {
   "name": "Bright (Light)",
+  "dark": false,
   "styles": {
     "lines":    "#c000c0 bold",
     "item":     "#0b1320 bold",

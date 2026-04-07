@@ -1,5 +1,6 @@
 {
   "name": "Color Blind (Dark)",
+  "dark": true,
   "styles": {
     "lines":    "#c77dff bold",
     "item":     "#f8fafc",

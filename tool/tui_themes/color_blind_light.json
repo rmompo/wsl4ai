@@ -1,5 +1,6 @@
 {
   "name": "Color Blind (Light)",
+  "dark": false,
   "styles": {
     "lines":    "#7c3aed bold",
     "item":     "#111827",

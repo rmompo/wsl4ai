@@ -1,15 +1,16 @@
 {
   "name": "High Contrast",
+  "dark": true,
   "styles": {
-    "lines":      "#ffffff bold",
-    "item":       "#ffffff",
+    "lines":      "#ffffff on #000000 bold",
+    "item":       "#ffffff on #000000",
     "label":      "#000000 on #ffffff",
     "button":     "#000000 on #ffff00",
     "button_sel": "#000000 on #00ff00",
-    "text":       "#ffffff",
-    "text_hl":    "#ffff00 bold",
-    "text_ok":    "#00ff00 bold",
-    "text_err":   "#ff0000 bold",
-    "input":      "#ffff00"
+    "text":       "#ffffff on #000000",
+    "text_hl":    "#ffff00 on #000000 bold",
+    "text_ok":    "#00ff00 on #000000 bold",
+    "text_err":   "#ff0000 on #000000 bold",
+    "input":      "#ffff00 on #000000"
   }
 }

@@ -38,10 +38,12 @@ _S: dict[str, str] = {
     "text_err":   "red bold",
     "input":      "",
 }
+_THEME_DARK: bool = True  # set by _load_theme(); drives Textual dark/light mode
 
 
 def _load_theme() -> None:
     """Read config.json and load the configured theme into _S (in-place)."""
+    global _THEME_DARK
     theme_id = _DEFAULT_THEME
     try:
         cfg = json.loads(_THEME_CFG.read_text(encoding="utf-8"))
@@ -54,6 +56,7 @@ def _load_theme() -> None:
         raw = data.get("styles", {}) if isinstance(data, dict) else {}
     except Exception:
         pass
+    _THEME_DARK = bool(raw.get("dark", True))
     _S["lines"]  = raw.get("lines",  "dim")
     _S["item"]   = raw.get("item",   "")
     _S["label"]  = raw.get("label",  "bold")
@@ -314,7 +317,7 @@ if _HAS_TEXTUAL:
         DEFAULT_CSS = """
         DropdownMenu {
             layer: above;
-            background: transparent;
+            background: $surface;
         }
         """
 
@@ -363,12 +366,9 @@ if _HAS_TEXTUAL:
     class Wsl4aiApp(App):
         """WSL4AI main Textual application."""
 
-        DARK = False  # prevent Textual from forcing its own dark background
-
         CSS = """
         Screen {
             layers: default above;
-            background: transparent;
         }
         """
 
@@ -379,6 +379,9 @@ if _HAS_TEXTUAL:
             self._open_top_idx: int = -1
             self._dd_iw: int = 0
             self._stack: list[DropdownMenu] = []
+
+        def on_mount(self) -> None:
+            self.dark = _THEME_DARK
 
         def compose(self) -> ComposeResult:
             yield MenuBar()

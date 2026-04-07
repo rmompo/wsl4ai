@@ -1,5 +1,6 @@
 {
   "name": "Normal (Light)",
+  "dark": false,
   "styles": {
     "lines":    "#9b005f bold",
     "item":     "#102030",
