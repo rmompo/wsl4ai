@@ -365,6 +365,153 @@ def _render_cascade(items: list, cursor: int, iw: int) -> "Text":
     return t
 
 
+# ─── Dialog renderer ──────────────────────────────────────────────────────────
+
+def _render_dialog(
+    breadcrumb: str,
+    body_lines: list,
+    buttons: list[str],
+    btn_focus: int,
+    width: int,
+) -> "Text":
+    """Render a WSL4AI dialog frame as Rich Text.
+
+    Frame structure (width W, inner iw=W-2, content cw=W-6):
+        ╔╣ breadcrumb ╠═══╗
+        ║                 ║
+        ║ +--content----+ ║
+        ║ |             | ║  × body_lines
+        ║ +-------------+ ║
+        ╠═════════════════╣
+        ║ +--buttons----+ ║
+        ║ |       [ OK ]| ║
+        ║ +-------------+ ║
+        ╚═════════════════╝
+
+    body_lines: list of str | list[tuple[str,style]]
+    """
+    L   = _S["lines"]
+    T   = _S["text"]
+    LBL = _S["label"]
+
+    iw = width - 2      # inner width  (between ║ ║)
+    cw = width - 6      # content width (inside |…|, with 1-space margin each side)
+
+    t = Text()
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    bc   = f" {breadcrumb} "
+    fill = max(0, width - 4 - len(bc))   # ╔╣ + bc + ╠ + fill + ╗ = width
+    t.append("╔╣",        style=L)
+    t.append(bc,          style=LBL)
+    t.append("╠" + "═" * fill + "╗\n", style=L)
+
+    # ── Body area ─────────────────────────────────────────────────────────────
+    t.append("║" + " " * iw + "║\n",     style=L)
+    t.append("║ +" + "-" * cw + "+ ║\n", style=L)
+
+    for line in body_lines:
+        if isinstance(line, str):
+            padded = line[:cw].ljust(cw)
+            t.append("║ |",    style=L)
+            t.append(padded,   style=T)
+            t.append("| ║\n",  style=L)
+        else:
+            # list/tuple of (chunk, style) pairs
+            t.append("║ |", style=L)
+            used = 0
+            for chunk, sty in line:
+                t.append(chunk, style=sty)
+                used += len(chunk)
+            if used < cw:
+                t.append(" " * (cw - used))
+            t.append("| ║\n", style=L)
+
+    t.append("║ +" + "-" * cw + "+ ║\n", style=L)
+
+    # ── Separator ─────────────────────────────────────────────────────────────
+    t.append("╠" + "═" * iw + "╣\n", style=L)
+
+    # ── Button area ───────────────────────────────────────────────────────────
+    t.append("║ +" + "-" * cw + "+ ║\n", style=L)
+
+    btn_chunks: list[tuple[str, str]] = []
+    for i, btn in enumerate(buttons):
+        cell = f" {btn} "
+        sty  = _S["button_sel"] if i == btn_focus else _S["button"]
+        btn_chunks.append((cell, sty))
+
+    total_bw = sum(len(c) for c, _ in btn_chunks)
+    t.append("║ |",                   style=L)
+    t.append(" " * (cw - total_bw),   style=T)
+    for cell, sty in btn_chunks:
+        t.append(cell, style=sty)
+    t.append("| ║\n", style=L)
+
+    t.append("║ +" + "-" * cw + "+ ║\n", style=L)
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    t.append("╚" + "═" * iw + "╝", style=L)
+
+    return t
+
+
+# ─── Data helpers for list dialogs ────────────────────────────────────────────
+
+def _db_registry_list(cw: int) -> list[str]:
+    from commands.common import DB_PATH, connect_db
+    try:
+        with connect_db(DB_PATH) as con:
+            rows = con.execute(
+                "SELECT name, rel_path_host, "
+                "(SELECT 1 FROM uses WHERE registry_uuid = r.uuid LIMIT 1) AS in_use "
+                "FROM registries r ORDER BY name COLLATE NOCASE"
+            ).fetchall()
+        if not rows:
+            return ["(no entries)"]
+        col = cw - 4
+        return [f"{'*' if u else ' '} {n:<{col//2}} {h}"[:cw] for n, h, u in rows]
+    except Exception as exc:
+        return [f"Error: {exc}"]
+
+
+def _db_use_list(cw: int) -> list[str]:
+    from commands.common import DB_PATH, connect_db
+    try:
+        with connect_db(DB_PATH) as con:
+            rows = con.execute(
+                "SELECT w.name, r.name, u.enabled "
+                "FROM uses u "
+                "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                "JOIN registries r ON r.uuid = u.registry_uuid "
+                "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
+            ).fetchall()
+        if not rows:
+            return ["(no entries)"]
+        half = cw // 2 - 2
+        return [
+            f"{'[on]' if e else '[off]'} {wsl:<{half}} {reg}"[:cw]
+            for wsl, reg, e in rows
+        ]
+    except Exception as exc:
+        return [f"Error: {exc}"]
+
+
+def _db_wsl_list(cw: int) -> list[str]:
+    from commands.common import DB_PATH, connect_db
+    try:
+        with connect_db(DB_PATH) as con:
+            rows = con.execute(
+                "SELECT name, user FROM wsls ORDER BY name COLLATE NOCASE"
+            ).fetchall()
+        if not rows:
+            return ["(no entries)"]
+        half = cw // 2
+        return [f"{n:<{half}} {u}"[:cw] for n, u in rows]
+    except Exception as exc:
+        return [f"Error: {exc}"]
+
+
 # ─── Widgets ──────────────────────────────────────────────────────────────────
 
 if _HAS_TEXTUAL:
@@ -467,6 +614,133 @@ if _HAS_TEXTUAL:
         @property
         def iw(self) -> int:
             return _dropdown_iw(self._items)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    from textual.screen import ModalScreen
+
+    class _DialogWidget(Widget):
+        """Renders the full dialog frame as Rich Text."""
+
+        DEFAULT_CSS = """
+        _DialogWidget { background: $surface; }
+        """
+
+        def __init__(self, dlg: "Wsl4aiDialog") -> None:
+            super().__init__()
+            self._dlg = dlg
+
+        def on_mount(self) -> None:
+            d = self._dlg
+            self.styles.width  = d._dlg_w
+            self.styles.height = d._height()
+
+        def render(self) -> "Text":
+            d = self._dlg
+            return _render_dialog(
+                d._breadcrumb, d.body_lines(), d._buttons, d._btn_focus, d._dlg_w
+            )
+
+    class Wsl4aiDialog(ModalScreen):
+        """Base WSL4AI dialog.  Subclass and override body_lines()."""
+
+        DEFAULT_CSS = """
+        Wsl4aiDialog { align: center middle; }
+        """
+
+        def __init__(
+            self,
+            breadcrumb: str,
+            width: int = 60,
+            body_rows: int = 5,
+            buttons: "list[str] | None" = None,
+        ) -> None:
+            super().__init__()
+            self._breadcrumb = breadcrumb
+            self._dlg_w      = width
+            self._body_rows  = body_rows
+            self._buttons    = buttons or ["Close"]
+            self._btn_focus  = 0
+
+        def _height(self) -> int:
+            # header + blank + body_top + rows + body_bot + sep + btn_top + btn_row + btn_bot + footer
+            return self._body_rows + 9
+
+        def compose(self) -> ComposeResult:
+            yield _DialogWidget(self)
+
+        def body_lines(self) -> list:
+            """Override to provide content. Return list of str or [(chunk,style),...]."""
+            return [""] * self._body_rows
+
+        def on_key(self, event: "events.Key") -> None:
+            key = event.key
+            n   = len(self._buttons)
+            if key in ("tab", "right"):
+                if self._btn_focus < n - 1:
+                    self._btn_focus += 1
+                    self._refresh_dlg()
+            elif key in ("shift+tab", "left"):
+                if self._btn_focus > 0:
+                    self._btn_focus -= 1
+                    self._refresh_dlg()
+            elif key == "enter":
+                self.dismiss(self._buttons[self._btn_focus])
+            elif key == "escape":
+                self.dismiss(None)
+
+        def _refresh_dlg(self) -> None:
+            try:
+                self.query_one(_DialogWidget).refresh()
+            except Exception:
+                pass
+
+    class ListDialog(Wsl4aiDialog):
+        """Generic scrollable list dialog."""
+
+        def __init__(self, breadcrumb: str, rows: "list[str]", width: int = 62) -> None:
+            visible = max(3, min(len(rows), 12))
+            super().__init__(breadcrumb, width=width, body_rows=visible, buttons=["Close"])
+            self._rows    = rows
+            self._scroll  = 0   # top row index
+            self._cursor  = 0   # selected row index
+
+        def body_lines(self) -> list:
+            cw      = self._dlg_w - 6
+            visible = self._body_rows
+            window  = self._rows[self._scroll: self._scroll + visible]
+            lines   = []
+            for i, row in enumerate(window):
+                abs_i = self._scroll + i
+                if abs_i == self._cursor:
+                    padded = row[:cw].ljust(cw)
+                    lines.append([(padded, _S["item_sel"])])
+                else:
+                    lines.append(row[:cw].ljust(cw))
+            # pad if fewer rows than body_rows
+            while len(lines) < visible:
+                lines.append("")
+            return lines
+
+        def on_key(self, event: "events.Key") -> None:
+            key = event.key
+            n   = len(self._rows)
+            if key == "up":
+                if self._cursor > 0:
+                    self._cursor -= 1
+                    if self._cursor < self._scroll:
+                        self._scroll = self._cursor
+                    self._refresh_dlg()
+            elif key == "down":
+                if self._cursor < n - 1:
+                    self._cursor += 1
+                    if self._cursor >= self._scroll + self._body_rows:
+                        self._scroll += 1
+                    self._refresh_dlg()
+            else:
+                super().on_key(event)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -639,10 +913,11 @@ if _HAS_TEXTUAL:
             if action == "Exit":
                 self.exit()
                 return
-            # Theme switching: path = ["Others", "Theme", ...]
+
+            # ── Theme switching ────────────────────────────────────────────────
             if len(path) >= 3 and path[0] == "Others" and path[1] == "Theme":
                 theme_key = tuple(path[2:])
-                theme_id = _THEME_MAP.get(theme_key)
+                theme_id  = _THEME_MAP.get(theme_key)
                 if theme_id:
                     _save_theme(theme_id)
                     _load_theme()
@@ -651,6 +926,21 @@ if _HAS_TEXTUAL:
                 else:
                     self.notify(f"Unknown theme: {theme_key}", timeout=3)
                 return
+
+            # ── List dialogs ───────────────────────────────────────────────────
+            breadcrumb = " > ".join(path)
+            cw = 56   # content width for data fetch (dialog width 62, cw = 62-6)
+
+            if path == ["Registry", "List"]:
+                self.push_screen(ListDialog(breadcrumb, _db_registry_list(cw)))
+                return
+            if path == ["Use", "List"]:
+                self.push_screen(ListDialog(breadcrumb, _db_use_list(cw)))
+                return
+            if path == ["Wsl", "List"]:
+                self.push_screen(ListDialog(breadcrumb, _db_wsl_list(cw)))
+                return
+
             # TODO: connect remaining command handlers in the next phase
             self.notify(f"→ {action}", timeout=3)
 
