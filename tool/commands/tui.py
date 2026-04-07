@@ -151,12 +151,12 @@ def _bar_layout() -> list[tuple[int, int]]:
     """Return (label_x, label_w) for each top-level MENU item.
 
     Layout rules:
-    - 1-cell left margin.
+    - 2-cell left margin (1 border space + 1 separation space outside highlight).
     - Normal items: label + 1-cell gap.
     - Others (boxed): │ space label space │ + 1-cell gap.
     """
     out: list[tuple[int, int]] = []
-    x = 1
+    x = 2
     for i, item in enumerate(MENU):
         lw = len(_label(item))
         if i == _OTHERS_IDX:
@@ -468,8 +468,8 @@ if _HAS_TEXTUAL:
                 item = top.current_item
                 if item is not None and _kids(item) is not None:
                     self._push_cascade(top, _kids(item))   # open child cascade
-                elif len(self._stack) == 1:
-                    self._navigate_bar_from_dropdown(1)    # first level leaf → bar right
+                else:
+                    self._navigate_bar_from_dropdown(1)    # any leaf (any depth) → bar right
             elif key == "left":
                 if len(self._stack) > 1:
                     self._pop()                             # in cascade → close, back to parent
@@ -512,8 +512,7 @@ if _HAS_TEXTUAL:
             new_focus = self._bar_focus + direction
             n = len(MENU)
             if new_focus < 0 or new_focus >= n:
-                self._dismiss_all()
-                return
+                return  # boundary: do nothing, stay in current submenu
             self._dismiss_all()
             self._bar_focus = new_focus
             if _kids(MENU[self._bar_focus]) is not None:
