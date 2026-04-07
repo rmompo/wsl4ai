@@ -446,10 +446,14 @@ if _HAS_TEXTUAL:
         def _key_dropdown(self, key: str) -> None:
             top = self._stack[-1]
             if key == "up":
-                top.move(-1)
+                first = next((i for i, it in enumerate(top._items) if it is not None), 0)
+                if len(self._stack) == 1 and top._cursor == first:
+                    self._pop()   # first level, first item → close, back to bar
+                else:
+                    top.move(-1)
             elif key == "down":
                 top.move(1)
-            elif key in ("enter", "right"):
+            elif key == "enter":
                 item = top.current_item
                 if item is None:
                     return
@@ -460,6 +464,17 @@ if _HAS_TEXTUAL:
                     path = self._path() + [_label(item)]
                     self._dismiss_all()
                     self._dispatch(path)
+            elif key == "right":
+                item = top.current_item
+                if item is not None and _kids(item) is not None:
+                    self._push_cascade(top, _kids(item))   # open child cascade
+                elif len(self._stack) == 1:
+                    self._navigate_bar_from_dropdown(1)    # first level leaf → bar right
+            elif key == "left":
+                if len(self._stack) > 1:
+                    self._pop()                             # in cascade → close, back to parent
+                else:
+                    self._navigate_bar_from_dropdown(-1)   # first level → bar left
             elif key == "escape":
                 self._pop()
             elif key == "q":
@@ -491,6 +506,20 @@ if _HAS_TEXTUAL:
             self._open_top_idx = -1
             self._dd_iw = 0
             self._refresh_bar()
+
+        def _navigate_bar_from_dropdown(self, direction: int) -> None:
+            """Close all dropdowns, move bar focus left/right (non-circular), open new submenu."""
+            new_focus = self._bar_focus + direction
+            n = len(MENU)
+            if new_focus < 0 or new_focus >= n:
+                self._dismiss_all()
+                return
+            self._dismiss_all()
+            self._bar_focus = new_focus
+            if _kids(MENU[self._bar_focus]) is not None:
+                self._open_from_bar(self._bar_focus)
+            else:
+                self._refresh_bar()   # leaf item — just focus on bar, no dispatch
 
         def _path(self) -> list[str]:
             """Build the action path from root to the currently selected item."""
