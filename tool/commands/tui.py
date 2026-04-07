@@ -395,7 +395,7 @@ def _render_dialog(
     LBL = _S["label"]
 
     iw = width - 2      # inner width  (between ║ ║)
-    cw = width - 6      # content width (inside |…|, with 1-space margin each side)
+    cw = width - 4      # content width (1-space margin each side: ║ content ║)
 
     t = Text()
 
@@ -407,34 +407,29 @@ def _render_dialog(
     t.append("╠" + "═" * fill + "╗\n", style=L)
 
     # ── Body area ─────────────────────────────────────────────────────────────
-    t.append("║" + " " * iw + "║\n",     style=L)
-    t.append("║ +" + "-" * cw + "+ ║\n", style=L)
+    t.append("║" + " " * iw + "║\n", style=L)   # blank line above content
 
     for line in body_lines:
         if isinstance(line, str):
             padded = line[:cw].ljust(cw)
-            t.append("║ |",    style=L)
-            t.append(padded,   style=T)
-            t.append("| ║\n",  style=L)
+            t.append("║ ",   style=L)
+            t.append(padded, style=T)
+            t.append(" ║\n", style=L)
         else:
             # list/tuple of (chunk, style) pairs
-            t.append("║ |", style=L)
+            t.append("║ ", style=L)
             used = 0
             for chunk, sty in line:
                 t.append(chunk, style=sty)
                 used += len(chunk)
             if used < cw:
                 t.append(" " * (cw - used))
-            t.append("| ║\n", style=L)
-
-    t.append("║ +" + "-" * cw + "+ ║\n", style=L)
+            t.append(" ║\n", style=L)
 
     # ── Separator ─────────────────────────────────────────────────────────────
     t.append("╠" + "═" * iw + "╣\n", style=L)
 
-    # ── Button area ───────────────────────────────────────────────────────────
-    t.append("║ +" + "-" * cw + "+ ║\n", style=L)
-
+    # ── Button row (right-aligned) ────────────────────────────────────────────
     btn_chunks: list[tuple[str, str]] = []
     for i, btn in enumerate(buttons):
         cell = f" {btn} "
@@ -442,13 +437,11 @@ def _render_dialog(
         btn_chunks.append((cell, sty))
 
     total_bw = sum(len(c) for c, _ in btn_chunks)
-    t.append("║ |",                   style=L)
-    t.append(" " * (cw - total_bw),   style=T)
+    t.append("║ ",                   style=L)
+    t.append(" " * (cw - total_bw), style=T)
     for cell, sty in btn_chunks:
         t.append(cell, style=sty)
-    t.append("| ║\n", style=L)
-
-    t.append("║ +" + "-" * cw + "+ ║\n", style=L)
+    t.append(" ║\n", style=L)
 
     # ── Footer ────────────────────────────────────────────────────────────────
     t.append("╚" + "═" * iw + "╝", style=L)
@@ -665,8 +658,8 @@ if _HAS_TEXTUAL:
             self._btn_focus  = 0
 
         def _height(self) -> int:
-            # header + blank + body_top + rows + body_bot + sep + btn_top + btn_row + btn_bot + footer
-            return self._body_rows + 9
+            # header + blank + body_rows + separator + btn_row + footer
+            return self._body_rows + 5
 
         def compose(self) -> ComposeResult:
             yield _DialogWidget(self)
@@ -708,7 +701,7 @@ if _HAS_TEXTUAL:
             self._cursor  = 0   # selected row index
 
         def body_lines(self) -> list:
-            cw      = self._dlg_w - 6
+            cw      = self._dlg_w - 4
             visible = self._body_rows
             window  = self._rows[self._scroll: self._scroll + visible]
             lines   = []
@@ -772,6 +765,8 @@ if _HAS_TEXTUAL:
             yield MenuBar()
 
         def on_key(self, event: events.Key) -> None:
+            if len(self.screen_stack) > 1:
+                return   # modal is active — let it handle all keys
             if self._stack:
                 self._key_dropdown(event.key)
             else:
@@ -929,7 +924,7 @@ if _HAS_TEXTUAL:
 
             # ── List dialogs ───────────────────────────────────────────────────
             breadcrumb = " > ".join(path)
-            cw = 56   # content width for data fetch (dialog width 62, cw = 62-6)
+            cw = 58   # content width for data fetch (dialog width 62, cw = 62-4)
 
             if path == ["Registry", "List"]:
                 self.push_screen(ListDialog(breadcrumb, _db_registry_list(cw)))
