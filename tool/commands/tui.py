@@ -26,6 +26,7 @@ _DEFAULT_THEME = "normal_dark"
 # item_sel is always auto-computed as the inverse of item (not stored in theme files).
 # button_sel can be overridden per-theme; defaults to the inverse of button.
 _S: dict[str, str] = {
+    "bg":             "#000000",
     "lines":          "dim",
     "item":           "",
     "item_sel":       "bold reverse",
@@ -54,15 +55,16 @@ def _load_theme() -> None:
         raw = data.get("styles", {}) if isinstance(data, dict) else {}
     except Exception:
         pass
-    _S["lines"]  = raw.get("lines",  "dim")
-    _S["item"]   = raw.get("item",   "")
-    _S["label"]  = raw.get("label",  "bold")
-    _S["button"] = raw.get("button", "bold")
-    _S["text"]         = raw.get("text",         "")
-    _S["text_hl"]      = raw.get("text_hl",      "bold")
+    _S["bg"]     = raw.get("background", "#000000")
+    _S["lines"]  = raw.get("lines",     "dim")
+    _S["item"]   = raw.get("item",      "")
+    _S["label"]  = raw.get("label",     "bold")
+    _S["button"] = raw.get("button",    "bold")
+    _S["text"]     = raw.get("text",     "")
+    _S["text_hl"]  = raw.get("text_hl",  "bold")
     _S["text_ok"]  = raw.get("text_ok",  "green bold")
     _S["text_err"] = raw.get("text_err", "red bold")
-    _S["input"]        = raw.get("input",        "")
+    _S["input"]    = raw.get("input",    "")
     # item_sel: always the inverse of item (UX spec — not stored in theme)
     item = _S["item"]
     _S["item_sel"] = (item + " reverse").strip() if item else "bold reverse"
@@ -301,6 +303,9 @@ if _HAS_TEXTUAL:
         }
         """
 
+        def on_mount(self) -> None:
+            self.styles.background = _S["bg"]
+
         def render(self) -> "Text":
             w = self.size.width or 80
             a: "Wsl4aiApp" = self.app  # type: ignore[assignment]
@@ -332,6 +337,7 @@ if _HAS_TEXTUAL:
             self.styles.width = iw + 4          # │ + space + content + space + │
             self.styles.height = len(self._items) + 1 + extra
             self.styles.offset = (self._x, self._y)
+            self.styles.background = _S["bg"]
 
         def render(self) -> "Text":
             iw = _dropdown_iw(self._items)
@@ -363,6 +369,8 @@ if _HAS_TEXTUAL:
     class Wsl4aiApp(App):
         """WSL4AI main Textual application."""
 
+        DARK = False  # prevent Textual from forcing its own dark background
+
         CSS = """
         Screen {
             layers: default above;
@@ -376,6 +384,10 @@ if _HAS_TEXTUAL:
             self._open_top_idx: int = -1
             self._dd_iw: int = 0
             self._stack: list[DropdownMenu] = []
+
+        def on_mount(self) -> None:
+            self.screen.styles.background = _S["bg"]
+            self.screen.styles.color = _S["item"]
 
         def compose(self) -> ComposeResult:
             yield MenuBar()

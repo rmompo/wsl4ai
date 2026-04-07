@@ -1,14 +1,15 @@
 {
   "name": "Bright (Light)",
   "styles": {
+    "background":   "#ffffff",
     "lines":        "#c000c0 bold",
     "item":         "#0b1320 bold",
     "label":        "#0066ff bold",
     "button":       "#cc7a00 bold",
     "text":         "#0b1320 bold",
     "text_hl":      "#0066ff bold",
-    "text_ok": "#00a84f bold",
-    "text_err":   "#cc004d bold",
+    "text_ok":      "#00a84f bold",
+    "text_err":     "#cc004d bold",
     "input":        "#003d7a bold"
   }
 }

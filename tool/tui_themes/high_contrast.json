@@ -1,6 +1,7 @@
 {
   "name": "High Contrast",
   "styles": {
+    "background":   "#000000",
     "lines":        "#ffffff on #000000 bold",
     "item":         "#ffffff on #000000 bold",
     "label":        "#ffffff on #000000 bold",
@@ -8,8 +9,8 @@
     "button_sel":   "#000000 on #00ff00 bold",
     "text":         "#ffffff on #000000 bold",
     "text_hl":      "#ffff00 on #000000 bold",
-    "text_ok": "#000000 on #00ff00 bold",
-    "text_err":   "#ffffff on #ff0000 bold",
+    "text_ok":      "#000000 on #00ff00 bold",
+    "text_err":     "#ffffff on #ff0000 bold",
     "input":        "#ffff00 on #000000 bold"
   }
 }

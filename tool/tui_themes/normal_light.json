@@ -1,14 +1,15 @@
 {
   "name": "Normal (Light)",
   "styles": {
+    "background":   "#f5f7fa",
     "lines":        "#9b005f bold",
     "item":         "#102030",
     "label":        "#005f87 bold",
     "button":       "#9a5a00 bold",
     "text":         "#102030",
     "text_hl":      "#005f87 bold",
-    "text_ok": "#007a3d bold",
-    "text_err":   "#b00040 bold",
+    "text_ok":      "#007a3d bold",
+    "text_err":     "#b00040 bold",
     "input":        "#1a365d"
   }
 }
