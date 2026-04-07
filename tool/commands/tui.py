@@ -344,7 +344,8 @@ if _HAS_TEXTUAL:
             super().__init__()
             self._items = items
             self._x = x
-            self._y = y
+            self._y = y           # absolute screen y (used for child cascade calculations)
+            self._y_rel: int | None = None  # relative offset set by _push_cascade
             self._cascade = cascade
             self._cursor = next((i for i, it in enumerate(items) if it is not None), 0)
 
@@ -353,7 +354,9 @@ if _HAS_TEXTUAL:
             extra = 1 if self._cascade else 0   # +1 row for top border in cascades
             self.styles.width = iw + 4          # │ + space + content + space + │
             self.styles.height = len(self._items) + 1 + extra
-            self.styles.offset = (self._x, self._y)
+            # Use relative offset for cascades (natural flow pos ≠ 0 on above layer)
+            offset_y = self._y_rel if self._y_rel is not None else self._y
+            self.styles.offset = (self._x, offset_y)
 
         def render(self) -> "Text":
             iw = _dropdown_iw(self._items)
@@ -492,10 +495,16 @@ if _HAS_TEXTUAL:
         def _push_cascade(self, parent: "DropdownMenu", kids: list) -> None:
             # x: parent's right │ column — cascade overwrites it with ├
             x = parent._x + parent.iw + 3
-            # y: row of the currently selected item in parent
+            # y_abs: absolute screen row for the cascade top border
             extra = 1 if parent._cascade else 0
-            y = parent._y + extra + parent._cursor
-            dd = DropdownMenu(kids, x, y, cascade=True)
+            y_abs = parent._y + extra + parent._cursor
+            # y_rel: offset relative to cascade's natural flow position on the above layer.
+            # Natural y = sum of heights of all already-mounted above-layer widgets.
+            natural_y = sum(len(dd._items) + 1 + (1 if dd._cascade else 0) for dd in self._stack)
+            y_rel = y_abs - natural_y
+            logging.debug("_push_cascade: y_abs=%d  natural_y=%d  y_rel=%d  x=%d", y_abs, natural_y, y_rel, x)
+            dd = DropdownMenu(kids, x, y_abs, cascade=True)
+            dd._y_rel = y_rel
             self._stack.append(dd)
             self.screen.mount(dd)
 
