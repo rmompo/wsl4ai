@@ -112,6 +112,33 @@ def _load_theme() -> None:
         _S["button_sel"] = (btn + " reverse").strip() if btn else "bold reverse"
 
 
+# ─── Theme map ────────────────────────────────────────────────────────────────
+# Maps (submenu_label, ...) path segments after "Theme" → theme file id
+
+_THEME_MAP: dict[tuple, str] = {
+    ("Dark",  "Normal"):      "normal_dark",
+    ("Dark",  "Bright"):      "bright_dark",
+    ("Dark",  "Color Blind"): "color_blind_dark",
+    ("Light", "Normal"):      "normal_light",
+    ("Light", "Bright"):      "bright_light",
+    ("Light", "Color Blind"): "color_blind_light",
+    ("High Contrast",):       "high_contrast",
+}
+
+
+def _save_theme(theme_id: str) -> None:
+    """Persist theme_id to conf/config.json under tui.theme."""
+    try:
+        try:
+            cfg = json.loads(_THEME_CFG.read_text(encoding="utf-8"))
+        except Exception:
+            cfg = {}
+        cfg.setdefault("tui", {})["theme"] = theme_id
+        _THEME_CFG.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception as exc:
+        logging.warning("_save_theme: could not write config: %s", exc)
+
+
 # ─── Menu definition ──────────────────────────────────────────────────────────
 # str         → leaf action (direct dispatch on enter)
 # (str, list) → item with submenu children
@@ -612,8 +639,29 @@ if _HAS_TEXTUAL:
             if action == "Exit":
                 self.exit()
                 return
-            # TODO: connect to command handlers in the next phase
+            # Theme switching: path = ["Others", "Theme", ...]
+            if len(path) >= 3 and path[0] == "Others" and path[1] == "Theme":
+                theme_key = tuple(path[2:])
+                theme_id = _THEME_MAP.get(theme_key)
+                if theme_id:
+                    _save_theme(theme_id)
+                    _load_theme()
+                    self._apply_theme()
+                    self.notify(f"Theme: {' › '.join(path[2:])}", timeout=2)
+                else:
+                    self.notify(f"Unknown theme: {theme_key}", timeout=3)
+                return
+            # TODO: connect remaining command handlers in the next phase
             self.notify(f"→ {action}", timeout=3)
+
+        def _apply_theme(self) -> None:
+            """Switch Textual dark/light mode and refresh all widgets."""
+            self.theme = "textual-light" if not _THEME_DARK else "textual-dark"
+            try:
+                self.query_one(Banner).refresh()
+            except Exception:
+                pass
+            self._refresh_bar()
 
         def _refresh_bar(self) -> None:
             try:
