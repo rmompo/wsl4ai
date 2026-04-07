@@ -89,6 +89,11 @@ def main() -> int:
         metavar="BRANCH",
         help=f"Repository branch to check and download from (default: {DEFAULT_BRANCH})",
     )
+    parser.add_argument(
+        "-f", "--force",
+        action="store_true",
+        help="Force update without checking the remote version",
+    )
     args = parser.parse_args()
 
     local_v, local_str = _local_version()
@@ -121,8 +126,8 @@ def main() -> int:
     remote_str = _version_str(remote_v)
     print(f"Remote version: {remote_str}")
 
-    # Step 4: compare
-    if local_v is not None and remote_v <= local_v:
+    # Step 4: compare (skipped with --force)
+    if not args.force and local_v is not None and remote_v <= local_v:
         print("Already up to date.")
         _cleanup()
         return 0
