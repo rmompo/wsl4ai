@@ -231,13 +231,14 @@ def _render_bar(total_w: int, focused: int, open_idx: int, dd_iw: int) -> "Text"
     # ── Row 3: bottom border ─────────────────────────────────────────────────
     r3 = ["─"] * total_w
     if open_idx >= 0 and dd_iw > 0 and open_idx == _OTHERS_IDX:
-        # Others dropdown open: left box corner becomes ┌ (dropdown starts here),
-        # right box corner keeps ┴ (closes the Others top border connector).
-        dr = ox + dd_iw + 3
+        # ┴ closes the Others left │ connector; dropdown ┌ starts one cell to the right.
+        # oe falls inside the dropdown span → stays "─" (no explicit write needed).
+        dl = ox + 1                  # dropdown left corner = ox + 1
+        dr = dl + dd_iw + 3         # dropdown right corner
         if 0 <= ox < total_w:
-            r3[ox] = "┌"
-        if 0 <= oe < total_w:
-            r3[oe] = "┴"
+            r3[ox] = "┴"
+        if 0 < dl < total_w:
+            r3[dl] = "┌"
         if 0 < dr < total_w:
             r3[dr] = "┐"
     else:
@@ -447,7 +448,7 @@ if _HAS_TEXTUAL:
                 return
             layout = _bar_layout()
             lx, _ = layout[idx]
-            x = lx - 2 if idx == _OTHERS_IDX else lx - 1
+            x = lx - 1   # dropdown left │ aligns with bar ┌ (ox+1 for Others, lx-1 for all)
             dd = DropdownMenu(kids, x, 3, cascade=False)
             self._open_top_idx = idx
             self._dd_iw = dd.iw
