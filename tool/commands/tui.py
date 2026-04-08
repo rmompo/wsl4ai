@@ -715,15 +715,15 @@ if _HAS_TEXTUAL:
             exactly once.  Subclasses override _handle_key() instead.
             """
             event.stop()
-            self._handle_key(event.key)
+            self._handle_key(event)
 
-        def _handle_key(self, key: str) -> None:
+        def _handle_key(self, event: "events.Key") -> None:
             """Override in subclasses to add extra key handling.
-            Tab-based button navigation is reserved for ADD dialogs only.
+            Tab-based circular input navigation is for ADD dialogs only.
             """
-            if key == "enter":
+            if event.key == "enter":
                 self.dismiss(self._buttons[self._btn_focus])
-            elif key == "escape":
+            elif event.key == "escape":
                 self.dismiss(None)
 
         def _refresh_dlg(self) -> None:
@@ -753,10 +753,10 @@ if _HAS_TEXTUAL:
                 "",
             ]
 
-        def _handle_key(self, key: str) -> None:
-            if key == "escape":
+        def _handle_key(self, event: "events.Key") -> None:
+            if event.key == "escape":
                 self.dismiss(None)
-            elif key == "enter":
+            elif event.key == "enter":
                 self.dismiss("Ok")
 
     class ListDialog(Wsl4aiDialog):
@@ -867,7 +867,8 @@ if _HAS_TEXTUAL:
 
         # ── keyboard ──────────────────────────────────────────────────────────
 
-        def _handle_key(self, key: str) -> None:
+        def _handle_key(self, event: "events.Key") -> None:
+            key          = event.key
             n            = len(self._records)
             content_rows = self._body_rows - 2
             max_scroll   = max(0, len(self._flat) - content_rows)
@@ -883,7 +884,7 @@ if _HAS_TEXTUAL:
                     self._ensure_visible(content_rows, max_scroll)
                     self._refresh_dlg()
             else:
-                super()._handle_key(key)  # button nav + close
+                super()._handle_key(event)  # button nav + close
 
         def _ensure_visible(self, content_rows: int, max_scroll: int) -> None:
             """Scroll so ALL lines of the selected record are visible if possible."""
@@ -914,7 +915,8 @@ if _HAS_TEXTUAL:
             self._buttons   = ["Cancel", "Remove"]
             self._btn_focus = 0
 
-        def _handle_key(self, key: str) -> None:
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
@@ -964,6 +966,109 @@ if _HAS_TEXTUAL:
                     self.app.notify(f"Remove failed: {exc}", timeout=4)
 
             self.app.push_screen(ConfirmDialog(f"Remove '{name}'?"), _do_remove)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class RegistryAddDialog(Wsl4aiDialog):
+        """Registry Add form — Name / Host / Wsl inputs with Tab circular navigation."""
+
+        _LABELS = ["Name", "Host", "Wsl "]   # padded to 4 chars each
+        _LW     = 4                            # label display width
+
+        def __init__(self, breadcrumb: str, width: int = 64) -> None:
+            # body: blank + 3 fields + blank = 5 rows
+            super().__init__(breadcrumb, width=width, body_rows=5, buttons=["Cancel", "Add"])
+            self._values      = ["", "", ""]   # Name, Host, Wsl
+            self._field_focus = 0              # active input index
+
+        # ── rendering ─────────────────────────────────────────────────────────
+
+        def body_lines(self) -> list:
+            cw  = self._dlg_w - 4   # content width
+            iw  = cw - self._LW - 2  # input width (label + "  " separator)
+            result: list = [""]      # blank line above fields
+
+            for i, (lbl, val) in enumerate(zip(self._LABELS, self._values)):
+                active = (i == self._field_focus)
+                # Show last iw-1 chars when text overflows, with cursor at end
+                if len(val) >= iw:
+                    visible = val[-(iw - 1):]
+                else:
+                    visible = val
+                if active:
+                    display = (visible + "│").ljust(iw)
+                    result.append([
+                        (lbl + "  ", _S["text_hl"]),
+                        (display,    _S["input"]),
+                    ])
+                else:
+                    display = visible.ljust(iw)
+                    result.append([
+                        (lbl + "  ", _S["text"]),
+                        (display,    _S["input"]),
+                    ])
+
+            result.append("")   # blank line below fields
+            return result
+
+        # ── keyboard ──────────────────────────────────────────────────────────
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            n   = len(self._values)
+
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "tab":
+                self._field_focus = (self._field_focus + 1) % n
+                self._refresh_dlg()
+            elif key == "shift+tab":
+                self._field_focus = (self._field_focus - 1) % n
+                self._refresh_dlg()
+            elif key == "backspace":
+                if self._values[self._field_focus]:
+                    self._values[self._field_focus] = self._values[self._field_focus][:-1]
+                    self._refresh_dlg()
+            elif key == "enter":
+                self._try_submit()
+            elif event.is_printable and event.character:
+                self._values[self._field_focus] += event.character
+                self._refresh_dlg()
+
+        def _try_submit(self) -> None:
+            name = self._values[0].strip()
+            host = self._values[1].strip()
+            wsl  = self._values[2].strip()
+            if not name or not host or not wsl:
+                self.app.notify("All fields are required", timeout=3)
+                return
+
+            def _do_add(result: "str | None") -> None:
+                if result != "Ok":
+                    return
+                import uuid as _uuid
+                from commands.common import DB_PATH, connect_db
+                uid = str(_uuid.uuid4())
+                try:
+                    with connect_db(DB_PATH) as con:
+                        taken = con.execute(
+                            "SELECT name FROM registries WHERE LOWER(name) = LOWER(?) LIMIT 1",
+                            (name,),
+                        ).fetchone()
+                        if taken:
+                            self.app.notify(f"Name already taken: {taken[0]!r}", timeout=4)
+                            return
+                        con.execute(
+                            "INSERT INTO registries (uuid, name, rel_path_host, rel_path_wsl)"
+                            " VALUES (?, ?, ?, ?)",
+                            (uid, name, host, wsl),
+                        )
+                    self.app.notify(f"Registry added: {name}", timeout=3)
+                    self.dismiss(None)
+                except Exception as exc:
+                    self.app.notify(f"Add failed: {exc}", timeout=4)
+
+            self.app.push_screen(ConfirmDialog(f"Add registry '{name}'?"), _do_add)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1164,6 +1269,9 @@ if _HAS_TEXTUAL:
                 return
             if path == ["Registry", "Remove"]:
                 self.push_screen(RegistryRemoveDialog(breadcrumb))
+                return
+            if path == ["Registry", "Add"]:
+                self.push_screen(RegistryAddDialog(breadcrumb))
                 return
             if path == ["Use", "List"]:
                 hdr, recs = _db_use_list()
