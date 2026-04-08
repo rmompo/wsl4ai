@@ -429,17 +429,21 @@ def _render_dialog(
     # ── Separator ─────────────────────────────────────────────────────────────
     t.append("╠" + "═" * iw + "╣\n", style=L)
 
-    # ── Button row (right-aligned) ────────────────────────────────────────────
+    # ── Button row (right-aligned, equal width, 1-space gap between buttons) ─────
+    max_bw = max(len(b) for b in buttons) if buttons else 0
     btn_chunks: list[tuple[str, str]] = []
     for i, btn in enumerate(buttons):
-        cell = f" {btn} "
+        cell = f" {btn.center(max_bw)} "          # equal width for all buttons
         sty  = _S["button_sel"] if i == btn_focus else _S["button"]
         btn_chunks.append((cell, sty))
 
-    total_bw = sum(len(c) for c, _ in btn_chunks)
+    # total width = sum of cells + 1-space gap between each pair
+    total_bw = sum(len(c) for c, _ in btn_chunks) + max(0, len(btn_chunks) - 1)
     t.append("║ ",                   style=L)
     t.append(" " * (cw - total_bw), style=T)
-    for cell, sty in btn_chunks:
+    for i, (cell, sty) in enumerate(btn_chunks):
+        if i > 0:
+            t.append(" ", style=T)          # 1-space gap between buttons
         t.append(cell, style=sty)
     t.append(" ║\n", style=L)
 
@@ -753,7 +757,7 @@ if _HAS_TEXTUAL:
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
-                self.dismiss("ok")
+                self.dismiss("Ok")
 
     class ListDialog(Wsl4aiDialog):
         """Scrollable multi-line record list dialog.
@@ -949,7 +953,7 @@ if _HAS_TEXTUAL:
                 return
 
             def _do_remove(result: "str | None") -> None:
-                if result != "ok":
+                if result != "Ok":
                     return
                 try:
                     with connect_db(DB_PATH) as con:
