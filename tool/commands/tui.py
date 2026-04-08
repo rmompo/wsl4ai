@@ -1435,7 +1435,26 @@ if _HAS_TEXTUAL:
                 self.push_screen(ListDialog(breadcrumb, hdr, recs))
                 return
             if path == ["Wsl", "Set"]:
-                self.push_screen(WslSetDialog(breadcrumb))
+                ri = self._cli_args.runtime_identity
+                from commands.common import DB_PATH, connect_db
+                try:
+                    with connect_db(DB_PATH) as con:
+                        row = con.execute(
+                            "SELECT uuid, name, user, cli_command FROM wsls"
+                            " WHERE name = ? AND user = ?",
+                            (ri.wsl_name, ri.user),
+                        ).fetchone()
+                except Exception as exc:
+                    self.notify(f"DB error: {exc}", timeout=4)
+                    return
+                if not row:
+                    self.notify(
+                        f"WSL '{ri.wsl_name}' not found in DB — run 'use add' first",
+                        timeout=4,
+                    )
+                    return
+                uuid, name, user, cli_cmd = row
+                self.push_screen(WslSetFormDialog(breadcrumb, uuid, name, user, cli_cmd or ""))
                 return
 
             # TODO: connect remaining command handlers in the next phase
