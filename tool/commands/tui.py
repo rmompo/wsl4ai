@@ -687,12 +687,15 @@ def _get_aliases_typed() -> "list[tuple[str, str]]":
 
 
 def _db_mounted_uses(wsl_name: str, user: str) -> "tuple[str, list, list]":
-    """Return (header, display_records, raw_rows) for mounted=1 uses of given WSL."""
+    """Return (header, display_records, raw_rows) for mounted=1 uses of given WSL.
+
+    raw_rows columns: (r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd)
+    """
     from commands.common import DB_PATH, connect_db
     try:
         with connect_db(DB_PATH) as con:
             rows = con.execute(
-                "SELECT r.uuid, r.name, r.rel_path_wsl, w.cli_command "
+                "SELECT r.uuid, r.name, r.rel_path_host, r.rel_path_wsl, w.cli_command "
                 "FROM uses u "
                 "JOIN registries r ON r.uuid = u.registry_uuid "
                 "JOIN wsls w ON w.uuid = u.wsl_uuid "
@@ -702,13 +705,14 @@ def _db_mounted_uses(wsl_name: str, user: str) -> "tuple[str, list, list]":
             ).fetchall()
         if not rows:
             return "LIST", [["(no mounted uses)"]], []
-        W = 8  # "Registry"
+        W = 13  # "Registry UUID" / "Registry Name"
         records = []
-        for r_uuid, r_name, rel_path, cli_cmd in rows:
+        for r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd in rows:
             records.append([
-                (_lpad("Registry", W), r_name),
-                (_lpad("Path WSL", W), rel_path or ""),
-                (_lpad("CLI cmd",  W), cli_cmd  or ""),
+                (_lpad("Registry UUID", W), r_uuid),
+                (_lpad("Registry Name", W), r_name),
+                (_lpad("Path Host",     W), rel_path_host or ""),
+                (_lpad("Path Wsl",      W), rel_path_wsl  or ""),
             ])
         return "LIST", records, list(rows)
     except Exception as exc:
@@ -1908,14 +1912,15 @@ if _HAS_TEXTUAL:
         """Select a mounted use to start."""
 
         def __init__(self, breadcrumb: str, raw_rows: list) -> None:
-            # raw_rows: list of (r_uuid, r_name, rel_path_wsl, cli_cmd)
-            W = 8
+            # raw_rows: list of (r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd)
+            W = 13  # "Registry UUID" / "Registry Name"
             records = []
-            for r_uuid, r_name, rel_path, cli_cmd in raw_rows:
+            for r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd in raw_rows:
                 records.append([
-                    (_lpad("Registry", W), r_name),
-                    (_lpad("Path WSL", W), rel_path or ""),
-                    (_lpad("CLI cmd",  W), cli_cmd  or ""),
+                    (_lpad("Registry UUID", W), r_uuid),
+                    (_lpad("Registry Name", W), r_name),
+                    (_lpad("Path Host",     W), rel_path_host or ""),
+                    (_lpad("Path Wsl",      W), rel_path_wsl  or ""),
                 ])
             if not records:
                 records = [["(no mounted uses)"]]
@@ -2238,7 +2243,7 @@ if _HAS_TEXTUAL:
                 def _on_start(selected: "tuple | None") -> None:
                     if selected is None:
                         return
-                    r_uuid, r_name, rel_path, cli_cmd = selected
+                    r_uuid, r_name, rel_path_host, rel_path, cli_cmd = selected
                     from commands.common import expand_path_template, load_local_env_paths
                     import os
                     cli = (cli_cmd or "").strip()
