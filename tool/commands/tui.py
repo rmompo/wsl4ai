@@ -1196,9 +1196,10 @@ if _HAS_TEXTUAL:
         _LBL_EDIT  = "CLI cmd"                           # editable label, 7 chars
 
         def __init__(self, breadcrumb: str, uuid: str, name: str, user: str, cli_cmd: str) -> None:
-            self._uuid    = uuid
-            self._name    = name
-            self._user    = user
+            # NOTE: avoid self._name — Textual's Widget uses it internally
+            self._wsl_uuid = uuid
+            self._wsl_name = name
+            self._wsl_user = user
             # body: blank + 3 ro + blank + 1 editable + blank = 7 rows
             super().__init__(breadcrumb, width=70, body_rows=7, buttons=["Cancel", "Save"])
             self._cli_val        = cli_cmd or ""   # pre-filled
@@ -1223,7 +1224,7 @@ if _HAS_TEXTUAL:
             result: list = [""]   # blank
 
             # read-only context rows
-            for lbl, val in zip(self._LABELS_RO, [self._uuid, self._name, self._user]):
+            for lbl, val in zip(self._LABELS_RO, [self._wsl_uuid, self._wsl_name, self._wsl_user]):
                 safe = (val or "")
                 result.append([(lbl + "  ", _S["text_hl"]), (safe[:iw].ljust(iw), _S["text"])])
 
@@ -1267,14 +1268,14 @@ if _HAS_TEXTUAL:
                     with connect_db(DB_PATH) as con:
                         con.execute(
                             "UPDATE wsls SET cli_command = ? WHERE uuid = ?",
-                            (cli_val, self._uuid),
+                            (cli_val, self._wsl_uuid),
                         )
-                    self.app.notify(f"Updated CLI cmd for '{self._name}'", timeout=3)
+                    self.app.notify(f"Updated CLI cmd for '{self._wsl_name}'", timeout=3)
                     self.dismiss(None)
                 except Exception as exc:
                     self.app.notify(f"Save failed: {exc}", timeout=4)
 
-            self.app.push_screen(ConfirmDialog(f"Save CLI cmd for '{self._name}'?"), _do_save)
+            self.app.push_screen(ConfirmDialog(f"Save CLI cmd for '{self._wsl_name}'?"), _do_save)
 
     class WslSetDialog(ListDialog):
         """Select a WSL entry to edit its CLI command."""
