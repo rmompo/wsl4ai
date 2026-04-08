@@ -451,24 +451,34 @@ def _render_dialog(
 
 # ─── Data helpers for list dialogs ────────────────────────────────────────────
 
-def _db_registry_list(cw: int) -> list[str]:
+def _db_registry_list() -> "tuple[str, list[list[str]]]":
+    """Returns (header, records) where each record is a list of display lines."""
     from commands.common import DB_PATH, connect_db
     try:
         with connect_db(DB_PATH) as con:
             rows = con.execute(
-                "SELECT name, rel_path_host, "
+                "SELECT r.uuid, r.name, r.rel_path_host, r.rel_path_wsl, "
                 "(SELECT 1 FROM uses WHERE registry_uuid = r.uuid LIMIT 1) AS in_use "
                 "FROM registries r ORDER BY name COLLATE NOCASE"
             ).fetchall()
         if not rows:
-            return ["(no entries)"]
-        col = cw - 4
-        return [f"{'*' if u else ' '} {n:<{col//2}} {h}"[:cw] for n, h, u in rows]
+            return "REGISTRY LIST", [["(no entries)"]]
+        records = []
+        for uuid, name, host, wsl, in_use in rows:
+            records.append([
+                f"UUID:   {uuid}",
+                f"Name:   {name}",
+                f"Host:   {host}",
+                f"Wsl:    {wsl}",
+                f"In Use: {'yes' if in_use else 'no'}",
+            ])
+        return f"REGISTRY LIST  ({len(records)} entries)", records
     except Exception as exc:
-        return [f"Error: {exc}"]
+        return "REGISTRY LIST", [[f"Error: {exc}"]]
 
 
-def _db_use_list(cw: int) -> list[str]:
+def _db_use_list() -> "tuple[str, list[list[str]]]":
+    """Returns (header, records) where each record is a list of display lines."""
     from commands.common import DB_PATH, connect_db
     try:
         with connect_db(DB_PATH) as con:
@@ -480,17 +490,21 @@ def _db_use_list(cw: int) -> list[str]:
                 "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
             ).fetchall()
         if not rows:
-            return ["(no entries)"]
-        half = cw // 2 - 2
-        return [
-            f"{'[on]' if e else '[off]'} {wsl:<{half}} {reg}"[:cw]
-            for wsl, reg, e in rows
-        ]
+            return "USE LIST", [["(no entries)"]]
+        records = []
+        for wsl, reg, enabled in rows:
+            records.append([
+                f"WSL:      {wsl}",
+                f"Registry: {reg}",
+                f"Enabled:  {'yes' if enabled else 'no'}",
+            ])
+        return f"USE LIST  ({len(records)} entries)", records
     except Exception as exc:
-        return [f"Error: {exc}"]
+        return "USE LIST", [[f"Error: {exc}"]]
 
 
-def _db_wsl_list(cw: int) -> list[str]:
+def _db_wsl_list() -> "tuple[str, list[list[str]]]":
+    """Returns (header, records) where each record is a list of display lines."""
     from commands.common import DB_PATH, connect_db
     try:
         with connect_db(DB_PATH) as con:
@@ -498,11 +512,16 @@ def _db_wsl_list(cw: int) -> list[str]:
                 "SELECT name, user FROM wsls ORDER BY name COLLATE NOCASE"
             ).fetchall()
         if not rows:
-            return ["(no entries)"]
-        half = cw // 2
-        return [f"{n:<{half}} {u}"[:cw] for n, u in rows]
+            return "WSL LIST", [["(no entries)"]]
+        records = []
+        for name, user in rows:
+            records.append([
+                f"Name: {name}",
+                f"User: {user}",
+            ])
+        return f"WSL LIST  ({len(records)} entries)", records
     except Exception as exc:
-        return [f"Error: {exc}"]
+        return "WSL LIST", [[f"Error: {exc}"]]
 
 
 # ─── Widgets ──────────────────────────────────────────────────────────────────
@@ -669,6 +688,7 @@ if _HAS_TEXTUAL:
             return [""] * self._body_rows
 
         def on_key(self, event: "events.Key") -> None:
+            event.stop()   # prevent Textual MRO from calling this twice via subclass
             key = event.key
             n   = len(self._buttons)
             if key in ("tab", "right"):
@@ -691,49 +711,126 @@ if _HAS_TEXTUAL:
                 pass
 
     class ListDialog(Wsl4aiDialog):
-        """Generic scrollable list dialog."""
+        """Scrollable multi-line record list dialog.
 
-        def __init__(self, breadcrumb: str, rows: "list[str]", width: int = 62) -> None:
-            visible = max(3, min(len(rows), 12))
-            super().__init__(breadcrumb, width=width, body_rows=visible, buttons=["Close"])
-            self._rows    = rows
-            self._scroll  = 0   # top row index
-            self._cursor  = 0   # selected row index
+        Shows a fixed header line + separator, then a scrollable window of records.
+        Each record is a list of display lines; records are separated by a blank row.
+        The scrollbar on the right is proportional (thumb size reflects visible fraction).
+        """
+
+        def __init__(
+            self,
+            breadcrumb: str,
+            header: str,
+            records: "list[list[str]]",
+            width: int = 78,
+        ) -> None:
+            self._header  = header
+            self._records = records
+            # Build flat list: (line_str, record_idx), -1 for blank separators
+            self._flat: "list[tuple[str, int]]" = []
+            for ri, rec in enumerate(records):
+                for line in rec:
+                    self._flat.append((line, ri))
+                if ri < len(records) - 1:
+                    self._flat.append(("", -1))  # blank separator between records
+            self._scroll = 0   # first visible flat line
+            self._cursor = 0   # selected record index
+            content_rows = min(14, max(3, len(self._flat)))
+            # body_rows = header(1) + separator(1) + content rows
+            super().__init__(breadcrumb, width=width, body_rows=content_rows + 2, buttons=["Close"])
+
+        # ── proportional scrollbar ─────────────────────────────────────────────
+
+        def _build_scrollbar(self, content_rows: int) -> "list[str]":
+            """Return a list of content_rows characters for the scrollbar column.
+
+            ▓ = thumb (visible region indicator)
+            ░ = track (non-visible region)
+            Thumb height is proportional to fraction visible.  When everything fits,
+            the entire bar is ▓ (no scrolling needed).
+            """
+            n = len(self._flat)
+            if n <= content_rows:
+                return ["▓"] * content_rows          # everything fits — full thumb
+            max_scroll = n - content_rows
+            thumb_h    = max(1, round(content_rows * content_rows / n))
+            thumb_h    = min(thumb_h, content_rows)
+            track      = content_rows - thumb_h
+            thumb_start = round(self._scroll / max_scroll * track) if track > 0 else 0
+            thumb_start = max(0, min(thumb_start, track))
+            return [
+                "▓" if thumb_start <= i < thumb_start + thumb_h else "░"
+                for i in range(content_rows)
+            ]
+
+        # ── rendering ─────────────────────────────────────────────────────────
 
         def body_lines(self) -> list:
-            cw      = self._dlg_w - 4
-            visible = self._body_rows
-            window  = self._rows[self._scroll: self._scroll + visible]
-            lines   = []
-            for i, row in enumerate(window):
-                abs_i = self._scroll + i
-                if abs_i == self._cursor:
-                    padded = row[:cw].ljust(cw)
-                    lines.append([(padded, _S["item_sel"])])
+            cw           = self._dlg_w - 4   # total content width (as per _render_dialog)
+            tw           = cw - 1            # text width — last column is scrollbar
+            content_rows = self._body_rows - 2
+            result: list = []
+
+            # ── header line ───────────────────────────────────────────────────
+            result.append([(self._header[:tw].ljust(tw), _S["label"]), (" ", "")])
+
+            # ── separator ─────────────────────────────────────────────────────
+            result.append([("─" * tw, _S["lines"]), ("─", _S["lines"])])
+
+            # ── content window ────────────────────────────────────────────────
+            window    = self._flat[self._scroll : self._scroll + content_rows]
+            scrollbar = self._build_scrollbar(content_rows)
+
+            for i, (line, ri) in enumerate(window):
+                is_sel   = (ri == self._cursor and ri >= 0)
+                txt      = line[:tw].ljust(tw)
+                bar_char = scrollbar[i]
+                if is_sel:
+                    result.append([(txt, _S["item_sel"]), (bar_char, _S["lines"])])
+                elif ri < 0:                   # blank separator row
+                    result.append([(" " * tw, _S["text"]), (bar_char, _S["lines"])])
                 else:
-                    lines.append(row[:cw].ljust(cw))
-            # pad if fewer rows than body_rows
-            while len(lines) < visible:
-                lines.append("")
-            return lines
+                    result.append([(txt, _S["text"]), (bar_char, _S["lines"])])
+
+            # ── pad empty rows ─────────────────────────────────────────────────
+            while len(result) < self._body_rows:
+                result.append("")
+
+            return result
+
+        # ── keyboard ──────────────────────────────────────────────────────────
 
         def on_key(self, event: "events.Key") -> None:
-            key = event.key
-            n   = len(self._rows)
+            event.stop()                  # prevent Textual MRO double-dispatch
+            key          = event.key
+            n            = len(self._records)
+            content_rows = self._body_rows - 2
+            max_scroll   = max(0, len(self._flat) - content_rows)
+
             if key == "up":
                 if self._cursor > 0:
                     self._cursor -= 1
-                    if self._cursor < self._scroll:
-                        self._scroll = self._cursor
+                    self._ensure_visible(content_rows, max_scroll)
                     self._refresh_dlg()
             elif key == "down":
                 if self._cursor < n - 1:
                     self._cursor += 1
-                    if self._cursor >= self._scroll + self._body_rows:
-                        self._scroll += 1
+                    self._ensure_visible(content_rows, max_scroll)
                     self._refresh_dlg()
-            else:
-                super().on_key(event)
+            elif key == "enter":
+                self.dismiss(self._buttons[self._btn_focus])
+            elif key == "escape":
+                self.dismiss(None)
+
+        def _ensure_visible(self, content_rows: int, max_scroll: int) -> None:
+            """Scroll so the first line of the selected record is visible."""
+            first = next((i for i, (_, ri) in enumerate(self._flat) if ri == self._cursor), 0)
+            if first < self._scroll:
+                self._scroll = first
+            elif first >= self._scroll + content_rows:
+                self._scroll = min(max_scroll, first)
+            self._scroll = max(0, min(self._scroll, max_scroll))
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -924,16 +1021,18 @@ if _HAS_TEXTUAL:
 
             # ── List dialogs ───────────────────────────────────────────────────
             breadcrumb = " > ".join(path)
-            cw = 58   # content width for data fetch (dialog width 62, cw = 62-4)
 
             if path == ["Registry", "List"]:
-                self.push_screen(ListDialog(breadcrumb, _db_registry_list(cw)))
+                hdr, recs = _db_registry_list()
+                self.push_screen(ListDialog(breadcrumb, hdr, recs, width=80))
                 return
             if path == ["Use", "List"]:
-                self.push_screen(ListDialog(breadcrumb, _db_use_list(cw)))
+                hdr, recs = _db_use_list()
+                self.push_screen(ListDialog(breadcrumb, hdr, recs))
                 return
             if path == ["Wsl", "List"]:
-                self.push_screen(ListDialog(breadcrumb, _db_wsl_list(cw)))
+                hdr, recs = _db_wsl_list()
+                self.push_screen(ListDialog(breadcrumb, hdr, recs))
                 return
 
             # TODO: connect remaining command handlers in the next phase
