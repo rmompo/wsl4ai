@@ -772,12 +772,12 @@ if _HAS_TEXTUAL:
                         ident   = f"{user}@{wsl}({machine})"
                         pad = max(0, w - prefix_len - len(ident) - 1)
                         line.append(" " * pad)
-                        line.append(user,    style=_S["lines"])
-                        line.append("@",     style=_S["text_hl"])
-                        line.append(wsl,     style=_S["lines"])
-                        line.append("(",     style=_S["text_hl"])
-                        line.append(machine, style=_S["lines"])
-                        line.append(")",     style=_S["text_hl"])
+                        line.append(user,    style=_S["text_hl"])
+                        line.append("@",     style=_S["lines"])
+                        line.append(wsl,     style=_S["text_hl"])
+                        line.append("(",     style=_S["lines"])
+                        line.append(machine, style=_S["text_hl"])
+                        line.append(")",     style=_S["lines"])
 
                 t.append_text(line)
                 t.append("\n")
