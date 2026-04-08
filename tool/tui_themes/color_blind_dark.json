@@ -2,14 +2,15 @@
   "name": "Color Blind (Dark)",
   "dark": true,
   "styles": {
-    "lines":    "#c77dff bold",
-    "item":     "#f8fafc",
-    "label":    "#0d1117 on #89cff0",
-    "button":   "#0d1117 on #ffd166",
-    "text":     "#f8fafc",
-    "text_hl":  "#ffffff bold",
-    "text_ok":  "#7ae582 bold",
+    "lines": "#c77dff bold",
+    "item": "#f8fafc",
+    "label": "#0d1117 on #89cff0",
+    "button": "#0d1117 on #ffd166",
+    "text": "#f8fafc",
+    "text_hl": "#ffffff bold",
+    "text_ok": "#7ae582 bold",
     "text_err": "#ffa69e bold",
-    "input":    "#ffd166"
+    "input": "#ffd166",
+    "input_sel": "#000000 on #ffd166 bold"
   }
 }

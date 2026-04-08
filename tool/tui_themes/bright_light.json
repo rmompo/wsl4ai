@@ -2,14 +2,15 @@
   "name": "Bright (Light)",
   "dark": false,
   "styles": {
-    "lines":    "#c000c0 bold",
-    "item":     "#0b1320 bold",
-    "label":    "#ffffff on #0066ff",
-    "button":   "#ffffff on #cc7a00",
-    "text":     "#0b1320 bold",
-    "text_hl":  "#000000 bold",
-    "text_ok":  "#00a84f bold",
+    "lines": "#c000c0 bold",
+    "item": "#0b1320 bold",
+    "label": "#ffffff on #0066ff",
+    "button": "#ffffff on #cc7a00",
+    "text": "#0b1320 bold",
+    "text_hl": "#000000 bold",
+    "text_ok": "#00a84f bold",
     "text_err": "#cc004d bold",
-    "input":    "#003d7a bold"
+    "input": "#003d7a bold",
+    "input_sel": "#ffffff on #003d7a bold"
   }
 }

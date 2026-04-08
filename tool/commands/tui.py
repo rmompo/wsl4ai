@@ -65,6 +65,7 @@ _S: dict[str, str] = {
     "text_ok":    "green bold",
     "text_err":   "red bold",
     "input":      "",
+    "input_sel":  "bold reverse",
 }
 _THEME_DARK: bool = True  # set by _load_theme(); drives Textual dark/light mode
 
@@ -101,6 +102,12 @@ def _load_theme() -> None:
     _S["text_ok"]  = raw.get("text_ok",  "green bold")
     _S["text_err"] = raw.get("text_err", "red bold")
     _S["input"]    = raw.get("input",    "")
+    # input_sel: explicit theme override or auto-invert from input
+    if "input_sel" in raw:
+        _S["input_sel"] = raw["input_sel"]
+    else:
+        inp = _S["input"]
+        _S["input_sel"] = (inp + " reverse").strip() if inp else "bold reverse"
     # item_sel: always the inverse of item (UX spec — not stored in theme)
     item = _S["item"]
     _S["item_sel"] = (item + " reverse").strip() if item else "bold reverse"
@@ -978,28 +985,39 @@ if _HAS_TEXTUAL:
         def __init__(self, breadcrumb: str, width: int = 64) -> None:
             # body: blank + 3 fields + blank = 5 rows
             super().__init__(breadcrumb, width=width, body_rows=5, buttons=["Cancel", "Add"])
-            self._values      = ["", "", ""]   # Name, Host, Wsl
-            self._field_focus = 0              # active input index
+            self._values         = ["", "", ""]   # Name, Host, Wsl
+            self._field_focus    = 0              # active input index
+            self._cursor_visible = True           # blink state
+            self._blink_timer    = None
+
+        def on_mount(self) -> None:
+            self._blink_timer = self.set_interval(0.5, self._blink)
+
+        def on_unmount(self) -> None:
+            if self._blink_timer:
+                self._blink_timer.stop()
+
+        def _blink(self) -> None:
+            self._cursor_visible = not self._cursor_visible
+            self._refresh_dlg()
 
         # ── rendering ─────────────────────────────────────────────────────────
 
         def body_lines(self) -> list:
-            cw  = self._dlg_w - 4   # content width
+            cw  = self._dlg_w - 4    # content width
             iw  = cw - self._LW - 2  # input width (label + "  " separator)
-            result: list = [""]      # blank line above fields
+            result: list = [""]       # blank line above fields
 
             for i, (lbl, val) in enumerate(zip(self._LABELS, self._values)):
                 active = (i == self._field_focus)
-                # Show last iw-1 chars when text overflows, with cursor at end
-                if len(val) >= iw:
-                    visible = val[-(iw - 1):]
-                else:
-                    visible = val
+                # Truncate to iw-1 visible chars to leave room for cursor
+                visible = val[-(iw - 1):] if len(val) >= iw else val
                 if active:
-                    display = (visible + "│").ljust(iw)
+                    cursor_char = "│" if self._cursor_visible else " "
+                    display = (visible + cursor_char).ljust(iw)
                     result.append([
                         (lbl + "  ", _S["text_hl"]),
-                        (display,    _S["input"]),
+                        (display,    _S["input_sel"]),   # full-width highlight
                     ])
                 else:
                     display = visible.ljust(iw)

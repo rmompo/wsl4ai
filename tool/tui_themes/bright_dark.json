@@ -2,14 +2,15 @@
   "name": "Bright (Dark)",
   "dark": true,
   "styles": {
-    "lines":    "#ff44ff bold",
-    "item":     "#ffffff bold",
-    "label":    "#000000 on #00ffff",
-    "button":   "#000000 on #ffea00",
-    "text":     "#ffffff bold",
-    "text_hl":  "#ffffff bold",
-    "text_ok":  "#00ff66 bold",
+    "lines": "#ff44ff bold",
+    "item": "#ffffff bold",
+    "label": "#000000 on #00ffff",
+    "button": "#000000 on #ffea00",
+    "text": "#ffffff bold",
+    "text_hl": "#ffffff bold",
+    "text_ok": "#00ff66 bold",
     "text_err": "#ff3366 bold",
-    "input":    "#ffff00 bold"
+    "input": "#ffff00 bold",
+    "input_sel": "#000000 on #ffff00 bold"
   }
 }
