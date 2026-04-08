@@ -1115,8 +1115,8 @@ if _HAS_TEXTUAL:
     class RegistryAddDialog(Wsl4aiDialog):
         """Registry Add form — Name / Host / Wsl inputs with Tab circular navigation."""
 
-        _LABELS = ["Name", "Host", "Wsl "]   # padded to 4 chars each
-        _LW     = 4                            # label display width
+        _LABELS = ["Name     ", "Path Host", "Path Wsl "]   # padded to 9 chars each
+        _LW     = 9                                        # label display width
 
         def __init__(self, breadcrumb: str, width: int = 64) -> None:
             # body: blank + 3 fields + blank = 5 rows
