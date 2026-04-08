@@ -451,6 +451,11 @@ def _render_dialog(
 
 # ─── Data helpers for list dialogs ────────────────────────────────────────────
 
+def _lbl(label: str, width: int) -> str:
+    """Format a label padded with dots to `width`, e.g. _lbl('Name', 7) → 'Name...'"""
+    return label + "." * max(0, width - len(label))
+
+
 def _db_registry_list() -> "tuple[str, list[list[str]]]":
     """Returns (header, records) where each record is a list of display lines."""
     from commands.common import DB_PATH, connect_db
@@ -464,13 +469,14 @@ def _db_registry_list() -> "tuple[str, list[list[str]]]":
         if not rows:
             return "LIST", [["(no entries)"]]
         records = []
+        W = 6  # max label len: "In Use"
         for uuid, name, host, wsl, in_use in rows:
             records.append([
-                f"UUID:   {uuid}",
-                f"Name:   {name}",
-                f"Host:   {host}",
-                f"Wsl:    {wsl}",
-                f"In Use: {'yes' if in_use else 'no'}",
+                f"{_lbl('UUID',   W)}: {uuid}",
+                f"{_lbl('Name',   W)}: {name}",
+                f"{_lbl('Host',   W)}: {host}",
+                f"{_lbl('Wsl',    W)}: {wsl}",
+                f"{_lbl('In Use', W)}: {'yes' if in_use else 'no'}",
             ])
         return "LIST", records
     except Exception as exc:
@@ -492,11 +498,12 @@ def _db_use_list() -> "tuple[str, list[list[str]]]":
         if not rows:
             return "LIST", [["(no entries)"]]
         records = []
+        W = 8  # max label len: "Registry"
         for wsl, reg, mounted in rows:
             records.append([
-                f"WSL:      {wsl}",
-                f"Registry: {reg}",
-                f"Mounted:  {'yes' if mounted else 'no'}",
+                f"{_lbl('WSL',      W)}: {wsl}",
+                f"{_lbl('Registry', W)}: {reg}",
+                f"{_lbl('Mounted',  W)}: {'yes' if mounted else 'no'}",
             ])
         return "LIST", records
     except Exception as exc:
@@ -514,12 +521,13 @@ def _db_wsl_list() -> "tuple[str, list[list[str]]]":
         if not rows:
             return "LIST", [["(no entries)"]]
         records = []
+        W = 7  # max label len: "CLI cmd"
         for uuid, name, user, cli_cmd in rows:
             records.append([
-                f"UUID:    {uuid}",
-                f"Name:    {name}",
-                f"User:    {user}",
-                f"CLI cmd: {cli_cmd or ''}",
+                f"{_lbl('UUID',    W)}: {uuid}",
+                f"{_lbl('Name',    W)}: {name}",
+                f"{_lbl('User',    W)}: {user}",
+                f"{_lbl('CLI cmd', W)}: {cli_cmd or ''}",
             ])
         return "LIST", records
     except Exception as exc:
