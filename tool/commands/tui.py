@@ -979,15 +979,17 @@ if _HAS_TEXTUAL:
     class WslSetFormDialog(Wsl4aiDialog):
         """Edit the CLI command for a single WSL entry (pre-filled)."""
 
-        _LABELS_RO = ["UUID   ", "Name   ", "User   "]  # read-only, 7 chars each
-        _LBL_EDIT  = "CLI cmd"                           # editable label, 7 chars
+        # read-only context labels (padded to "Wsl Name" = 8 chars)
+        _LABELS_RO = ["Wsl UUID", "Wsl Name"]
+        _LW        = 8    # label display width
+        _LBL_EDIT  = "CLI cmd "                          # editable label, padded to 8
 
         def __init__(self, breadcrumb: str, uuid: str, name: str, user: str, cli_cmd: str) -> None:
             self._uuid    = uuid
             self._name    = name
             self._user    = user
-            # body: blank + 3 ro + blank + 1 editable + blank = 7 rows
-            super().__init__(breadcrumb, width=70, body_rows=7, buttons=["Cancel", "Save"])
+            # body: blank + 2 ro + blank + 1 editable + blank = 6 rows
+            super().__init__(breadcrumb, width=70, body_rows=6, buttons=["Cancel", "Save"])
             self._cli_val        = cli_cmd or ""   # pre-filled
             self._cursor_visible = True
             self._blink_timer    = None
@@ -1004,14 +1006,13 @@ if _HAS_TEXTUAL:
             self._refresh_dlg()
 
         def body_lines(self) -> list:
-            cw   = self._dlg_w - 4
-            lw   = 7    # label width
-            iw   = cw - lw - 2   # input width
+            cw = self._dlg_w - 4
+            iw = cw - self._LW - 2   # value width
 
             result: list = [""]   # blank
 
-            # read-only info rows
-            for lbl, val in zip(self._LABELS_RO, [self._uuid, self._name, self._user]):
+            # read-only context rows
+            for lbl, val in zip(self._LABELS_RO, [self._uuid, self._name]):
                 result.append([(lbl + "  ", _S["text_hl"]), (val[:iw].ljust(iw), _S["text"])])
 
             result.append("")   # blank separator
