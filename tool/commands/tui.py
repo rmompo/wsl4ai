@@ -1371,12 +1371,12 @@ if _HAS_TEXTUAL:
             result: list = [""]           # blank line above fields
             result.append(self._input_row(0, "Name", self._values[0], iw))
             result.append([
-                (("Path Base Host").ljust(self._LW) + "  ", _S["label"]),
+                (("Path Host Base").ljust(self._LW) + "  ", _S["text"]),
                 (self._base_host,                           _S["text"]),
             ])
             result.append(self._input_row(1, "Path Host", self._values[1], iw))
             result.append([
-                (("Path Base Wsl").ljust(self._LW) + "  ",  _S["label"]),
+                (("Path Wsl Base").ljust(self._LW) + "  ",  _S["text"]),
                 (self._base_wsl,                            _S["text"]),
             ])
             result.append(self._input_row(2, "Path Wsl", self._values[2], iw))
