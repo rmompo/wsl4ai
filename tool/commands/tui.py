@@ -153,14 +153,13 @@ def _save_theme(theme_id: str) -> None:
 
 MENU: list = [
     ("Registry", ["List", None, "Add", "Remove"]),
-    ("Use", ["List", None, "Add", "Remove", None, "Enable", "Disable", "Disable All"]),
+    ("Use", ["List", None, "Add", "Remove"]),
     ("Wsl", ["List", None, "Set"]),
     "Start",
     ("Others", [
         "Who Am I",
         None,
         ("Install", [
-            "Tool",
             "Database",
             ("Alias", ["List", None, "Add", "Remove"]),
         ]),
@@ -551,6 +550,48 @@ def _db_wsl_list() -> "tuple[str, list[list[str]]]":
         return "LIST", [[f"Error: {exc}"]]
 
 
+def _get_alias_names() -> "list[str]":
+    """Return alias names from ~/.startup-wsl4ai.sh."""
+    from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
+    from commands.install_alias import _bash_names_from_block, _extract_block
+    try:
+        path = bashrc_path()
+        content = path.read_text(encoding="utf-8") if path.exists() else ""
+        _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
+        return _bash_names_from_block(block)
+    except Exception:
+        return []
+
+
+def _db_mounted_uses(wsl_name: str, user: str) -> "tuple[str, list, list]":
+    """Return (header, display_records, raw_rows) for mounted=1 uses of given WSL."""
+    from commands.common import DB_PATH, connect_db
+    try:
+        with connect_db(DB_PATH) as con:
+            rows = con.execute(
+                "SELECT r.uuid, r.name, r.rel_path_wsl, w.cli_command "
+                "FROM uses u "
+                "JOIN registries r ON r.uuid = u.registry_uuid "
+                "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                "WHERE u.mounted = 1 AND w.name = ? AND w.user = ? "
+                "ORDER BY r.name COLLATE NOCASE",
+                (wsl_name, user),
+            ).fetchall()
+        if not rows:
+            return "LIST", [["(no mounted uses)"]], []
+        W = 8  # "Registry"
+        records = []
+        for r_uuid, r_name, rel_path, cli_cmd in rows:
+            records.append([
+                (_lpad("Registry", W), r_name),
+                (_lpad("Path WSL", W), rel_path or ""),
+                (_lpad("CLI cmd",  W), cli_cmd  or ""),
+            ])
+        return "LIST", records, list(rows)
+    except Exception as exc:
+        return "LIST", [[f"Error: {exc}"]], []
+
+
 # ─── Widgets ──────────────────────────────────────────────────────────────────
 
 if _HAS_TEXTUAL:
@@ -875,23 +916,25 @@ if _HAS_TEXTUAL:
         # ── keyboard ──────────────────────────────────────────────────────────
 
         def _handle_key(self, event: "events.Key") -> None:
-            key          = event.key
+            if not self._navigate(event.key):
+                super()._handle_key(event)
+
+        def _navigate(self, key: str) -> bool:
+            """Move cursor up/down. Returns True if handled."""
             n            = len(self._records)
             content_rows = self._body_rows - 2
             max_scroll   = max(0, len(self._flat) - content_rows)
-
-            if key == "up":
-                if self._cursor > 0:
-                    self._cursor -= 1
-                    self._ensure_visible(content_rows, max_scroll)
-                    self._refresh_dlg()
-            elif key == "down":
-                if self._cursor < n - 1:
-                    self._cursor += 1
-                    self._ensure_visible(content_rows, max_scroll)
-                    self._refresh_dlg()
-            else:
-                super()._handle_key(event)  # button nav + close
+            if key == "up" and self._cursor > 0:
+                self._cursor -= 1
+                self._ensure_visible(content_rows, max_scroll)
+                self._refresh_dlg()
+                return True
+            if key == "down" and self._cursor < n - 1:
+                self._cursor += 1
+                self._ensure_visible(content_rows, max_scroll)
+                self._refresh_dlg()
+                return True
+            return False
 
         def _ensure_visible(self, content_rows: int, max_scroll: int) -> None:
             """Scroll so ALL lines of the selected record are visible if possible."""
@@ -929,22 +972,11 @@ if _HAS_TEXTUAL:
             elif key == "enter":
                 if not self._records:
                     return
-                uuid = self._records[self._cursor][0][1]  # field 0 value = UUID
-                name = self._records[self._cursor][1][1]  # field 1 value = Name
+                uuid = self._records[self._cursor][0][1]
+                name = self._records[self._cursor][1][1]
                 self._confirm_remove(uuid, name)
-            elif key in ("up", "down"):
-                # delegate list navigation to ListDialog
-                n            = len(self._records)
-                content_rows = self._body_rows - 2
-                max_scroll   = max(0, len(self._flat) - content_rows)
-                if key == "up" and self._cursor > 0:
-                    self._cursor -= 1
-                    self._ensure_visible(content_rows, max_scroll)
-                    self._refresh_dlg()
-                elif key == "down" and self._cursor < n - 1:
-                    self._cursor += 1
-                    self._ensure_visible(content_rows, max_scroll)
-                    self._refresh_dlg()
+            else:
+                self._navigate(key)
 
         def _confirm_remove(self, uuid: str, name: str) -> None:
             from commands.common import DB_PATH, connect_db
@@ -1227,6 +1259,374 @@ if _HAS_TEXTUAL:
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+    class WhoAmIDialog(Wsl4aiDialog):
+        """Display current runtime identity (machine, user, WSL name)."""
+
+        _LABELS = ["Machine ", "User    ", "WSL Name"]  # padded to 8 chars
+        _LW     = 8
+
+        def __init__(self, breadcrumb: str, machine: str, user: str, wsl_name: str) -> None:
+            super().__init__(breadcrumb, width=60, body_rows=5, buttons=["Close"])
+            self._machine  = machine
+            self._user     = user
+            self._wsl_name = wsl_name
+
+        def body_lines(self) -> list:
+            cw = self._dlg_w - 4
+            iw = cw - self._LW - 2
+            result: list = [""]
+            for lbl, val in zip(self._LABELS, [self._machine, self._user, self._wsl_name]):
+                result.append([(lbl + "  ", _S["text_hl"]), ((val or "")[:iw].ljust(iw), _S["text"])])
+            result.append("")
+            return result
+
+        def _handle_key(self, event: "events.Key") -> None:
+            if event.key in ("escape", "enter"):
+                self.dismiss(None)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class UseAddDialog(ListDialog):
+        """Select a registry to add a use link for the current WSL."""
+
+        def __init__(self, breadcrumb: str) -> None:
+            hdr, recs = _db_registry_list()
+            super().__init__(breadcrumb, hdr, recs, width=80)
+            self._buttons   = ["Cancel", "Add"]
+            self._btn_focus = 0
+            self._raw_rows  = self._fetch_raw()
+
+        @staticmethod
+        def _fetch_raw() -> list:
+            from commands.common import DB_PATH, connect_db
+            try:
+                with connect_db(DB_PATH) as con:
+                    return con.execute(
+                        "SELECT uuid, name FROM registries ORDER BY name COLLATE NOCASE"
+                    ).fetchall()
+            except Exception:
+                return []
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                    return
+                r_uuid, r_name = self._raw_rows[self._cursor]
+                self._confirm_add(r_uuid, r_name)
+            else:
+                self._navigate(key)
+
+        def _confirm_add(self, r_uuid: str, r_name: str) -> None:
+            ri = self.app._cli_args.runtime_identity
+
+            def _do_add(result: "str | None") -> None:
+                if result != "Ok":
+                    return
+                from commands.common import DB_PATH, connect_db
+                from commands.wsl_db import resolve_wsl_uuid
+                try:
+                    with connect_db(DB_PATH) as con:
+                        w_uuid, w_err = resolve_wsl_uuid(
+                            con,
+                            wsl_uuid="",
+                            wsl_name=ri.wsl_name,
+                            runtime_user=ri.user,
+                            runtime_wsl_name=ri.wsl_name,
+                            create_if_missing=True,
+                            msg_prefix="use add",
+                        )
+                        if w_err:
+                            self.app.notify(f"WSL error: {w_err}", timeout=4)
+                            return
+                        existing = con.execute(
+                            "SELECT 1 FROM uses WHERE wsl_uuid = ? AND registry_uuid = ?",
+                            (w_uuid, r_uuid),
+                        ).fetchone()
+                        if existing:
+                            self.app.notify(f"Use already exists: {r_name}", timeout=4)
+                            return
+                        con.execute(
+                            "INSERT INTO uses (wsl_uuid, registry_uuid, mounted) VALUES (?, ?, 0)",
+                            (w_uuid, r_uuid),
+                        )
+                    self.app.notify(f"Use added: {r_name}", timeout=3)
+                    self.dismiss(None)
+                except Exception as exc:
+                    self.app.notify(f"Add failed: {exc}", timeout=4)
+
+            self.app.push_screen(ConfirmDialog(f"Add use for '{r_name}'?"), _do_add)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class UseRemoveDialog(ListDialog):
+        """Select a use link to remove."""
+
+        def __init__(self, breadcrumb: str) -> None:
+            hdr, recs = _db_use_list()
+            super().__init__(breadcrumb, hdr, recs, width=80)
+            self._buttons   = ["Cancel", "Remove"]
+            self._btn_focus = 0
+            self._raw_rows  = self._fetch_raw()
+
+        @staticmethod
+        def _fetch_raw() -> list:
+            from commands.common import DB_PATH, connect_db
+            try:
+                with connect_db(DB_PATH) as con:
+                    return con.execute(
+                        "SELECT r.uuid, r.name, w.uuid, u.mounted "
+                        "FROM uses u "
+                        "JOIN registries r ON r.uuid = u.registry_uuid "
+                        "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                        "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
+                    ).fetchall()
+            except Exception:
+                return []
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                    return
+                r_uuid, r_name, w_uuid, mounted = self._raw_rows[self._cursor]
+                if mounted:
+                    self.app.notify(f"Cannot remove: '{r_name}' is mounted", timeout=4)
+                    return
+                self._confirm_remove(r_uuid, r_name, w_uuid)
+            else:
+                self._navigate(key)
+
+        def _confirm_remove(self, r_uuid: str, r_name: str, w_uuid: str) -> None:
+            def _do_remove(result: "str | None") -> None:
+                if result != "Ok":
+                    return
+                from commands.common import DB_PATH, connect_db
+                try:
+                    with connect_db(DB_PATH) as con:
+                        con.execute(
+                            "DELETE FROM uses WHERE wsl_uuid = ? AND registry_uuid = ?",
+                            (w_uuid, r_uuid),
+                        )
+                    self.app.notify(f"Removed use: {r_name}", timeout=3)
+                    self.dismiss(None)
+                except Exception as exc:
+                    self.app.notify(f"Remove failed: {exc}", timeout=4)
+
+            self.app.push_screen(ConfirmDialog(f"Remove use for '{r_name}'?"), _do_remove)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class AliasListDialog(ListDialog):
+        """Show alias names from ~/.startup-wsl4ai.sh."""
+
+        def __init__(self, breadcrumb: str) -> None:
+            names = _get_alias_names()
+            if names:
+                records = [[("", name)] for name in names]
+                hdr = "LIST"
+            else:
+                records = [["(no aliases defined)"]]
+                hdr = "LIST"
+            super().__init__(breadcrumb, hdr, records)
+
+        def _handle_key(self, event: "events.Key") -> None:
+            if not self._navigate(event.key):
+                if event.key in ("escape", "enter"):
+                    self.dismiss(None)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class AliasAddDialog(Wsl4aiDialog):
+        """Add a new alias to ~/.startup-wsl4ai.sh."""
+
+        _LBL  = "Alias name"
+        _LW   = 10
+
+        def __init__(self, breadcrumb: str) -> None:
+            super().__init__(breadcrumb, width=56, body_rows=3, buttons=["Cancel", "Add"])
+            self._value          = ""
+            self._cursor_visible = True
+            self._blink_timer    = None
+
+        def on_mount(self) -> None:
+            self._blink_timer = self.set_interval(0.5, self._blink)
+
+        def on_unmount(self) -> None:
+            if self._blink_timer:
+                self._blink_timer.stop()
+
+        def _blink(self) -> None:
+            self._cursor_visible = not self._cursor_visible
+            self._refresh_dlg()
+
+        def body_lines(self) -> list:
+            cw = self._dlg_w - 4
+            iw = cw - self._LW - 2
+            visible = self._value[-(iw - 1):] if len(self._value) >= iw else self._value
+            cursor  = "│" if self._cursor_visible else " "
+            display = (visible + cursor).ljust(iw)
+            return [
+                [(self._LBL + "  ", _S["text_hl"]), (display, _S["input_sel"])],
+                "",
+                "",
+            ]
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "backspace":
+                if self._value:
+                    self._value = self._value[:-1]
+                    self._refresh_dlg()
+            elif key == "enter":
+                self._try_submit()
+            elif event.is_printable and event.character:
+                self._value += event.character
+                self._refresh_dlg()
+
+        def _try_submit(self) -> None:
+            name = self._value.strip()
+            if not name:
+                self.app.notify("Alias name cannot be empty", timeout=3)
+                return
+
+            def _do_add(result: "str | None") -> None:
+                if result != "Ok":
+                    return
+                from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
+                from commands.install_alias import (
+                    _bash_names_from_block, _build_bash_block,
+                    _extract_block, _script_and_python,
+                )
+                try:
+                    path = bashrc_path()
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    content = path.read_text(encoding="utf-8") if path.exists() else ""
+                    _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
+                    names = _bash_names_from_block(block)
+                    if name in names:
+                        self.app.notify(f"Alias already exists: {name}", timeout=4)
+                        return
+                    names.append(name)
+                    script_path, python_exe = _script_and_python()
+                    new_block = _build_bash_block(names, script_path, python_exe)
+                    before, _, after = _extract_block(content, BASH_BEGIN, BASH_END)
+                    updated = before + ("\n\n" if before else "") + new_block
+                    if after:
+                        updated += ("\n" if not updated.endswith("\n") else "") + "\n" + after
+                    path.write_text(updated, encoding="utf-8")
+                    self.app.notify(f"Alias added: {name}", timeout=3)
+                    self.dismiss(None)
+                except Exception as exc:
+                    self.app.notify(f"Add failed: {exc}", timeout=4)
+
+            self.app.push_screen(ConfirmDialog(f"Add alias '{name}'?"), _do_add)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class AliasRemoveDialog(ListDialog):
+        """Select an alias to remove from ~/.startup-wsl4ai.sh."""
+
+        def __init__(self, breadcrumb: str) -> None:
+            names = _get_alias_names()
+            if names:
+                records = [[("", name)] for name in names]
+                hdr = "LIST"
+            else:
+                records = [["(no aliases defined)"]]
+                hdr = "LIST"
+            super().__init__(breadcrumb, hdr, records)
+            self._buttons   = ["Cancel", "Remove"]
+            self._btn_focus = 0
+            self._alias_names = names
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                if not self._alias_names or self._cursor >= len(self._alias_names):
+                    return
+                alias = self._alias_names[self._cursor]
+                self._confirm_remove(alias)
+            else:
+                self._navigate(key)
+
+        def _confirm_remove(self, alias: str) -> None:
+            def _do_remove(result: "str | None") -> None:
+                if result != "Ok":
+                    return
+                from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
+                from commands.install_alias import (
+                    _bash_names_from_block, _build_bash_block,
+                    _extract_block, _script_and_python,
+                )
+                try:
+                    path = bashrc_path()
+                    content = path.read_text(encoding="utf-8") if path.exists() else ""
+                    _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
+                    names = [n for n in _bash_names_from_block(block) if n != alias]
+                    script_path, python_exe = _script_and_python()
+                    before, _, after = _extract_block(content, BASH_BEGIN, BASH_END)
+                    if names:
+                        new_block = _build_bash_block(names, script_path, python_exe)
+                        updated = before + ("\n\n" if before else "") + new_block
+                        if after:
+                            updated += ("\n" if not updated.endswith("\n") else "") + "\n" + after
+                    else:
+                        updated = before
+                        if after:
+                            updated = (updated + "\n\n" + after) if updated else after
+                        updated = updated.rstrip() + ("\n" if updated else "")
+                    path.write_text(updated, encoding="utf-8")
+                    self.app.notify(f"Alias removed: {alias}", timeout=3)
+                    self.dismiss(None)
+                except Exception as exc:
+                    self.app.notify(f"Remove failed: {exc}", timeout=4)
+
+            self.app.push_screen(ConfirmDialog(f"Remove alias '{alias}'?"), _do_remove)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class StartDialog(ListDialog):
+        """Select a mounted use to start."""
+
+        def __init__(self, breadcrumb: str, raw_rows: list) -> None:
+            # raw_rows: list of (r_uuid, r_name, rel_path_wsl, cli_cmd)
+            W = 8
+            records = []
+            for r_uuid, r_name, rel_path, cli_cmd in raw_rows:
+                records.append([
+                    (_lpad("Registry", W), r_name),
+                    (_lpad("Path WSL", W), rel_path or ""),
+                    (_lpad("CLI cmd",  W), cli_cmd  or ""),
+                ])
+            if not records:
+                records = [["(no mounted uses)"]]
+            super().__init__(breadcrumb, "LIST", records, width=78)
+            self._buttons   = ["Cancel", "Start"]
+            self._btn_focus = 0
+            self._raw_rows  = raw_rows
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                    return
+                self.dismiss(self._raw_rows[self._cursor])
+            else:
+                self._navigate(key)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
     class Wsl4aiApp(App):
         """WSL4AI main Textual application."""
 
@@ -1243,6 +1643,7 @@ if _HAS_TEXTUAL:
             self._open_top_idx: int = -1
             self._dd_iw: int = 0
             self._stack: list[DropdownMenu] = []
+            self._pending_start: "dict | None" = None   # set by StartDialog on selection
 
         def on_mount(self) -> None:
             target = "textual-light" if not _THEME_DARK else "textual-dark"
@@ -1432,6 +1833,12 @@ if _HAS_TEXTUAL:
                 hdr, recs = _db_use_list()
                 self.push_screen(ListDialog(breadcrumb, hdr, recs))
                 return
+            if path == ["Use", "Add"]:
+                self.push_screen(UseAddDialog(breadcrumb))
+                return
+            if path == ["Use", "Remove"]:
+                self.push_screen(UseRemoveDialog(breadcrumb))
+                return
             if path == ["Wsl", "List"]:
                 hdr, recs = _db_wsl_list()
                 self.push_screen(ListDialog(breadcrumb, hdr, recs))
@@ -1465,7 +1872,88 @@ if _HAS_TEXTUAL:
                 ))
                 return
 
-            # TODO: connect remaining command handlers in the next phase
+            if path == ["Others", "Who Am I"]:
+                ri = self._cli_args.runtime_identity
+                self.push_screen(WhoAmIDialog(
+                    breadcrumb,
+                    machine=ri.machine or "",
+                    user=ri.user or "",
+                    wsl_name=ri.wsl_name or "",
+                ))
+                return
+
+            if path == ["Others", "Install", "Database"]:
+                def _do_install_db(result: "str | None") -> None:
+                    if result != "Ok":
+                        return
+                    from commands.common import DB_PATH, TABLE_DDL, connect_db
+                    try:
+                        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+                        con = connect_db(DB_PATH)
+                        con.executescript(TABLE_DDL)
+                        con.commit()
+                        con.close()
+                        self.notify("Database initialized", timeout=3)
+                    except Exception as exc:
+                        self.notify(f"Database error: {exc}", timeout=5)
+                self.push_screen(ConfirmDialog("Initialize database?"), _do_install_db)
+                return
+
+            if path == ["Others", "Install", "Alias", "List"]:
+                self.push_screen(AliasListDialog(breadcrumb))
+                return
+            if path == ["Others", "Install", "Alias", "Add"]:
+                self.push_screen(AliasAddDialog(breadcrumb))
+                return
+            if path == ["Others", "Install", "Alias", "Remove"]:
+                self.push_screen(AliasRemoveDialog(breadcrumb))
+                return
+
+            if path == ["Start"]:
+                ri = self._cli_args.runtime_identity
+                from commands.common import DB_PATH, connect_db
+                try:
+                    with connect_db(DB_PATH) as con:
+                        row = con.execute(
+                            "SELECT cli_command FROM wsls WHERE name = ? AND user = ?",
+                            (ri.wsl_name, ri.user),
+                        ).fetchone()
+                except Exception as exc:
+                    self.notify(f"DB error: {exc}", timeout=4)
+                    return
+                if not row or not (row[0] or "").strip():
+                    self.notify(
+                        "No CLI command set — configure it via Wsl > Set",
+                        timeout=5,
+                    )
+                    return
+                hdr, recs, raw = _db_mounted_uses(ri.wsl_name, ri.user)
+                if not raw:
+                    self.notify("No mounted uses for current WSL", timeout=4)
+                    return
+
+                def _on_start(selected: "tuple | None") -> None:
+                    if selected is None:
+                        return
+                    r_uuid, r_name, rel_path, cli_cmd = selected
+                    from commands.common import expand_path_template, load_local_env_paths
+                    import os
+                    cli = (cli_cmd or "").strip()
+                    if not cli:
+                        self.notify("CLI command is empty", timeout=4)
+                        return
+                    _, base_path_wsl = load_local_env_paths()
+                    root = expand_path_template(str(base_path_wsl or ""))
+                    if not root:
+                        self.notify("Missing WSL_PROJECTS in local.env", timeout=5)
+                        return
+                    workdir = os.path.normpath(os.path.join(root, str(rel_path or "").strip()))
+                    self._pending_start = {"cli": cli, "workdir": workdir, "name": r_name}
+                    self.exit()
+
+                self.push_screen(StartDialog(breadcrumb, raw), _on_start)
+                return
+
             self.notify(f"→ {action}", timeout=3)
 
         def _apply_theme(self) -> None:
@@ -1488,11 +1976,32 @@ if _HAS_TEXTUAL:
 
 def cmd_tui(args: Namespace) -> int:
     """Launch the WSL4AI interactive Text User Interface."""
+    import os
+    import subprocess
+
     global _APP_VERSION
     if not _HAS_TEXTUAL:
         print("ERROR: textual is required; run pip install -r requirements.txt")
         return 1
     _APP_VERSION = getattr(args, "app_version", "")
     _load_theme()
-    Wsl4aiApp(args).run()
+    app = Wsl4aiApp(args)
+    app.run()
+
+    pending = getattr(app, "_pending_start", None)
+    if pending:
+        cli     = pending["cli"]
+        workdir = pending["workdir"]
+        name    = pending.get("name", "")
+        if not os.path.isdir(workdir):
+            print(f"start: target directory not found: {workdir}")
+            return 1
+        print(f"Starting '{name}' in {workdir} …")
+        try:
+            proc = subprocess.run(cli, shell=True, cwd=workdir, check=False)
+            return int(proc.returncode)
+        except Exception as exc:
+            print(f"start: execution failed: {exc}")
+            return 1
+
     return 0
