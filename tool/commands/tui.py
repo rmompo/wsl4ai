@@ -1391,10 +1391,10 @@ if _HAS_TEXTUAL:
 
             if key == "escape":
                 self.dismiss(None)
-            elif key == "tab":
+            elif key == "down":
                 self._field_focus = (self._field_focus + 1) % n
                 self._refresh_dlg()
-            elif key == "shift+tab":
+            elif key == "up":
                 self._field_focus = (self._field_focus - 1) % n
                 self._refresh_dlg()
             elif key == "backspace":
