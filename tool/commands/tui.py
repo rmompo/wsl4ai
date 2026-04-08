@@ -747,7 +747,7 @@ if _HAS_TEXTUAL:
 
                 if i == 0:
                     # " WSL4AI " (label) + "v{version}" (text) — right-aligned together
-                    app_part = f" WSL4AI "
+                    app_part = f" WSL4AI  "
                     ver_part = f"v{_APP_VERSION}"
                     total    = len(app_part) + len(ver_part)
                     pad = max(0, w - prefix_len - total - 1)
