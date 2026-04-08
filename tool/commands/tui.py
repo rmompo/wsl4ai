@@ -714,17 +714,10 @@ if _HAS_TEXTUAL:
             self._handle_key(event.key)
 
         def _handle_key(self, key: str) -> None:
-            """Override in subclasses to add extra key handling before button nav."""
-            n = len(self._buttons)
-            if key in ("tab", "right"):
-                if self._btn_focus < n - 1:
-                    self._btn_focus += 1
-                    self._refresh_dlg()
-            elif key in ("shift+tab", "left"):
-                if self._btn_focus > 0:
-                    self._btn_focus -= 1
-                    self._refresh_dlg()
-            elif key == "enter":
+            """Override in subclasses to add extra key handling.
+            Tab-based button navigation is reserved for ADD dialogs only.
+            """
+            if key == "enter":
                 self.dismiss(self._buttons[self._btn_focus])
             elif key == "escape":
                 self.dismiss(None)
@@ -736,7 +729,7 @@ if _HAS_TEXTUAL:
                 pass
 
     class ConfirmDialog(Wsl4aiDialog):
-        """Simple yes/no confirmation dialog."""
+        """Simple confirmation dialog.  Esc=Cancel, Enter=Ok (no tab navigation)."""
 
         def __init__(self, message: str, width: int = 50) -> None:
             super().__init__(
@@ -746,7 +739,7 @@ if _HAS_TEXTUAL:
                 buttons=["Cancel", "Ok"],
             )
             self._message = message
-            self._btn_focus = 0   # default focus on Cancel
+            self._btn_focus = 1   # highlight Ok
 
         def body_lines(self) -> list:
             cw = self._dlg_w - 4
@@ -755,6 +748,12 @@ if _HAS_TEXTUAL:
                 self._message[:cw].center(cw),
                 "",
             ]
+
+        def _handle_key(self, key: str) -> None:
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                self.dismiss("ok")
 
     class ListDialog(Wsl4aiDialog):
         """Scrollable multi-line record list dialog.
@@ -895,6 +894,72 @@ if _HAS_TEXTUAL:
                 # record is below (or partially) — scroll down so last line is visible
                 self._scroll = min(max_scroll, last - content_rows + 1)
             self._scroll = max(0, min(self._scroll, max_scroll))
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class RegistryRemoveDialog(ListDialog):
+        """Registry Remove — list view with Cancel/Remove buttons.
+
+        Enter on a selected record confirms removal; Esc dismisses.
+        Refuses removal when the registry still has use links.
+        """
+
+        def __init__(self, breadcrumb: str) -> None:
+            hdr, recs = _db_registry_list()
+            super().__init__(breadcrumb, hdr, recs, width=80)
+            self._buttons   = ["Cancel", "Remove"]
+            self._btn_focus = 0
+
+        def _handle_key(self, key: str) -> None:
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                if not self._records:
+                    return
+                uuid = self._records[self._cursor][0][1]  # field 0 value = UUID
+                name = self._records[self._cursor][1][1]  # field 1 value = Name
+                self._confirm_remove(uuid, name)
+            elif key in ("up", "down"):
+                # delegate list navigation to ListDialog
+                n            = len(self._records)
+                content_rows = self._body_rows - 2
+                max_scroll   = max(0, len(self._flat) - content_rows)
+                if key == "up" and self._cursor > 0:
+                    self._cursor -= 1
+                    self._ensure_visible(content_rows, max_scroll)
+                    self._refresh_dlg()
+                elif key == "down" and self._cursor < n - 1:
+                    self._cursor += 1
+                    self._ensure_visible(content_rows, max_scroll)
+                    self._refresh_dlg()
+
+        def _confirm_remove(self, uuid: str, name: str) -> None:
+            from commands.common import DB_PATH, connect_db
+            from commands.wsl_db import count_uses_for_registry
+            try:
+                with connect_db(DB_PATH) as con:
+                    n_use = count_uses_for_registry(con, uuid)
+            except Exception as exc:
+                self.app.notify(f"Error: {exc}", timeout=4)
+                return
+            if n_use > 0:
+                self.app.notify(
+                    f"Cannot remove '{name}': still has use links", timeout=4
+                )
+                return
+
+            def _do_remove(result: "str | None") -> None:
+                if result != "ok":
+                    return
+                try:
+                    with connect_db(DB_PATH) as con:
+                        con.execute("DELETE FROM registries WHERE uuid = ?", (uuid,))
+                    self.app.notify(f"Removed registry: {name}", timeout=3)
+                    self.dismiss(None)
+                except Exception as exc:
+                    self.app.notify(f"Remove failed: {exc}", timeout=4)
+
+            self.app.push_screen(ConfirmDialog(f"Remove '{name}'?"), _do_remove)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1092,6 +1157,9 @@ if _HAS_TEXTUAL:
             if path == ["Registry", "List"]:
                 hdr, recs = _db_registry_list()
                 self.push_screen(ListDialog(breadcrumb, hdr, recs, width=80))
+                return
+            if path == ["Registry", "Remove"]:
+                self.push_screen(RegistryRemoveDialog(breadcrumb))
                 return
             if path == ["Use", "List"]:
                 hdr, recs = _db_use_list()
