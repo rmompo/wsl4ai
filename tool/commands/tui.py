@@ -976,6 +976,141 @@ if _HAS_TEXTUAL:
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+    class WslSetFormDialog(Wsl4aiDialog):
+        """Edit the CLI command for a single WSL entry (pre-filled)."""
+
+        _LABELS_RO = ["UUID   ", "Name   ", "User   "]  # read-only, 7 chars each
+        _LBL_EDIT  = "CLI cmd"                           # editable label, 7 chars
+
+        def __init__(self, breadcrumb: str, uuid: str, name: str, user: str, cli_cmd: str) -> None:
+            self._uuid    = uuid
+            self._name    = name
+            self._user    = user
+            # body: blank + 3 ro + blank + 1 editable + blank = 7 rows
+            super().__init__(breadcrumb, width=70, body_rows=7, buttons=["Cancel", "Save"])
+            self._cli_val        = cli_cmd or ""   # pre-filled
+            self._cursor_visible = True
+            self._blink_timer    = None
+
+        def on_mount(self) -> None:
+            self._blink_timer = self.set_interval(0.5, self._blink)
+
+        def on_unmount(self) -> None:
+            if self._blink_timer:
+                self._blink_timer.stop()
+
+        def _blink(self) -> None:
+            self._cursor_visible = not self._cursor_visible
+            self._refresh_dlg()
+
+        def body_lines(self) -> list:
+            cw   = self._dlg_w - 4
+            lw   = 7    # label width
+            iw   = cw - lw - 2   # input width
+
+            result: list = [""]   # blank
+
+            # read-only info rows
+            for lbl, val in zip(self._LABELS_RO, [self._uuid, self._name, self._user]):
+                result.append([(lbl + "  ", _S["text_hl"]), (val[:iw].ljust(iw), _S["text"])])
+
+            result.append("")   # blank separator
+
+            # editable CLI cmd field
+            val     = self._cli_val
+            visible = val[-(iw - 1):] if len(val) >= iw else val
+            cursor  = "│" if self._cursor_visible else " "
+            display = (visible + cursor).ljust(iw)
+            result.append([(self._LBL_EDIT + "  ", _S["text_hl"]), (display, _S["input_sel"])])
+
+            result.append("")   # blank
+            return result
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "backspace":
+                if self._cli_val:
+                    self._cli_val = self._cli_val[:-1]
+                    self._refresh_dlg()
+            elif key == "enter":
+                self._try_save()
+            elif event.is_printable and event.character:
+                self._cli_val += event.character
+                self._refresh_dlg()
+
+        def _try_save(self) -> None:
+            cli_val = self._cli_val.strip()
+            if not cli_val:
+                self.app.notify("CLI cmd cannot be empty", timeout=3)
+                return
+
+            def _do_save(result: "str | None") -> None:
+                if result != "Ok":
+                    return
+                from commands.common import DB_PATH, connect_db
+                try:
+                    with connect_db(DB_PATH) as con:
+                        con.execute(
+                            "UPDATE wsls SET cli_command = ? WHERE uuid = ?",
+                            (cli_val, self._uuid),
+                        )
+                    self.app.notify(f"Updated CLI cmd for '{self._name}'", timeout=3)
+                    self.dismiss(None)
+                except Exception as exc:
+                    self.app.notify(f"Save failed: {exc}", timeout=4)
+
+            self.app.push_screen(ConfirmDialog(f"Save CLI cmd for '{self._name}'?"), _do_save)
+
+    class WslSetDialog(ListDialog):
+        """Select a WSL entry to edit its CLI command."""
+
+        def __init__(self, breadcrumb: str) -> None:
+            hdr, recs = _db_wsl_list()
+            super().__init__(breadcrumb, hdr, recs)
+            self._buttons   = ["Cancel", "Set"]
+            self._btn_focus = 0
+            self._raw_rows  = self._fetch_raw()
+
+        @staticmethod
+        def _fetch_raw() -> list:
+            from commands.common import DB_PATH, connect_db
+            try:
+                with connect_db(DB_PATH) as con:
+                    return con.execute(
+                        "SELECT uuid, name, user, cli_command FROM wsls ORDER BY name COLLATE NOCASE"
+                    ).fetchall()
+            except Exception:
+                return []
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                    return
+                uuid, name, user, cli_cmd = self._raw_rows[self._cursor]
+                self.app.push_screen(
+                    WslSetFormDialog(f"Wsl > Set > {name}", uuid, name, user, cli_cmd or ""),
+                    lambda _: None,
+                )
+            elif key in ("up", "down"):
+                n            = len(self._records)
+                content_rows = self._body_rows - 2
+                max_scroll   = max(0, len(self._flat) - content_rows)
+                if key == "up" and self._cursor > 0:
+                    self._cursor -= 1
+                    self._ensure_visible(content_rows, max_scroll)
+                    self._refresh_dlg()
+                elif key == "down" and self._cursor < n - 1:
+                    self._cursor += 1
+                    self._ensure_visible(content_rows, max_scroll)
+                    self._refresh_dlg()
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
     class RegistryAddDialog(Wsl4aiDialog):
         """Registry Add form — Name / Host / Wsl inputs with Tab circular navigation."""
 
@@ -1298,6 +1433,9 @@ if _HAS_TEXTUAL:
             if path == ["Wsl", "List"]:
                 hdr, recs = _db_wsl_list()
                 self.push_screen(ListDialog(breadcrumb, hdr, recs))
+                return
+            if path == ["Wsl", "Set"]:
+                self.push_screen(WslSetDialog(breadcrumb))
                 return
 
             # TODO: connect remaining command handlers in the next phase
