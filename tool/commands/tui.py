@@ -860,12 +860,17 @@ if _HAS_TEXTUAL:
                 super()._handle_key(key)  # button nav + close
 
         def _ensure_visible(self, content_rows: int, max_scroll: int) -> None:
-            """Scroll so the first line of the selected record is visible."""
-            first = next((i for i, (_, ri) in enumerate(self._flat) if ri == self._cursor), 0)
+            """Scroll so ALL lines of the selected record are visible if possible."""
+            indices = [i for i, (_, ri) in enumerate(self._flat) if ri == self._cursor]
+            if not indices:
+                return
+            first, last = indices[0], indices[-1]
             if first < self._scroll:
+                # record is above — scroll up to first line
                 self._scroll = first
-            elif first >= self._scroll + content_rows:
-                self._scroll = min(max_scroll, first)
+            elif last >= self._scroll + content_rows:
+                # record is below (or partially) — scroll down so last line is visible
+                self._scroll = min(max_scroll, last - content_rows + 1)
             self._scroll = max(0, min(self._scroll, max_scroll))
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
