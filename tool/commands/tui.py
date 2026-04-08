@@ -650,17 +650,40 @@ def _db_wsl_list() -> "tuple[str, list[list[str]]]":
         return "LIST", [[f"Error: {exc}"]]
 
 
-def _get_alias_names() -> "list[str]":
-    """Return alias names from ~/.startup-wsl4ai.sh."""
+_PROTECTED_ALIASES = {"wsl4ai"}  # cannot be removed
+
+
+def _get_aliases_typed() -> "list[tuple[str, str]]":
+    """Return [(name, shell_type), ...] from all managed profile files.
+
+    shell_type is 'bash' (Linux/WSL) or 'ps' (Windows PowerShell).
+    The 'wsl4ai' entry is always included when present — it is protected.
+    """
+    import platform
     from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
     from commands.install_alias import _bash_names_from_block, _extract_block
+    result: "list[tuple[str, str]]" = []
     try:
         path = bashrc_path()
         content = path.read_text(encoding="utf-8") if path.exists() else ""
         _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
-        return _bash_names_from_block(block)
+        for name in _bash_names_from_block(block):
+            result.append((name, "bash"))
     except Exception:
-        return []
+        pass
+    if platform.system() == "Windows":
+        try:
+            from commands.alias_ps import PS_BEGIN, PS_END, profile_paths
+            from commands.install_alias import _ps_names_from_block
+            for ps_path in profile_paths():
+                content = ps_path.read_text(encoding="utf-8") if ps_path.exists() else ""
+                _, block, _ = _extract_block(content, PS_BEGIN, PS_END)
+                for name in _ps_names_from_block(block):
+                    if (name, "ps") not in result:
+                        result.append((name, "ps"))
+        except Exception:
+            pass
+    return result
 
 
 def _db_mounted_uses(wsl_name: str, user: str) -> "tuple[str, list, list]":
@@ -1651,17 +1674,19 @@ if _HAS_TEXTUAL:
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
     class AliasListDialog(ListDialog):
-        """Show alias names from ~/.startup-wsl4ai.sh."""
+        """Show aliases with Name / Type fields."""
 
         def __init__(self, breadcrumb: str) -> None:
-            names = _get_alias_names()
-            if names:
-                records = [[("", name)] for name in names]
-                hdr = "LIST"
+            aliases = _get_aliases_typed()
+            W = 4  # len("Name") == len("Type")
+            if aliases:
+                records = [
+                    [(_lpad("Name", W), name), (_lpad("Type", W), stype)]
+                    for name, stype in aliases
+                ]
             else:
                 records = [["(no aliases defined)"]]
-                hdr = "LIST"
-            super().__init__(breadcrumb, hdr, records)
+            super().__init__(breadcrumb, "LIST", records)
 
         def _handle_key(self, event: "events.Key") -> None:
             if not self._navigate(event.key):
@@ -1724,6 +1749,9 @@ if _HAS_TEXTUAL:
             if not name:
                 self.app.notify("Alias name cannot be empty", timeout=3)
                 return
+            if name in _PROTECTED_ALIASES:
+                self.app.notify(f"'{name}' is a protected alias", timeout=4)
+                return
 
             def _do_add(result: "str | None") -> None:
                 if result != "Ok":
@@ -1760,29 +1788,34 @@ if _HAS_TEXTUAL:
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
     class AliasRemoveDialog(ListDialog):
-        """Select an alias to remove from ~/.startup-wsl4ai.sh."""
+        """Select an alias to remove. Shows Name / Type. Protected aliases blocked."""
 
         def __init__(self, breadcrumb: str) -> None:
-            names = _get_alias_names()
-            if names:
-                records = [[("", name)] for name in names]
-                hdr = "LIST"
+            aliases = _get_aliases_typed()
+            W = 4
+            if aliases:
+                records = [
+                    [(_lpad("Name", W), name), (_lpad("Type", W), stype)]
+                    for name, stype in aliases
+                ]
             else:
                 records = [["(no aliases defined)"]]
-                hdr = "LIST"
-            super().__init__(breadcrumb, hdr, records)
-            self._buttons   = ["Cancel", "Remove"]
+            super().__init__(breadcrumb, "LIST", records)
+            self._buttons  = ["Cancel", "Remove"]
             self._btn_focus = 0
-            self._alias_names = names
+            self._aliases  = aliases   # list of (name, stype)
 
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
-                if not self._alias_names or self._cursor >= len(self._alias_names):
+                if not self._aliases or self._cursor >= len(self._aliases):
                     return
-                alias = self._alias_names[self._cursor]
+                alias, _stype = self._aliases[self._cursor]
+                if alias in _PROTECTED_ALIASES:
+                    self.app.notify(f"'{alias}' is a protected alias", timeout=4)
+                    return
                 self._confirm_remove(alias)
             else:
                 self._navigate(key)
