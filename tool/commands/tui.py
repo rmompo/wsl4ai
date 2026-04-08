@@ -978,7 +978,11 @@ if _HAS_TEXTUAL:
             result: list = []
 
             # ── header line (dynamic position counter) ───────────────────────
-            n_rec = len(self._records)
+            # Count only real records (first field is a tuple, not a plain string)
+            n_rec = sum(
+                1 for r in self._records
+                if r and not isinstance(r[0], str)
+            )
             if n_rec > 0:
                 pos_str = f"({self._cursor + 1}/{n_rec} entries)"
             else:
