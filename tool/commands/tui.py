@@ -979,10 +979,10 @@ if _HAS_TEXTUAL:
     class WslSetFormDialog(Wsl4aiDialog):
         """Edit the CLI command for a single WSL entry (pre-filled)."""
 
-        # read-only context labels (padded to "User" = 4 chars)
-        _LABELS_RO = ["UUID", "Name", "User"]
-        _LW        = 4    # label display width
-        _LBL_EDIT  = "CLI "                              # editable label, padded to 4
+        # read-only context labels (padded to "CLI cmd" = 7 chars)
+        _LABELS_RO = ["UUID   ", "Name   ", "User   "]
+        _LW        = 7    # label display width
+        _LBL_EDIT  = "CLI cmd"                           # editable label, 7 chars
 
         def __init__(self, breadcrumb: str, uuid: str, name: str, user: str, cli_cmd: str) -> None:
             self._uuid    = uuid
@@ -1459,8 +1459,8 @@ if _HAS_TEXTUAL:
                 self.push_screen(WslSetFormDialog(
                     breadcrumb,
                     uuid    or "",
-                    name    or "",
-                    user    or "",
+                    name    or ri.wsl_name or "",   # fallback to runtime if NULL in DB
+                    user    or ri.user     or "",
                     cli_cmd or "",
                 ))
                 return
