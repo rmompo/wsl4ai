@@ -36,12 +36,7 @@ BANNER_TENTACLES = [
     "▃▄▂▂▁",
     "▄▃▄▂▃▂▂▁",
 ]
-BANNER_LABELS = [
-    "",
-    "WSL4AI",
-    "v{version}",
-    "https://github.com/rmompo/wsl4ai",
-]
+BANNER_GITHUB = "https://github.com/rmompo/wsl4ai"
 
 # ─── Theme ────────────────────────────────────────────────────────────────────
 
@@ -177,8 +172,6 @@ MENU: list = [
     ("Wsl", ["List", None, "Set"]),
     "Start",
     ("Others", [
-        "Who Am I",
-        None,
         ("Install", [
             "Database",
             ("Alias", ["List", None, "Add", "Remove"]),
@@ -706,29 +699,58 @@ if _HAS_TEXTUAL:
     class Banner(Widget):
         DEFAULT_CSS = """
         Banner {
-            height: 5;
+            height: 4;
             width: 1fr;
         }
         """
 
         def render(self) -> "Text":
-            w = self.size.width or 80
-            label_styles = [_S["text"], _S["label"], _S["text"], _S["lines"]]
+            w  = self.size.width or 80
+            ri = None
+            try:
+                ri = self.app._cli_args.runtime_identity
+            except Exception:
+                pass
+
             t = Text()
-            t.append("\n")   # empty line above banner
-            for i, (body, tent, lbl_tmpl) in enumerate(
-                zip(BANNER_BODY, BANNER_TENTACLES, BANNER_LABELS)
-            ):
-                lbl = lbl_tmpl.replace("{version}", _APP_VERSION)
+            for i, (body, tent) in enumerate(zip(BANNER_BODY, BANNER_TENTACLES)):
                 line = Text()
-                line.append(" ")                              # left padding
+                line.append(" ")
                 line.append(body, style=_BANNER_MAGENTA)
                 line.append(tent, style=_S["lines"])
-                if lbl:
-                    pad = (w - 1) - len(body) - len(tent) - len(lbl) - 1  # -1 left, -1 right
-                    if pad > 0:
+
+                prefix_len = 1 + len(body) + len(tent)   # " " + body + tentacles
+
+                if i == 0:
+                    lbl = "WSL4AI"
+                    pad = max(0, w - prefix_len - len(lbl) - 1)
+                    line.append(" " * pad)
+                    line.append(lbl, style=_S["label"])
+
+                elif i == 1:
+                    lbl = f"v{_APP_VERSION}"
+                    pad = max(0, w - prefix_len - len(lbl) - 1)
+                    line.append(" " * pad)
+                    line.append(lbl, style=_S["text"])
+
+                elif i == 2:
+                    lbl = BANNER_GITHUB
+                    pad = max(0, w - prefix_len - len(lbl) - 1)
+                    line.append(" " * pad)
+                    line.append(lbl, style=_S["lines"])
+
+                else:  # i == 3 — identity line
+                    if ri:
+                        user    = ri.user     or ""
+                        machine = ri.machine  or ""
+                        wsl     = ri.wsl_name or ""
+                        ident   = f"{user}@{machine}({wsl})"
+                        pad = max(0, w - prefix_len - len(ident) - 1)
                         line.append(" " * pad)
-                    line.append(lbl, style=label_styles[i])
+                        line.append(user,              style=_S["text"])
+                        line.append("@",               style=_S["text_hl"])
+                        line.append(f"{machine}({wsl})", style=_S["text"])
+
                 t.append_text(line)
                 t.append("\n")
             return t
@@ -2134,16 +2156,6 @@ if _HAS_TEXTUAL:
                     name    or ri.wsl_name or "",   # fallback to runtime if NULL in DB
                     user    or ri.user     or "",
                     cli_cmd or "",
-                ))
-                return
-
-            if path == ["Others", "Who Am I"]:
-                ri = self._cli_args.runtime_identity
-                self.push_screen(WhoAmIDialog(
-                    breadcrumb,
-                    machine=ri.machine or "",
-                    user=ri.user or "",
-                    wsl_name=ri.wsl_name or "",
                 ))
                 return
 
