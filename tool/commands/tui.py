@@ -479,6 +479,13 @@ def _lpad(label: str, width: int) -> str:
     return label.ljust(width) + " "
 
 
+def _load_base_paths() -> "tuple[str, str]":
+    """Return (base_host, base_wsl) — both expanded and with trailing slash."""
+    from commands.common import expand_path_template, load_local_env_paths
+    bh, bw = load_local_env_paths()
+    return expand_path_template(bh), expand_path_template(bw)
+
+
 def _db_registry_list() -> "tuple[str, list[list[str]]]":
     """Returns (header, records) where each record is a list of display lines."""
     from commands.common import DB_PATH, connect_db
@@ -491,14 +498,15 @@ def _db_registry_list() -> "tuple[str, list[list[str]]]":
             ).fetchall()
         if not rows:
             return "LIST", [["(no entries)"]]
+        base_host, base_wsl = _load_base_paths()
         records = []
         W = 9  # max label len: "Path Host"
         for uuid, name, host, wsl, in_use in rows:
             records.append([
                 (_lpad("UUID",      W), uuid),
                 (_lpad("Name",      W), name),
-                (_lpad("Path Host", W), host),
-                (_lpad("Path Wsl",  W), wsl),
+                (_lpad("Path Host", W), f"{base_host}{host}"),
+                (_lpad("Path Wsl",  W), f"{base_wsl}{wsl}"),
                 (_lpad("In Use",    W), "yes" if in_use else "no"),
             ])
         return "LIST", records
@@ -523,14 +531,15 @@ def _db_registry_list_available(wsl_name: str, user: str) -> "tuple[str, list[li
             ).fetchall()
         if not rows:
             return "LIST", [["(no registries available)"]]
+        base_host, base_wsl = _load_base_paths()
         records = []
         W = 9  # max label len: "Path Host"
         for r_uuid, r_name, host, wsl in rows:
             records.append([
                 (_lpad("UUID",      W), r_uuid),
                 (_lpad("Name",      W), r_name),
-                (_lpad("Path Host", W), host),
-                (_lpad("Path Wsl",  W), wsl),
+                (_lpad("Path Host", W), f"{base_host}{host}"),
+                (_lpad("Path Wsl",  W), f"{base_wsl}{wsl}"),
             ])
         return "LIST", records
     except Exception as exc:
@@ -705,14 +714,15 @@ def _db_mounted_uses(wsl_name: str, user: str) -> "tuple[str, list, list]":
             ).fetchall()
         if not rows:
             return "LIST", [["(no mounted uses)"]], []
+        base_host, base_wsl = _load_base_paths()
         W = 13  # "Registry UUID" / "Registry Name"
         records = []
         for r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd in rows:
             records.append([
                 (_lpad("Registry UUID", W), r_uuid),
                 (_lpad("Registry Name", W), r_name),
-                (_lpad("Path Host",     W), rel_path_host or ""),
-                (_lpad("Path Wsl",      W), rel_path_wsl  or ""),
+                (_lpad("Path Host",     W), f"{base_host}{rel_path_host or ''}"),
+                (_lpad("Path Wsl",      W), f"{base_wsl}{rel_path_wsl or ''}"),
             ])
         return "LIST", records, list(rows)
     except Exception as exc:
@@ -1317,16 +1327,18 @@ if _HAS_TEXTUAL:
     class RegistryAddDialog(Wsl4aiDialog):
         """Registry Add form — Name / Host / Wsl inputs with Tab circular navigation."""
 
-        _LABELS = ["Name     ", "Path Host", "Path Wsl "]   # padded to 9 chars each
-        _LW     = 9                                        # label display width
+        _LW = 14   # "Path Base Host" / "Path Base Wsl "
 
-        def __init__(self, breadcrumb: str, width: int = 64) -> None:
-            # body: blank + 3 fields + blank = 5 rows
-            super().__init__(breadcrumb, width=width, body_rows=5, buttons=["Cancel", "Add"])
-            self._values         = ["", "", ""]   # Name, Host, Wsl
-            self._field_focus    = 0              # active input index
-            self._cursor_visible = True           # blink state
+        def __init__(self, breadcrumb: str, width: int = 68) -> None:
+            # body: blank + Name + Path Base Host + Path Host + Path Base Wsl + Path Wsl + blank = 7
+            super().__init__(breadcrumb, width=width, body_rows=7, buttons=["Cancel", "Add"])
+            self._values         = ["", "", ""]   # Name, rel_path_host, rel_path_wsl
+            self._field_focus    = 0              # active input index (0-2)
+            self._cursor_visible = True
             self._blink_timer    = None
+            base_host, base_wsl  = _load_base_paths()
+            self._base_host      = base_host
+            self._base_wsl       = base_wsl
 
         def on_mount(self) -> None:
             self._blink_timer = self.set_interval(0.5, self._blink)
@@ -1341,30 +1353,34 @@ if _HAS_TEXTUAL:
 
         # ── rendering ─────────────────────────────────────────────────────────
 
+        def _input_row(self, field_idx: int, label: str, val: str, iw: int) -> list:
+            active  = (field_idx == self._field_focus)
+            visible = val[-(iw - 1):] if len(val) >= iw else val
+            if active:
+                cursor_char = "│" if self._cursor_visible else " "
+                display = (visible + cursor_char).ljust(iw)
+                return [(label.ljust(self._LW) + "  ", _S["text_hl"]),
+                        (display,                       _S["input_sel"])]
+            display = visible.ljust(iw)
+            return [(label.ljust(self._LW) + "  ", _S["text"]),
+                    (display,                       _S["input"])]
+
         def body_lines(self) -> list:
-            cw  = self._dlg_w - 4    # content width
-            iw  = cw - self._LW - 2  # input width (label + "  " separator)
-            result: list = [""]       # blank line above fields
-
-            for i, (lbl, val) in enumerate(zip(self._LABELS, self._values)):
-                active = (i == self._field_focus)
-                # Truncate to iw-1 visible chars to leave room for cursor
-                visible = val[-(iw - 1):] if len(val) >= iw else val
-                if active:
-                    cursor_char = "│" if self._cursor_visible else " "
-                    display = (visible + cursor_char).ljust(iw)
-                    result.append([
-                        (lbl + "  ", _S["text_hl"]),
-                        (display,    _S["input_sel"]),   # full-width highlight
-                    ])
-                else:
-                    display = visible.ljust(iw)
-                    result.append([
-                        (lbl + "  ", _S["text"]),
-                        (display,    _S["input"]),
-                    ])
-
-            result.append("")   # blank line below fields
+            cw = self._dlg_w - 4          # content width
+            iw = cw - self._LW - 2        # input width
+            result: list = [""]           # blank line above fields
+            result.append(self._input_row(0, "Name", self._values[0], iw))
+            result.append([
+                (("Path Base Host").ljust(self._LW) + "  ", _S["label"]),
+                (self._base_host,                           _S["text"]),
+            ])
+            result.append(self._input_row(1, "Path Host", self._values[1], iw))
+            result.append([
+                (("Path Base Wsl").ljust(self._LW) + "  ",  _S["label"]),
+                (self._base_wsl,                            _S["text"]),
+            ])
+            result.append(self._input_row(2, "Path Wsl", self._values[2], iw))
+            result.append("")             # blank line below fields
             return result
 
         # ── keyboard ──────────────────────────────────────────────────────────
