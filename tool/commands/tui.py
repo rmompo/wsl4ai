@@ -746,34 +746,38 @@ if _HAS_TEXTUAL:
                 prefix_len = 1 + len(body) + len(tent)   # " " + body + tentacles
 
                 if i == 0:
-                    lbl = "WSL4AI"
-                    pad = max(0, w - prefix_len - len(lbl) - 1)
+                    # " WSL4AI " (label) + "v{version}" (text) — right-aligned together
+                    app_part = f" WSL4AI "
+                    ver_part = f"v{_APP_VERSION}"
+                    total    = len(app_part) + len(ver_part)
+                    pad = max(0, w - prefix_len - total - 1)
                     line.append(" " * pad)
-                    line.append(lbl, style=_S["label"])
+                    line.append(app_part, style=_S["label"])
+                    line.append(ver_part, style=_S["text"])
 
                 elif i == 1:
-                    lbl = f"v{_APP_VERSION}"
-                    pad = max(0, w - prefix_len - len(lbl) - 1)
+                    # github url (lines style)
+                    pad = max(0, w - prefix_len - len(BANNER_GITHUB) - 1)
                     line.append(" " * pad)
-                    line.append(lbl, style=_S["text"])
+                    line.append(BANNER_GITHUB, style=_S["lines"])
 
                 elif i == 2:
-                    lbl = BANNER_GITHUB
-                    pad = max(0, w - prefix_len - len(lbl) - 1)
-                    line.append(" " * pad)
-                    line.append(lbl, style=_S["lines"])
+                    pass   # blank line
 
-                else:  # i == 3 — identity line
+                else:  # i == 3 — identity: user@wsl(machine)
                     if ri:
                         user    = ri.user     or ""
-                        machine = ri.machine  or ""
                         wsl     = ri.wsl_name or ""
+                        machine = ri.machine  or ""
                         ident   = f"{user}@{wsl}({machine})"
                         pad = max(0, w - prefix_len - len(ident) - 1)
                         line.append(" " * pad)
-                        line.append(user,              style=_S["text"])
-                        line.append("@",               style=_S["text_hl"])
-                        line.append(f"{wsl}({machine})", style=_S["text"])
+                        line.append(user,    style=_S["lines"])
+                        line.append("@",     style=_S["text_hl"])
+                        line.append(wsl,     style=_S["lines"])
+                        line.append("(",     style=_S["text_hl"])
+                        line.append(machine, style=_S["lines"])
+                        line.append(")",     style=_S["text_hl"])
 
                 t.append_text(line)
                 t.append("\n")
