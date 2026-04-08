@@ -462,7 +462,7 @@ def _db_registry_list() -> "tuple[str, list[list[str]]]":
                 "FROM registries r ORDER BY name COLLATE NOCASE"
             ).fetchall()
         if not rows:
-            return "REGISTRY LIST", [["(no entries)"]]
+            return "LIST", [["(no entries)"]]
         records = []
         for uuid, name, host, wsl, in_use in rows:
             records.append([
@@ -472,9 +472,9 @@ def _db_registry_list() -> "tuple[str, list[list[str]]]":
                 f"Wsl:    {wsl}",
                 f"In Use: {'yes' if in_use else 'no'}",
             ])
-        return f"REGISTRY LIST  ({len(records)} entries)", records
+        return "LIST", records
     except Exception as exc:
-        return "REGISTRY LIST", [[f"Error: {exc}"]]
+        return "LIST", [[f"Error: {exc}"]]
 
 
 def _db_use_list() -> "tuple[str, list[list[str]]]":
@@ -483,24 +483,24 @@ def _db_use_list() -> "tuple[str, list[list[str]]]":
     try:
         with connect_db(DB_PATH) as con:
             rows = con.execute(
-                "SELECT w.name, r.name, u.enabled "
+                "SELECT w.name, r.name, u.mounted "
                 "FROM uses u "
                 "JOIN wsls w ON w.uuid = u.wsl_uuid "
                 "JOIN registries r ON r.uuid = u.registry_uuid "
                 "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
             ).fetchall()
         if not rows:
-            return "USE LIST", [["(no entries)"]]
+            return "LIST", [["(no entries)"]]
         records = []
-        for wsl, reg, enabled in rows:
+        for wsl, reg, mounted in rows:
             records.append([
                 f"WSL:      {wsl}",
                 f"Registry: {reg}",
-                f"Enabled:  {'yes' if enabled else 'no'}",
+                f"Mounted:  {'yes' if mounted else 'no'}",
             ])
-        return f"USE LIST  ({len(records)} entries)", records
+        return "LIST", records
     except Exception as exc:
-        return "USE LIST", [[f"Error: {exc}"]]
+        return "LIST", [[f"Error: {exc}"]]
 
 
 def _db_wsl_list() -> "tuple[str, list[list[str]]]":
@@ -509,19 +509,21 @@ def _db_wsl_list() -> "tuple[str, list[list[str]]]":
     try:
         with connect_db(DB_PATH) as con:
             rows = con.execute(
-                "SELECT name, user FROM wsls ORDER BY name COLLATE NOCASE"
+                "SELECT uuid, name, user, cli_command FROM wsls ORDER BY name COLLATE NOCASE"
             ).fetchall()
         if not rows:
-            return "WSL LIST", [["(no entries)"]]
+            return "LIST", [["(no entries)"]]
         records = []
-        for name, user in rows:
+        for uuid, name, user, cli_cmd in rows:
             records.append([
-                f"Name: {name}",
-                f"User: {user}",
+                f"UUID:    {uuid}",
+                f"Name:    {name}",
+                f"User:    {user}",
+                f"CLI cmd: {cli_cmd or ''}",
             ])
-        return f"WSL LIST  ({len(records)} entries)", records
+        return "LIST", records
     except Exception as exc:
-        return "WSL LIST", [[f"Error: {exc}"]]
+        return "LIST", [[f"Error: {exc}"]]
 
 
 # ─── Widgets ──────────────────────────────────────────────────────────────────
@@ -772,8 +774,14 @@ if _HAS_TEXTUAL:
             content_rows = self._body_rows - 2
             result: list = []
 
-            # ── header line ───────────────────────────────────────────────────
-            result.append([(self._header[:tw].ljust(tw), _S["label"]), (" ", "")])
+            # ── header line (dynamic position counter) ───────────────────────
+            n_rec = len(self._records)
+            if n_rec > 0:
+                pos_str = f"({self._cursor + 1}/{n_rec} entries)"
+            else:
+                pos_str = "(0 entries)"
+            hdr_full = f"{self._header}  {pos_str}"
+            result.append([(hdr_full[:tw].ljust(tw), _S["label"]), (" ", "")])
 
             # ── separator ─────────────────────────────────────────────────────
             result.append([("─" * tw, _S["lines"]), ("─", _S["lines"])])
