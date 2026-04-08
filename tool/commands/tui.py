@@ -2056,7 +2056,8 @@ if _HAS_TEXTUAL:
             return path
 
         def _dispatch(self, path: list[str]) -> None:
-            action = " > ".join(path)
+            action     = " > ".join(path)
+            breadcrumb = action
             if action == "Exit":
                 def _on_confirm(result: "str | None") -> None:
                     if result == "Ok":
@@ -2070,8 +2071,6 @@ if _HAS_TEXTUAL:
                 return
 
             # ── List dialogs ───────────────────────────────────────────────────
-            breadcrumb = " > ".join(path)
-
             if path == ["Registry", "List"]:
                 hdr, recs = _db_registry_list()
                 self.push_screen(ListDialog(breadcrumb, hdr, recs, width=80))
