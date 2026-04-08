@@ -492,14 +492,14 @@ def _db_registry_list() -> "tuple[str, list[list[str]]]":
         if not rows:
             return "LIST", [["(no entries)"]]
         records = []
-        W = 6  # max label len: "In Use"
+        W = 9  # max label len: "Path Host"
         for uuid, name, host, wsl, in_use in rows:
             records.append([
-                (_lpad("UUID",   W), uuid),
-                (_lpad("Name",   W), name),
-                (_lpad("Host",   W), host),
-                (_lpad("Wsl",    W), wsl),
-                (_lpad("In Use", W), "yes" if in_use else "no"),
+                (_lpad("UUID",      W), uuid),
+                (_lpad("Name",      W), name),
+                (_lpad("Path Host", W), host),
+                (_lpad("Path Wsl",  W), wsl),
+                (_lpad("In Use",    W), "yes" if in_use else "no"),
             ])
         return "LIST", records
     except Exception as exc:
@@ -524,13 +524,13 @@ def _db_registry_list_available(wsl_name: str, user: str) -> "tuple[str, list[li
         if not rows:
             return "LIST", [["(no registries available)"]]
         records = []
-        W = 6
+        W = 9  # max label len: "Path Host"
         for r_uuid, r_name, host, wsl in rows:
             records.append([
-                (_lpad("UUID", W), r_uuid),
-                (_lpad("Name", W), r_name),
-                (_lpad("Host", W), host),
-                (_lpad("Wsl",  W), wsl),
+                (_lpad("UUID",      W), r_uuid),
+                (_lpad("Name",      W), r_name),
+                (_lpad("Path Host", W), host),
+                (_lpad("Path Wsl",  W), wsl),
             ])
         return "LIST", records
     except Exception as exc:
