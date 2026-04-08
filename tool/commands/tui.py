@@ -1395,32 +1395,27 @@ if _HAS_TEXTUAL:
                 self.app.notify("All fields are required", timeout=3)
                 return
 
-            def _do_add(result: "str | None") -> None:
-                if result != "Ok":
-                    return
-                import uuid as _uuid
-                from commands.common import DB_PATH, connect_db
-                uid = str(_uuid.uuid4())
-                try:
-                    with connect_db(DB_PATH) as con:
-                        taken = con.execute(
-                            "SELECT name FROM registries WHERE LOWER(name) = LOWER(?) LIMIT 1",
-                            (name,),
-                        ).fetchone()
-                        if taken:
-                            self.app.notify(f"Name already taken: {taken[0]!r}", timeout=4)
-                            return
-                        con.execute(
-                            "INSERT INTO registries (uuid, name, rel_path_host, rel_path_wsl)"
-                            " VALUES (?, ?, ?, ?)",
-                            (uid, name, host, wsl),
-                        )
-                    self.app.notify(f"Registry added: {name}", timeout=3)
-                    self.dismiss(None)
-                except Exception as exc:
-                    self.app.notify(f"Add failed: {exc}", timeout=4)
-
-            self.app.push_screen(ConfirmDialog(f"Add registry '{name}'?"), _do_add)
+            import uuid as _uuid
+            from commands.common import DB_PATH, connect_db
+            uid = str(_uuid.uuid4())
+            try:
+                with connect_db(DB_PATH) as con:
+                    taken = con.execute(
+                        "SELECT name FROM registries WHERE LOWER(name) = LOWER(?) LIMIT 1",
+                        (name,),
+                    ).fetchone()
+                    if taken:
+                        self.app.notify(f"Name already taken: {taken[0]!r}", timeout=4)
+                        return
+                    con.execute(
+                        "INSERT INTO registries (uuid, name, rel_path_host, rel_path_wsl)"
+                        " VALUES (?, ?, ?, ?)",
+                        (uid, name, host, wsl),
+                    )
+                self.app.notify(f"Registry added: {name}", timeout=3)
+                self.dismiss(None)
+            except Exception as exc:
+                self.app.notify(f"Add failed: {exc}", timeout=4)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1491,49 +1486,43 @@ if _HAS_TEXTUAL:
                 if not self._raw_rows or self._cursor >= len(self._raw_rows):
                     return
                 r_uuid, r_name = self._raw_rows[self._cursor]
-                self._confirm_add(r_uuid, r_name)
+                self._do_add(r_uuid, r_name)
             else:
                 self._navigate(key)
 
-        def _confirm_add(self, r_uuid: str, r_name: str) -> None:
+        def _do_add(self, r_uuid: str, r_name: str) -> None:
             ri = self.app._cli_args.runtime_identity
-
-            def _do_add(result: "str | None") -> None:
-                if result != "Ok":
-                    return
-                from commands.common import DB_PATH, connect_db
-                from commands.wsl_db import resolve_wsl_uuid
-                try:
-                    with connect_db(DB_PATH) as con:
-                        w_uuid, w_err = resolve_wsl_uuid(
-                            con,
-                            wsl_uuid="",
-                            wsl_name=ri.wsl_name,
-                            runtime_user=ri.user,
-                            runtime_wsl_name=ri.wsl_name,
-                            create_if_missing=True,
-                            msg_prefix="use add",
-                        )
-                        if w_err:
-                            self.app.notify(f"WSL error: {w_err}", timeout=4)
-                            return
-                        existing = con.execute(
-                            "SELECT 1 FROM uses WHERE wsl_uuid = ? AND registry_uuid = ?",
-                            (w_uuid, r_uuid),
-                        ).fetchone()
-                        if existing:
-                            self.app.notify(f"Use already exists: {r_name}", timeout=4)
-                            return
-                        con.execute(
-                            "INSERT INTO uses (wsl_uuid, registry_uuid, mounted) VALUES (?, ?, 0)",
-                            (w_uuid, r_uuid),
-                        )
-                    self.app.notify(f"Use added: {r_name}", timeout=3)
-                    self.dismiss(None)
-                except Exception as exc:
-                    self.app.notify(f"Add failed: {exc}", timeout=4)
-
-            self.app.push_screen(ConfirmDialog(f"Add use for '{r_name}'?"), _do_add)
+            from commands.common import DB_PATH, connect_db
+            from commands.wsl_db import resolve_wsl_uuid
+            try:
+                with connect_db(DB_PATH) as con:
+                    w_uuid, w_err = resolve_wsl_uuid(
+                        con,
+                        wsl_uuid="",
+                        wsl_name=ri.wsl_name,
+                        runtime_user=ri.user,
+                        runtime_wsl_name=ri.wsl_name,
+                        create_if_missing=True,
+                        msg_prefix="use add",
+                    )
+                    if w_err:
+                        self.app.notify(f"WSL error: {w_err}", timeout=4)
+                        return
+                    existing = con.execute(
+                        "SELECT 1 FROM uses WHERE wsl_uuid = ? AND registry_uuid = ?",
+                        (w_uuid, r_uuid),
+                    ).fetchone()
+                    if existing:
+                        self.app.notify(f"Use already exists: {r_name}", timeout=4)
+                        return
+                    con.execute(
+                        "INSERT INTO uses (wsl_uuid, registry_uuid, mounted) VALUES (?, ?, 0)",
+                        (w_uuid, r_uuid),
+                    )
+                self.app.notify(f"Use added: {r_name}", timeout=3)
+                self.dismiss(None)
+            except Exception as exc:
+                self.app.notify(f"Add failed: {exc}", timeout=4)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1759,37 +1748,32 @@ if _HAS_TEXTUAL:
                 self.app.notify(f"'{name}' is a protected alias", timeout=4)
                 return
 
-            def _do_add(result: "str | None") -> None:
-                if result != "Ok":
+            from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
+            from commands.install_alias import (
+                _bash_names_from_block, _build_bash_block,
+                _extract_block, _script_and_python,
+            )
+            try:
+                path = bashrc_path()
+                path.parent.mkdir(parents=True, exist_ok=True)
+                content = path.read_text(encoding="utf-8") if path.exists() else ""
+                _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
+                names = _bash_names_from_block(block)
+                if name in names:
+                    self.app.notify(f"Alias already exists: {name}", timeout=4)
                     return
-                from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
-                from commands.install_alias import (
-                    _bash_names_from_block, _build_bash_block,
-                    _extract_block, _script_and_python,
-                )
-                try:
-                    path = bashrc_path()
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    content = path.read_text(encoding="utf-8") if path.exists() else ""
-                    _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
-                    names = _bash_names_from_block(block)
-                    if name in names:
-                        self.app.notify(f"Alias already exists: {name}", timeout=4)
-                        return
-                    names.append(name)
-                    script_path, python_exe = _script_and_python()
-                    new_block = _build_bash_block(names, script_path, python_exe)
-                    before, _, after = _extract_block(content, BASH_BEGIN, BASH_END)
-                    updated = before + ("\n\n" if before else "") + new_block
-                    if after:
-                        updated += ("\n" if not updated.endswith("\n") else "") + "\n" + after
-                    path.write_text(updated, encoding="utf-8")
-                    self.app.notify(f"Alias added: {name}", timeout=3)
-                    self.dismiss(None)
-                except Exception as exc:
-                    self.app.notify(f"Add failed: {exc}", timeout=4)
-
-            self.app.push_screen(ConfirmDialog(f"Add alias '{name}'?"), _do_add)
+                names.append(name)
+                script_path, python_exe = _script_and_python()
+                new_block = _build_bash_block(names, script_path, python_exe)
+                before, _, after = _extract_block(content, BASH_BEGIN, BASH_END)
+                updated = before + ("\n\n" if before else "") + new_block
+                if after:
+                    updated += ("\n" if not updated.endswith("\n") else "") + "\n" + after
+                path.write_text(updated, encoding="utf-8")
+                self.app.notify(f"Alias added: {name}", timeout=3)
+                self.dismiss(None)
+            except Exception as exc:
+                self.app.notify(f"Add failed: {exc}", timeout=4)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
