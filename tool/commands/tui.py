@@ -497,18 +497,63 @@ def _db_registry_list() -> "tuple[str, list[list[str]]]":
         return "LIST", [[f"Error: {exc}"]]
 
 
-def _db_use_list() -> "tuple[str, list[list[str]]]":
-    """Returns (header, records) where each record is a list of display lines."""
+def _db_registry_list_available(wsl_name: str, user: str) -> "tuple[str, list[list[str]]]":
+    """Registries not yet linked to the given WSL (candidates for Use > Add)."""
     from commands.common import DB_PATH, connect_db
     try:
         with connect_db(DB_PATH) as con:
             rows = con.execute(
-                "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
-                "FROM uses u "
-                "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                "JOIN registries r ON r.uuid = u.registry_uuid "
-                "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
+                "SELECT r.uuid, r.name, r.rel_path_host, r.rel_path_wsl "
+                "FROM registries r "
+                "WHERE NOT EXISTS ("
+                "  SELECT 1 FROM uses u "
+                "  JOIN wsls w ON w.uuid = u.wsl_uuid "
+                "  WHERE u.registry_uuid = r.uuid AND w.name = ? AND w.user = ?"
+                ") ORDER BY r.name COLLATE NOCASE",
+                (wsl_name, user),
             ).fetchall()
+        if not rows:
+            return "LIST", [["(no registries available)"]]
+        records = []
+        W = 6
+        for r_uuid, r_name, host, wsl in rows:
+            records.append([
+                (_lpad("UUID", W), r_uuid),
+                (_lpad("Name", W), r_name),
+                (_lpad("Host", W), host),
+                (_lpad("Wsl",  W), wsl),
+            ])
+        return "LIST", records
+    except Exception as exc:
+        return "LIST", [[f"Error: {exc}"]]
+
+
+def _db_use_list(wsl_name: str = "", user: str = "") -> "tuple[str, list[list[str]]]":
+    """Returns (header, records) where each record is a list of display lines.
+
+    If wsl_name/user are given, results are filtered to that WSL only.
+    """
+    from commands.common import DB_PATH, connect_db
+    try:
+        with connect_db(DB_PATH) as con:
+            if wsl_name:
+                rows = con.execute(
+                    "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
+                    "FROM uses u "
+                    "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                    "JOIN registries r ON r.uuid = u.registry_uuid "
+                    "WHERE w.name = ? AND w.user = ? "
+                    "ORDER BY r.name COLLATE NOCASE",
+                    (wsl_name, user),
+                ).fetchall()
+            else:
+                rows = con.execute(
+                    "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
+                    "FROM uses u "
+                    "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                    "JOIN registries r ON r.uuid = u.registry_uuid "
+                    "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
+                ).fetchall()
         if not rows:
             return "LIST", [["(no entries)"]]
         records = []
@@ -526,20 +571,34 @@ def _db_use_list() -> "tuple[str, list[list[str]]]":
         return "LIST", [[f"Error: {exc}"]]
 
 
-def _db_use_list_filtered(mounted: int) -> "tuple[str, list[list[str]]]":
-    """Like _db_use_list but only returns rows with the given mounted value."""
+def _db_use_list_filtered(mounted: int, wsl_name: str = "", user: str = "") -> "tuple[str, list[list[str]]]":
+    """Like _db_use_list but only returns rows with the given mounted value.
+
+    If wsl_name/user are given, results are also filtered to that WSL.
+    """
     from commands.common import DB_PATH, connect_db
     try:
         with connect_db(DB_PATH) as con:
-            rows = con.execute(
-                "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
-                "FROM uses u "
-                "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                "JOIN registries r ON r.uuid = u.registry_uuid "
-                "WHERE u.mounted = ? "
-                "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE",
-                (mounted,),
-            ).fetchall()
+            if wsl_name:
+                rows = con.execute(
+                    "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
+                    "FROM uses u "
+                    "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                    "JOIN registries r ON r.uuid = u.registry_uuid "
+                    "WHERE u.mounted = ? AND w.name = ? AND w.user = ? "
+                    "ORDER BY r.name COLLATE NOCASE",
+                    (mounted, wsl_name, user),
+                ).fetchall()
+            else:
+                rows = con.execute(
+                    "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
+                    "FROM uses u "
+                    "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                    "JOIN registries r ON r.uuid = u.registry_uuid "
+                    "WHERE u.mounted = ? "
+                    "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE",
+                    (mounted,),
+                ).fetchall()
         label = "disabled" if mounted == 0 else "enabled"
         if not rows:
             return "LIST", [[f"(no {label} uses)"]]
@@ -1322,22 +1381,33 @@ if _HAS_TEXTUAL:
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
     class UseAddDialog(ListDialog):
-        """Select a registry to add a use link for the current WSL."""
+        """Select a registry to add a use link for the current WSL.
 
-        def __init__(self, breadcrumb: str) -> None:
-            hdr, recs = _db_registry_list()
+        Only shows registries not yet linked to the given WSL.
+        """
+
+        def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
+            self._wsl_name = wsl_name
+            self._user     = user
+            hdr, recs = _db_registry_list_available(wsl_name, user)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", "Add"]
             self._btn_focus = 0
-            self._raw_rows  = self._fetch_raw()
+            self._raw_rows  = self._fetch_raw_available(wsl_name, user)
 
         @staticmethod
-        def _fetch_raw() -> list:
+        def _fetch_raw_available(wsl_name: str, user: str) -> list:
             from commands.common import DB_PATH, connect_db
             try:
                 with connect_db(DB_PATH) as con:
                     return con.execute(
-                        "SELECT uuid, name FROM registries ORDER BY name COLLATE NOCASE"
+                        "SELECT r.uuid, r.name FROM registries r "
+                        "WHERE NOT EXISTS ("
+                        "  SELECT 1 FROM uses u "
+                        "  JOIN wsls w ON w.uuid = u.wsl_uuid "
+                        "  WHERE u.registry_uuid = r.uuid AND w.name = ? AND w.user = ?"
+                        ") ORDER BY r.name COLLATE NOCASE",
+                        (wsl_name, user),
                     ).fetchall()
             except Exception:
                 return []
@@ -1397,17 +1467,17 @@ if _HAS_TEXTUAL:
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
     class UseRemoveDialog(ListDialog):
-        """Select a use link to remove."""
+        """Select a use link to remove (filtered to current WSL)."""
 
-        def __init__(self, breadcrumb: str) -> None:
-            hdr, recs = _db_use_list()
+        def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
+            hdr, recs = _db_use_list(wsl_name, user)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", "Remove"]
             self._btn_focus = 0
-            self._raw_rows  = self._fetch_raw()
+            self._raw_rows  = self._fetch_raw(wsl_name, user)
 
         @staticmethod
-        def _fetch_raw() -> list:
+        def _fetch_raw(wsl_name: str, user: str) -> list:
             from commands.common import DB_PATH, connect_db
             try:
                 with connect_db(DB_PATH) as con:
@@ -1416,7 +1486,9 @@ if _HAS_TEXTUAL:
                         "FROM uses u "
                         "JOIN registries r ON r.uuid = u.registry_uuid "
                         "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                        "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
+                        "WHERE w.name = ? AND w.user = ? "
+                        "ORDER BY r.name COLLATE NOCASE",
+                        (wsl_name, user),
                     ).fetchall()
             except Exception:
                 return []
@@ -1464,15 +1536,15 @@ if _HAS_TEXTUAL:
         _NEW_MOUNTED:    int = 1    # value to SET on confirmation
         _ACTION_LABEL:   str = "Enable"
 
-        def __init__(self, breadcrumb: str) -> None:
-            hdr, recs = _db_use_list_filtered(self._TARGET_MOUNTED)
+        def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
+            hdr, recs = _db_use_list_filtered(self._TARGET_MOUNTED, wsl_name, user)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", self._ACTION_LABEL]
             self._btn_focus = 0
-            self._raw_rows  = self._fetch_raw_filtered(self._TARGET_MOUNTED)
+            self._raw_rows  = self._fetch_raw_filtered(self._TARGET_MOUNTED, wsl_name, user)
 
         @staticmethod
-        def _fetch_raw_filtered(mounted: int) -> list:
+        def _fetch_raw_filtered(mounted: int, wsl_name: str, user: str) -> list:
             from commands.common import DB_PATH, connect_db
             try:
                 with connect_db(DB_PATH) as con:
@@ -1481,9 +1553,9 @@ if _HAS_TEXTUAL:
                         "FROM uses u "
                         "JOIN registries r ON r.uuid = u.registry_uuid "
                         "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                        "WHERE u.mounted = ? "
-                        "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE",
-                        (mounted,),
+                        "WHERE u.mounted = ? AND w.name = ? AND w.user = ? "
+                        "ORDER BY r.name COLLATE NOCASE",
+                        (mounted, wsl_name, user),
                     ).fetchall()
             except Exception:
                 return []
@@ -1944,22 +2016,25 @@ if _HAS_TEXTUAL:
             if path == ["Registry", "Add"]:
                 self.push_screen(RegistryAddDialog(breadcrumb))
                 return
-            if path == ["Use", "List"]:
-                hdr, recs = _db_use_list()
-                self.push_screen(ListDialog(breadcrumb, hdr, recs))
-                return
-            if path == ["Use", "Add"]:
-                self.push_screen(UseAddDialog(breadcrumb))
-                return
-            if path == ["Use", "Remove"]:
-                self.push_screen(UseRemoveDialog(breadcrumb))
-                return
-            if path == ["Use", "Enable"]:
-                self.push_screen(UseEnableDialog(breadcrumb))
-                return
-            if path == ["Use", "Disable"]:
-                self.push_screen(UseDisableDialog(breadcrumb))
-                return
+            if path[0] == "Use":
+                ri = self._cli_args.runtime_identity
+                wn, usr = ri.wsl_name, ri.user
+                if path == ["Use", "List"]:
+                    hdr, recs = _db_use_list(wn, usr)
+                    self.push_screen(ListDialog(breadcrumb, hdr, recs))
+                    return
+                if path == ["Use", "Add"]:
+                    self.push_screen(UseAddDialog(breadcrumb, wn, usr))
+                    return
+                if path == ["Use", "Remove"]:
+                    self.push_screen(UseRemoveDialog(breadcrumb, wn, usr))
+                    return
+                if path == ["Use", "Enable"]:
+                    self.push_screen(UseEnableDialog(breadcrumb, wn, usr))
+                    return
+                if path == ["Use", "Disable"]:
+                    self.push_screen(UseDisableDialog(breadcrumb, wn, usr))
+                    return
             if path == ["Wsl", "List"]:
                 hdr, recs = _db_wsl_list()
                 self.push_screen(ListDialog(breadcrumb, hdr, recs))
