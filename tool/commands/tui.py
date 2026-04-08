@@ -451,9 +451,13 @@ def _render_dialog(
 
 # ─── Data helpers for list dialogs ────────────────────────────────────────────
 
-def _lbl(label: str, width: int) -> str:
-    """Format a label padded with dots to `width`, e.g. _lbl('Name', 7) → 'Name...'"""
-    return label + "." * max(0, width - len(label))
+def _lpad(label: str, width: int) -> str:
+    """Pad label to `width` with spaces and append one separator space.
+
+    Example: _lpad('UUID', 6) → 'UUID   '  (6 chars + 1 space = 7 total)
+             _lpad('In Use', 6) → 'In Use '  (6 chars + 1 space = 7 total)
+    """
+    return label.ljust(width) + " "
 
 
 def _db_registry_list() -> "tuple[str, list[list[str]]]":
@@ -472,11 +476,11 @@ def _db_registry_list() -> "tuple[str, list[list[str]]]":
         W = 6  # max label len: "In Use"
         for uuid, name, host, wsl, in_use in rows:
             records.append([
-                f"{_lbl('UUID',   W)}: {uuid}",
-                f"{_lbl('Name',   W)}: {name}",
-                f"{_lbl('Host',   W)}: {host}",
-                f"{_lbl('Wsl',    W)}: {wsl}",
-                f"{_lbl('In Use', W)}: {'yes' if in_use else 'no'}",
+                (_lpad("UUID",   W), uuid),
+                (_lpad("Name",   W), name),
+                (_lpad("Host",   W), host),
+                (_lpad("Wsl",    W), wsl),
+                (_lpad("In Use", W), "yes" if in_use else "no"),
             ])
         return "LIST", records
     except Exception as exc:
@@ -501,9 +505,9 @@ def _db_use_list() -> "tuple[str, list[list[str]]]":
         W = 8  # max label len: "Registry"
         for wsl, reg, mounted in rows:
             records.append([
-                f"{_lbl('WSL',      W)}: {wsl}",
-                f"{_lbl('Registry', W)}: {reg}",
-                f"{_lbl('Mounted',  W)}: {'yes' if mounted else 'no'}",
+                (_lpad("WSL",      W), wsl),
+                (_lpad("Registry", W), reg),
+                (_lpad("Mounted",  W), "yes" if mounted else "no"),
             ])
         return "LIST", records
     except Exception as exc:
@@ -524,10 +528,10 @@ def _db_wsl_list() -> "tuple[str, list[list[str]]]":
         W = 7  # max label len: "CLI cmd"
         for uuid, name, user, cli_cmd in rows:
             records.append([
-                f"{_lbl('UUID',    W)}: {uuid}",
-                f"{_lbl('Name',    W)}: {name}",
-                f"{_lbl('User',    W)}: {user}",
-                f"{_lbl('CLI cmd', W)}: {cli_cmd or ''}",
+                (_lpad("UUID",    W), uuid),
+                (_lpad("Name",    W), name),
+                (_lpad("User",    W), user),
+                (_lpad("CLI cmd", W), cli_cmd or ""),
             ])
         return "LIST", records
     except Exception as exc:
@@ -737,13 +741,14 @@ if _HAS_TEXTUAL:
         ) -> None:
             self._header  = header
             self._records = records
-            # Build flat list: (line_str, record_idx), -1 for blank separators
-            self._flat: "list[tuple[str, int]]" = []
+            # Build flat list: (field_data, record_idx)
+            # field_data = (label_str, value_str) for record lines, None for separators
+            self._flat: "list[tuple[any, int]]" = []
             for ri, rec in enumerate(records):
-                for line in rec:
-                    self._flat.append((line, ri))
+                for field in rec:
+                    self._flat.append((field, ri))
                 if ri < len(records) - 1:
-                    self._flat.append(("", -1))  # blank separator between records
+                    self._flat.append((None, -1))  # blank separator between records
             self._scroll = 0   # first visible flat line
             self._cursor = 0   # selected record index
             content_rows = min(14, max(3, len(self._flat)))
@@ -798,16 +803,26 @@ if _HAS_TEXTUAL:
             window    = self._flat[self._scroll : self._scroll + content_rows]
             scrollbar = self._build_scrollbar(content_rows)
 
-            for i, (line, ri) in enumerate(window):
+            for i, (field, ri) in enumerate(window):
                 is_sel   = (ri == self._cursor and ri >= 0)
-                txt      = line[:tw].ljust(tw)
                 bar_char = scrollbar[i]
-                if is_sel:
-                    result.append([(txt, _S["item_sel"]), (bar_char, _S["lines"])])
-                elif ri < 0:                   # blank separator row
+                if field is None:              # blank separator row
                     result.append([(" " * tw, _S["text"]), (bar_char, _S["lines"])])
+                elif is_sel:
+                    # selected: flatten label+value, render as one highlighted block
+                    lbl, val = field
+                    full = (lbl + val)[:tw].ljust(tw)
+                    result.append([(full, _S["item_sel"]), (bar_char, _S["lines"])])
                 else:
-                    result.append([(txt, _S["text"]), (bar_char, _S["lines"])])
+                    # normal: label in text_hl, value in text
+                    lbl, val = field
+                    lbl_w = len(lbl)
+                    val_w = max(0, tw - lbl_w)
+                    result.append([
+                        (lbl,                         _S["text_hl"]),
+                        (val[:val_w].ljust(val_w),    _S["text"]),
+                        (bar_char,                    _S["lines"]),
+                    ])
 
             # ── pad empty rows ─────────────────────────────────────────────────
             while len(result) < self._body_rows:
