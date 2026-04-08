@@ -923,6 +923,9 @@ if _HAS_TEXTUAL:
                 bar_char = scrollbar[i]
                 if field is None:              # blank separator row
                     result.append([(" " * tw, _S["text"]), (bar_char, _S["lines"])])
+                elif isinstance(field, str):   # plain-text message (e.g. "(no entries)")
+                    sty = _S["item_sel"] if is_sel else _S["text"]
+                    result.append([(field[:tw].ljust(tw), sty), (bar_char, _S["lines"])])
                 elif is_sel:
                     # selected: flatten label+value, render as one highlighted block
                     lbl, val = field
