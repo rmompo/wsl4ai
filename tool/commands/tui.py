@@ -735,6 +735,27 @@ if _HAS_TEXTUAL:
             except Exception:
                 pass
 
+    class ConfirmDialog(Wsl4aiDialog):
+        """Simple yes/no confirmation dialog."""
+
+        def __init__(self, message: str, width: int = 50) -> None:
+            super().__init__(
+                breadcrumb="Confirm",
+                width=width,
+                body_rows=3,
+                buttons=["Cancel", "Ok"],
+            )
+            self._message = message
+            self._btn_focus = 0   # default focus on Cancel
+
+        def body_lines(self) -> list:
+            cw = self._dlg_w - 4
+            return [
+                "",
+                self._message[:cw].center(cw),
+                "",
+            ]
+
     class ListDialog(Wsl4aiDialog):
         """Scrollable multi-line record list dialog.
 
@@ -1046,7 +1067,10 @@ if _HAS_TEXTUAL:
         def _dispatch(self, path: list[str]) -> None:
             action = " > ".join(path)
             if action == "Exit":
-                self.exit()
+                def _on_confirm(result: "str | None") -> None:
+                    if result == "Ok":
+                        self.exit()
+                self.push_screen(ConfirmDialog("Are you sure you want to exit?"), _on_confirm)
                 return
 
             # ── Theme switching ────────────────────────────────────────────────
