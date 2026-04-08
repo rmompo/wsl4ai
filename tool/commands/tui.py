@@ -146,8 +146,8 @@ def _save_theme(theme_id: str) -> None:
 
 MENU: list = [
     ("Registry", ["List", None, "Add", "Remove"]),
-    ("Use", ["List", None, "Add", "Remove", None, "Enable", "Disable", "Disable All"]),
     ("Wsl", ["List", None, "Set"]),
+    ("Use", ["List", None, "Add", "Remove", None, "Enable", "Disable", "Disable All"]),
     "Start",
     ("Others", [
         "Who Am I",
