@@ -1,63 +1,11 @@
 """Add and remove registry rows only."""
 
-import os
-import re
-import sqlite3
-import uuid
 from argparse import Namespace, _SubParsersAction
-from pathlib import Path
 
-from commands.api_json import OptionSpec, emit_envelope, options_from_args, row_from_pairs
-from commands.common import DB_PATH, connect_db, expand_path_template, load_local_env_paths, require_database_file
+from commands.api_json import OptionSpec, options_from_args
+from commands.common import load_local_env_paths
 from commands.help_md import help_summary_for_root, parser_description_from_manual
-from commands.wsl_db import count_uses_for_registry
-
-_UUID_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-    re.IGNORECASE,
-)
-
-
-def _new_uuid() -> str:
-    return str(uuid.uuid4())
-
-
-def _is_uuid(value: str) -> bool:
-    return bool(_UUID_RE.match(value.strip()))
-
-
-def _registry_row_by_uuid(con: sqlite3.Connection, reg_uuid: str) -> tuple[str, str, str, str] | None:
-    row = con.execute(
-        "SELECT uuid, name, rel_path_host, rel_path_wsl FROM registries WHERE uuid = ?",
-        (reg_uuid.strip(),),
-    ).fetchone()
-    return row
-
-
-def _registry_row_by_name(con: sqlite3.Connection, name: str) -> tuple[str, str, str, str] | None:
-    row = con.execute(
-        "SELECT uuid, name, rel_path_host, rel_path_wsl FROM registries WHERE LOWER(name) = LOWER(?)",
-        (name.strip(),),
-    ).fetchone()
-    return row
-
-
-def _absolute_under_param(base_raw: str, rel_segment: str) -> Path:
-    """Join expanded base with relative segment using ``os.path.join`` (no manual slash)."""
-    root = expand_path_template(base_raw)
-    rel = rel_segment.strip()
-    return Path(os.path.normpath(os.path.join(root, rel)))
-
-
-def _paths_under_param_exist(host_rel: str, wsl_rel: str) -> tuple[bool, str]:
-    """Ensure the HOST path exists. WSL path is created later by `use add`."""
-    host_root, _ = load_local_env_paths()
-    if not host_root:
-        return False, "add: missing HOST_PROJECTS in local.env"
-    host_full = _absolute_under_param(host_root, host_rel)
-    if not host_full.exists():
-        return False, f"add: host path not found: {host_full}"
-    return True, ""
+from commands.interface import emit_from_interface, interface_registry_add, interface_registry_remove
 
 
 def cmd_add(args: Namespace) -> int:
@@ -70,80 +18,13 @@ def cmd_add(args: Namespace) -> int:
             OptionSpec("--force", "force", is_flag=True),
         ],
     )
-    if not require_database_file():
-        return emit_envelope(
-            args=args,
-            command="registry",
-            subcommand="add",
-            options=opts,
-            status=1,
-            message="database file not found",
-        )
-    name = (args.name or "").strip()
-    host_rel = (args.host or "").strip()
-    wsl_rel = (args.wsl or "").strip()
-    if not name or not host_rel or not wsl_rel:
-        return emit_envelope(
-            args=args,
-            command="registry",
-            subcommand="add",
-            options=opts,
-            status=1,
-            message="add: --name, --host and --wsl must be non-empty",
-        )
-    if not getattr(args, "force", False):
-        ok_paths, err_paths = _paths_under_param_exist(host_rel, wsl_rel)
-        if not ok_paths:
-            return emit_envelope(
-                args=args,
-                command="registry",
-                subcommand="add",
-                options=opts,
-                status=1,
-                message=err_paths,
-            )
-    uid = _new_uuid()
-    try:
-        with connect_db(DB_PATH) as con:
-            taken = con.execute(
-                "SELECT name FROM registries WHERE LOWER(name) = LOWER(?) LIMIT 1",
-                (name,),
-            ).fetchone()
-            if taken:
-                return emit_envelope(
-                    args=args,
-                    command="registry",
-                    subcommand="add",
-                    options=opts,
-                    status=1,
-                    message=f"add: name already taken ({taken[0]!r})",
-                )
-            con.execute(
-                """
-                INSERT INTO registries (uuid, name, rel_path_host, rel_path_wsl)
-                VALUES (?, ?, ?, ?)
-                """,
-                (uid, name, host_rel, wsl_rel),
-            )
-    except sqlite3.IntegrityError:
-        return emit_envelope(
-            args=args,
-            command="registry",
-            subcommand="add",
-            options=opts,
-            status=1,
-            message="add: insert rejected (duplicate name?)",
-        )
-    return emit_envelope(
-        args=args,
-        command="registry",
-        subcommand="add",
-        options=opts,
-        status=0,
-        message=f"registry entry added: {name}",
-        uuid=uid,
-        rows=[row_from_pairs([("registryUuid", uid), ("registryName", name)])],
+    env = interface_registry_add(
+        name=(args.name or "").strip(),
+        host_rel=(args.host or "").strip(),
+        wsl_rel=(args.wsl or "").strip(),
+        force=bool(getattr(args, "force", False)),
     )
+    return emit_from_interface(args, env, opts)
 
 
 def cmd_remove(args: Namespace) -> int:
@@ -154,79 +35,11 @@ def cmd_remove(args: Namespace) -> int:
             OptionSpec("--name", "remove_name"),
         ],
     )
-    if not require_database_file():
-        return emit_envelope(
-            args=args,
-            command="registry",
-            subcommand="remove",
-            options=opts,
-            status=1,
-            message="database file not found",
-        )
-    reg_uuid = (getattr(args, "remove_uuid", None) or "").strip()
-    reg_name = (getattr(args, "remove_name", None) or "").strip()
-    if not reg_uuid and not reg_name:
-        return emit_envelope(
-            args=args,
-            command="registry",
-            subcommand="remove",
-            options=opts,
-            status=1,
-            message="remove: at least one of --uuid or --name is required",
-        )
-    with connect_db(DB_PATH) as con:
-        if reg_uuid:
-            if not _is_uuid(reg_uuid):
-                return emit_envelope(
-                    args=args,
-                    command="registry",
-                    subcommand="remove",
-                    options=opts,
-                    status=1,
-                    message=f"remove: invalid uuid: {reg_uuid!r}",
-                )
-            row = _registry_row_by_uuid(con, reg_uuid)
-            if not row:
-                return emit_envelope(
-                    args=args,
-                    command="registry",
-                    subcommand="remove",
-                    options=opts,
-                    status=1,
-                    message=f"remove: not found (uuid={reg_uuid!r})",
-                )
-        else:
-            row = _registry_row_by_name(con, reg_name)
-            if not row:
-                return emit_envelope(
-                    args=args,
-                    command="registry",
-                    subcommand="remove",
-                    options=opts,
-                    status=1,
-                    message=f"remove: not found (name={reg_name!r})",
-                )
-        rid, rname = row[0], row[1]
-        n_use = count_uses_for_registry(con, rid)
-        if n_use > 0:
-            return emit_envelope(
-                args=args,
-                command="registry",
-                subcommand="remove",
-                options=opts,
-                status=1,
-                message="remove: registry still has use links; run 'use disable' + 'use remove' first",
-            )
-        con.execute("DELETE FROM registries WHERE uuid = ?", (rid,))
-    return emit_envelope(
-        args=args,
-        command="registry",
-        subcommand="remove",
-        options=opts,
-        status=0,
-        message=f"removed registry: {rname}",
-        rows=[row_from_pairs([("registryUuid", rid), ("registryName", rname)])],
+    env = interface_registry_remove(
+        registry_uuid=(getattr(args, "remove_uuid", None) or "").strip(),
+        registry_name=(getattr(args, "remove_name", None) or "").strip(),
     )
+    return emit_from_interface(args, env, opts)
 
 
 def register_add_command(
