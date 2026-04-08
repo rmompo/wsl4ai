@@ -132,6 +132,26 @@ _THEME_MAP: dict[tuple, str] = {
     ("High Contrast",):       "high_contrast",
 }
 
+# Ordered list of (display_name, theme_id) for ThemeDialog
+_THEME_LIST: list[tuple[str, str]] = [
+    ("Dark  › Normal",      "normal_dark"),
+    ("Dark  › Bright",      "bright_dark"),
+    ("Dark  › Color Blind", "color_blind_dark"),
+    ("Light › Normal",      "normal_light"),
+    ("Light › Bright",      "bright_light"),
+    ("Light › Color Blind", "color_blind_light"),
+    ("High Contrast",       "high_contrast"),
+]
+
+
+def _current_theme_id() -> str:
+    """Read the active theme_id from config.json, falling back to default."""
+    try:
+        cfg = json.loads(_THEME_CFG.read_text(encoding="utf-8"))
+        return str(cfg.get("tui", {}).get("theme", _DEFAULT_THEME)).strip() or _DEFAULT_THEME
+    except Exception:
+        return _DEFAULT_THEME
+
 
 def _save_theme(theme_id: str) -> None:
     """Persist theme_id to conf/config.json under tui.theme."""
@@ -164,11 +184,7 @@ MENU: list = [
             ("Alias", ["List", None, "Add", "Remove"]),
         ]),
         None,
-        ("Theme", [
-            ("Dark",  ["Normal", "Bright", "Color Blind"]),
-            ("Light", ["Normal", "Bright", "Color Blind"]),
-            "High Contrast",
-        ]),
+        "Theme",
     ]),
     "Exit",
 ]
@@ -1781,6 +1797,64 @@ if _HAS_TEXTUAL:
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+    class ThemeDialog(Wsl4aiDialog):
+        """Theme picker with live preview on navigation.
+
+        Navigating up/down applies the theme immediately (no save).
+        Esc restores the original theme; Enter saves and closes.
+        The current active theme is pre-selected on open.
+        """
+
+        def __init__(self, breadcrumb: str) -> None:
+            W = max(len(name) for name, _ in _THEME_LIST)
+            n = len(_THEME_LIST)
+            super().__init__(breadcrumb, width=W + 10, body_rows=n + 2, buttons=["Cancel", "Apply"])
+            self._original_id = _current_theme_id()
+            # pre-select active theme
+            ids = [tid for _, tid in _THEME_LIST]
+            self._cursor = ids.index(self._original_id) if self._original_id in ids else 0
+            self._btn_focus = 1   # Apply highlighted by default
+
+        def body_lines(self) -> list:
+            cw = self._dlg_w - 4
+            result: list = [""]
+            for i, (name, _tid) in enumerate(_THEME_LIST):
+                cell = name.ljust(cw)
+                sty  = _S["item_sel"] if i == self._cursor else _S["item"]
+                result.append([(cell, sty)])
+            result.append("")
+            return result
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            n   = len(_THEME_LIST)
+            if key == "up" and self._cursor > 0:
+                self._cursor -= 1
+                self._preview()
+            elif key == "down" and self._cursor < n - 1:
+                self._cursor += 1
+                self._preview()
+            elif key == "escape":
+                # restore original theme without saving
+                _save_theme(self._original_id)
+                _load_theme()
+                self.app._apply_theme()
+                self.dismiss(None)
+            elif key == "enter":
+                # already applied; just save and close
+                _save_theme(_THEME_LIST[self._cursor][1])
+                self.dismiss(None)
+
+        def _preview(self) -> None:
+            """Apply theme visually (no save) and refresh dialog + app."""
+            tid = _THEME_LIST[self._cursor][1]
+            _save_theme(tid)          # write config so _load_theme reads it
+            _load_theme()
+            self.app._apply_theme()
+            self._refresh_dlg()
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
     class StartDialog(ListDialog):
         """Select a mounted use to start."""
 
@@ -1990,17 +2064,9 @@ if _HAS_TEXTUAL:
                 self.push_screen(ConfirmDialog("Are you sure you want to exit?"), _on_confirm)
                 return
 
-            # ── Theme switching ────────────────────────────────────────────────
-            if len(path) >= 3 and path[0] == "Others" and path[1] == "Theme":
-                theme_key = tuple(path[2:])
-                theme_id  = _THEME_MAP.get(theme_key)
-                if theme_id:
-                    _save_theme(theme_id)
-                    _load_theme()
-                    self._apply_theme()
-                    self.notify(f"Theme: {' › '.join(path[2:])}", timeout=2)
-                else:
-                    self.notify(f"Unknown theme: {theme_key}", timeout=3)
+            # ── Theme dialog ───────────────────────────────────────────────────
+            if path == ["Others", "Theme"]:
+                self.push_screen(ThemeDialog(breadcrumb))
                 return
 
             # ── List dialogs ───────────────────────────────────────────────────
