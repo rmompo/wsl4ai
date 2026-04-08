@@ -2079,18 +2079,15 @@ if _HAS_TEXTUAL:
                 return
 
             if path == ["Others", "Install", "Database"]:
-                from commands.common import DB_PATH
-                exists = DB_PATH.is_file()
-                msg = "Recreate database? ALL DATA WILL BE LOST" if exists else "Create database?"
-
                 def _do_install_db(result: "str | None") -> None:
                     if result != "Ok":
                         return
                     from commands.common import DB_PATH, TABLE_DDL, connect_db
                     try:
-                        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
                         if DB_PATH.is_file():
-                            DB_PATH.unlink()
+                            self.notify("Database already exists", timeout=4)
+                            return
+                        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
                         con = connect_db(DB_PATH)
                         con.executescript(TABLE_DDL)
                         con.commit()
@@ -2098,7 +2095,7 @@ if _HAS_TEXTUAL:
                         self.notify("Database created", timeout=3)
                     except Exception as exc:
                         self.notify(f"Database error: {exc}", timeout=5)
-                self.push_screen(ConfirmDialog(msg, width=56), _do_install_db)
+                self.push_screen(ConfirmDialog("Create database?"), _do_install_db)
                 return
 
             if path == ["Others", "Install", "Alias", "List"]:
