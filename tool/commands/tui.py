@@ -1013,7 +1013,8 @@ if _HAS_TEXTUAL:
 
             # read-only context rows
             for lbl, val in zip(self._LABELS_RO, [self._uuid, self._name, self._user]):
-                result.append([(lbl + "  ", _S["text_hl"]), (val[:iw].ljust(iw), _S["text"])])
+                safe = (val or "")
+                result.append([(lbl + "  ", _S["text_hl"]), (safe[:iw].ljust(iw), _S["text"])])
 
             result.append("")   # blank separator
 
@@ -1455,7 +1456,13 @@ if _HAS_TEXTUAL:
                     )
                     return
                 uuid, name, user, cli_cmd = row
-                self.push_screen(WslSetFormDialog(breadcrumb, uuid, name, user, cli_cmd or ""))
+                self.push_screen(WslSetFormDialog(
+                    breadcrumb,
+                    uuid    or "",
+                    name    or "",
+                    user    or "",
+                    cli_cmd or "",
+                ))
                 return
 
             # TODO: connect remaining command handlers in the next phase
