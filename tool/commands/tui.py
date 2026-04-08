@@ -702,9 +702,18 @@ if _HAS_TEXTUAL:
             return [""] * self._body_rows
 
         def on_key(self, event: "events.Key") -> None:
-            event.stop()   # prevent Textual MRO from calling this twice via subclass
-            key = event.key
-            n   = len(self._buttons)
+            """Single on_key for the entire dialog hierarchy.
+
+            Textual calls on_key for EVERY class in the MRO that defines it.
+            By defining it ONLY here (not in subclasses) we guarantee it runs
+            exactly once.  Subclasses override _handle_key() instead.
+            """
+            event.stop()
+            self._handle_key(event.key)
+
+        def _handle_key(self, key: str) -> None:
+            """Override in subclasses to add extra key handling before button nav."""
+            n = len(self._buttons)
             if key in ("tab", "right"):
                 if self._btn_focus < n - 1:
                     self._btn_focus += 1
@@ -832,9 +841,7 @@ if _HAS_TEXTUAL:
 
         # ── keyboard ──────────────────────────────────────────────────────────
 
-        def on_key(self, event: "events.Key") -> None:
-            event.stop()                  # prevent Textual MRO double-dispatch
-            key          = event.key
+        def _handle_key(self, key: str) -> None:
             n            = len(self._records)
             content_rows = self._body_rows - 2
             max_scroll   = max(0, len(self._flat) - content_rows)
@@ -849,10 +856,8 @@ if _HAS_TEXTUAL:
                     self._cursor += 1
                     self._ensure_visible(content_rows, max_scroll)
                     self._refresh_dlg()
-            elif key == "enter":
-                self.dismiss(self._buttons[self._btn_focus])
-            elif key == "escape":
-                self.dismiss(None)
+            else:
+                super()._handle_key(key)  # button nav + close
 
         def _ensure_visible(self, content_rows: int, max_scroll: int) -> None:
             """Scroll so the first line of the selected record is visible."""
