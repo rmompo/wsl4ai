@@ -493,7 +493,7 @@ def _db_use_list() -> "tuple[str, list[list[str]]]":
     try:
         with connect_db(DB_PATH) as con:
             rows = con.execute(
-                "SELECT w.name, r.name, u.mounted "
+                "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
                 "FROM uses u "
                 "JOIN wsls w ON w.uuid = u.wsl_uuid "
                 "JOIN registries r ON r.uuid = u.registry_uuid "
@@ -502,12 +502,14 @@ def _db_use_list() -> "tuple[str, list[list[str]]]":
         if not rows:
             return "LIST", [["(no entries)"]]
         records = []
-        W = 8  # max label len: "Registry"
-        for wsl, reg, mounted in rows:
+        W = 13  # max label len: "Registry UUID" / "Registry Name"
+        for r_uuid, r_name, w_uuid, w_name, mounted in rows:
             records.append([
-                (_lpad("WSL",      W), wsl),
-                (_lpad("Registry", W), reg),
-                (_lpad("Mounted",  W), "yes" if mounted else "no"),
+                (_lpad("Registry UUID", W), r_uuid),
+                (_lpad("Registry Name", W), r_name),
+                (_lpad("Wsl UUID",      W), w_uuid),
+                (_lpad("Wsl Name",      W), w_name),
+                (_lpad("Mounted",       W), "yes" if mounted else "no"),
             ])
         return "LIST", records
     except Exception as exc:
