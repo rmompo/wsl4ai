@@ -722,7 +722,7 @@ if _HAS_TEXTUAL:
     class Banner(Widget):
         DEFAULT_CSS = """
         Banner {
-            height: 4;
+            height: 5;
             width: 1fr;
         }
         """
@@ -736,6 +736,7 @@ if _HAS_TEXTUAL:
                 pass
 
             t = Text()
+            t.append("\n")   # top padding
             for i, (body, tent) in enumerate(zip(BANNER_BODY, BANNER_TENTACLES)):
                 line = Text()
                 line.append(" ")
@@ -767,12 +768,12 @@ if _HAS_TEXTUAL:
                         user    = ri.user     or ""
                         machine = ri.machine  or ""
                         wsl     = ri.wsl_name or ""
-                        ident   = f"{user}@{machine}({wsl})"
+                        ident   = f"{user}@{wsl}({machine})"
                         pad = max(0, w - prefix_len - len(ident) - 1)
                         line.append(" " * pad)
                         line.append(user,              style=_S["text"])
                         line.append("@",               style=_S["text_hl"])
-                        line.append(f"{machine}({wsl})", style=_S["text"])
+                        line.append(f"{wsl}({machine})", style=_S["text"])
 
                 t.append_text(line)
                 t.append("\n")
