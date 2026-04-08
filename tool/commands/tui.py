@@ -526,6 +526,38 @@ def _db_use_list() -> "tuple[str, list[list[str]]]":
         return "LIST", [[f"Error: {exc}"]]
 
 
+def _db_use_list_filtered(mounted: int) -> "tuple[str, list[list[str]]]":
+    """Like _db_use_list but only returns rows with the given mounted value."""
+    from commands.common import DB_PATH, connect_db
+    try:
+        with connect_db(DB_PATH) as con:
+            rows = con.execute(
+                "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
+                "FROM uses u "
+                "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                "JOIN registries r ON r.uuid = u.registry_uuid "
+                "WHERE u.mounted = ? "
+                "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE",
+                (mounted,),
+            ).fetchall()
+        label = "disabled" if mounted == 0 else "enabled"
+        if not rows:
+            return "LIST", [[f"(no {label} uses)"]]
+        records = []
+        W = 13
+        for r_uuid, r_name, w_uuid, w_name, m in rows:
+            records.append([
+                (_lpad("Registry UUID", W), r_uuid),
+                (_lpad("Registry Name", W), r_name),
+                (_lpad("Wsl UUID",      W), w_uuid),
+                (_lpad("Wsl Name",      W), w_name),
+                (_lpad("Mounted",       W), "yes" if m else "no"),
+            ])
+        return "LIST", records
+    except Exception as exc:
+        return "LIST", [[f"Error: {exc}"]]
+
+
 def _db_wsl_list() -> "tuple[str, list[list[str]]]":
     """Returns (header, records) where each record is a list of display lines."""
     from commands.common import DB_PATH, connect_db
@@ -1430,14 +1462,14 @@ if _HAS_TEXTUAL:
         _ACTION_LABEL:   str = "Enable"
 
         def __init__(self, breadcrumb: str) -> None:
-            hdr, recs = _db_use_list()
+            hdr, recs = _db_use_list_filtered(self._TARGET_MOUNTED)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", self._ACTION_LABEL]
             self._btn_focus = 0
-            self._raw_rows  = self._fetch_raw()
+            self._raw_rows  = self._fetch_raw_filtered(self._TARGET_MOUNTED)
 
         @staticmethod
-        def _fetch_raw() -> list:
+        def _fetch_raw_filtered(mounted: int) -> list:
             from commands.common import DB_PATH, connect_db
             try:
                 with connect_db(DB_PATH) as con:
@@ -1446,7 +1478,9 @@ if _HAS_TEXTUAL:
                         "FROM uses u "
                         "JOIN registries r ON r.uuid = u.registry_uuid "
                         "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                        "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
+                        "WHERE u.mounted = ? "
+                        "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE",
+                        (mounted,),
                     ).fetchall()
             except Exception:
                 return []
@@ -1458,11 +1492,7 @@ if _HAS_TEXTUAL:
             elif key == "enter":
                 if not self._raw_rows or self._cursor >= len(self._raw_rows):
                     return
-                r_uuid, r_name, w_uuid, mounted = self._raw_rows[self._cursor]
-                if mounted == self._NEW_MOUNTED:
-                    state = "enabled" if self._NEW_MOUNTED else "disabled"
-                    self.app.notify(f"'{r_name}' is already {state}", timeout=3)
-                    return
+                r_uuid, r_name, w_uuid, _mounted = self._raw_rows[self._cursor]
                 self._confirm_toggle(r_uuid, r_name, w_uuid)
             else:
                 self._navigate(key)
