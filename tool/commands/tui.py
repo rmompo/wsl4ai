@@ -153,7 +153,7 @@ def _save_theme(theme_id: str) -> None:
 
 MENU: list = [
     ("Registry", ["List", None, "Add", "Remove"]),
-    ("Use", ["List", None, "Add", "Remove"]),
+    ("Use", ["List", None, "Add", "Remove", None, "Enable", "Disable"]),
     ("Wsl", ["List", None, "Set"]),
     "Start",
     ("Others", [
@@ -1421,6 +1421,88 @@ if _HAS_TEXTUAL:
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+    class _UseToggleDialog(ListDialog):
+        """Base for Enable/Disable: shows uses filtered by target mounted state."""
+
+        # Subclasses set these:
+        _TARGET_MOUNTED: int = 0    # rows shown have this mounted value
+        _NEW_MOUNTED:    int = 1    # value to SET on confirmation
+        _ACTION_LABEL:   str = "Enable"
+
+        def __init__(self, breadcrumb: str) -> None:
+            hdr, recs = _db_use_list()
+            super().__init__(breadcrumb, hdr, recs, width=80)
+            self._buttons   = ["Cancel", self._ACTION_LABEL]
+            self._btn_focus = 0
+            self._raw_rows  = self._fetch_raw()
+
+        @staticmethod
+        def _fetch_raw() -> list:
+            from commands.common import DB_PATH, connect_db
+            try:
+                with connect_db(DB_PATH) as con:
+                    return con.execute(
+                        "SELECT r.uuid, r.name, w.uuid, u.mounted "
+                        "FROM uses u "
+                        "JOIN registries r ON r.uuid = u.registry_uuid "
+                        "JOIN wsls w ON w.uuid = u.wsl_uuid "
+                        "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
+                    ).fetchall()
+            except Exception:
+                return []
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            if key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                    return
+                r_uuid, r_name, w_uuid, mounted = self._raw_rows[self._cursor]
+                if mounted == self._NEW_MOUNTED:
+                    state = "enabled" if self._NEW_MOUNTED else "disabled"
+                    self.app.notify(f"'{r_name}' is already {state}", timeout=3)
+                    return
+                self._confirm_toggle(r_uuid, r_name, w_uuid)
+            else:
+                self._navigate(key)
+
+        def _confirm_toggle(self, r_uuid: str, r_name: str, w_uuid: str) -> None:
+            new_val  = self._NEW_MOUNTED
+            action   = self._ACTION_LABEL.lower()
+
+            def _do_toggle(result: "str | None") -> None:
+                if result != "Ok":
+                    return
+                from commands.common import DB_PATH, connect_db
+                try:
+                    with connect_db(DB_PATH) as con:
+                        con.execute(
+                            "UPDATE uses SET mounted = ? WHERE wsl_uuid = ? AND registry_uuid = ?",
+                            (new_val, w_uuid, r_uuid),
+                        )
+                    self.app.notify(f"{self._ACTION_LABEL}d: {r_name}", timeout=3)
+                    self.dismiss(None)
+                except Exception as exc:
+                    self.app.notify(f"{action} failed: {exc}", timeout=4)
+
+            self.app.push_screen(
+                ConfirmDialog(f"{self._ACTION_LABEL} use for '{r_name}'?"),
+                _do_toggle,
+            )
+
+    class UseEnableDialog(_UseToggleDialog):
+        _TARGET_MOUNTED = 0
+        _NEW_MOUNTED    = 1
+        _ACTION_LABEL   = "Enable"
+
+    class UseDisableDialog(_UseToggleDialog):
+        _TARGET_MOUNTED = 1
+        _NEW_MOUNTED    = 0
+        _ACTION_LABEL   = "Disable"
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
     class AliasListDialog(ListDialog):
         """Show alias names from ~/.startup-wsl4ai.sh."""
 
@@ -1838,6 +1920,12 @@ if _HAS_TEXTUAL:
                 return
             if path == ["Use", "Remove"]:
                 self.push_screen(UseRemoveDialog(breadcrumb))
+                return
+            if path == ["Use", "Enable"]:
+                self.push_screen(UseEnableDialog(breadcrumb))
+                return
+            if path == ["Use", "Disable"]:
+                self.push_screen(UseDisableDialog(breadcrumb))
                 return
             if path == ["Wsl", "List"]:
                 hdr, recs = _db_wsl_list()
