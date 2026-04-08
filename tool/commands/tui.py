@@ -468,265 +468,19 @@ def _render_dialog(
     return t
 
 
-# ─── Data helpers for list dialogs ────────────────────────────────────────────
+# ─── Data helpers ─────────────────────────────────────────────────────────────
 
 def _lpad(label: str, width: int) -> str:
-    """Pad label to `width` with spaces and append one separator space.
-
-    Example: _lpad('UUID', 6) → 'UUID   '  (6 chars + 1 space = 7 total)
-             _lpad('In Use', 6) → 'In Use '  (6 chars + 1 space = 7 total)
-    """
+    """Pad label to `width` with spaces and append one separator space."""
     return label.ljust(width) + " "
 
 
-def _load_base_paths() -> "tuple[str, str]":
-    """Return (base_host, base_wsl) — both expanded and with trailing slash."""
-    from commands.common import expand_path_template, load_local_env_paths
-    bh, bw = load_local_env_paths()
-    return expand_path_template(bh), expand_path_template(bw)
-
-
-def _db_registry_list() -> "tuple[str, list[list[str]]]":
-    """Returns (header, records) where each record is a list of display lines."""
-    from commands.common import DB_PATH, connect_db
-    try:
-        with connect_db(DB_PATH) as con:
-            rows = con.execute(
-                "SELECT r.uuid, r.name, r.rel_path_host, r.rel_path_wsl, "
-                "(SELECT 1 FROM uses WHERE registry_uuid = r.uuid LIMIT 1) AS in_use "
-                "FROM registries r ORDER BY name COLLATE NOCASE"
-            ).fetchall()
-        if not rows:
-            return "LIST", [["(no entries)"]]
-        base_host, base_wsl = _load_base_paths()
-        records = []
-        W = 9  # max label len: "Path Host"
-        for uuid, name, host, wsl, in_use in rows:
-            records.append([
-                (_lpad("UUID",      W), uuid),
-                (_lpad("Name",      W), name),
-                (_lpad("Path Host", W), f"{base_host}{host}"),
-                (_lpad("Path Wsl",  W), f"{base_wsl}{wsl}"),
-                (_lpad("In Use",    W), "yes" if in_use else "no"),
-            ])
-        return "LIST", records
-    except Exception as exc:
-        return "LIST", [[f"Error: {exc}"]]
-
-
-def _db_registry_list_available(wsl_name: str, user: str) -> "tuple[str, list[list[str]]]":
-    """Registries not yet linked to the given WSL (candidates for Use > Add)."""
-    from commands.common import DB_PATH, connect_db
-    try:
-        with connect_db(DB_PATH) as con:
-            rows = con.execute(
-                "SELECT r.uuid, r.name, r.rel_path_host, r.rel_path_wsl "
-                "FROM registries r "
-                "WHERE NOT EXISTS ("
-                "  SELECT 1 FROM uses u "
-                "  JOIN wsls w ON w.uuid = u.wsl_uuid "
-                "  WHERE u.registry_uuid = r.uuid AND w.name = ? AND w.user = ?"
-                ") ORDER BY r.name COLLATE NOCASE",
-                (wsl_name, user),
-            ).fetchall()
-        if not rows:
-            return "LIST", [["(no registries available)"]]
-        base_host, base_wsl = _load_base_paths()
-        records = []
-        W = 9  # max label len: "Path Host"
-        for r_uuid, r_name, host, wsl in rows:
-            records.append([
-                (_lpad("UUID",      W), r_uuid),
-                (_lpad("Name",      W), r_name),
-                (_lpad("Path Host", W), f"{base_host}{host}"),
-                (_lpad("Path Wsl",  W), f"{base_wsl}{wsl}"),
-            ])
-        return "LIST", records
-    except Exception as exc:
-        return "LIST", [[f"Error: {exc}"]]
-
-
-def _db_use_list(wsl_name: str = "", user: str = "") -> "tuple[str, list[list[str]]]":
-    """Returns (header, records) where each record is a list of display lines.
-
-    If wsl_name/user are given, results are filtered to that WSL only.
-    """
-    from commands.common import DB_PATH, connect_db
-    try:
-        with connect_db(DB_PATH) as con:
-            if wsl_name:
-                rows = con.execute(
-                    "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
-                    "FROM uses u "
-                    "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                    "JOIN registries r ON r.uuid = u.registry_uuid "
-                    "WHERE w.name = ? AND w.user = ? "
-                    "ORDER BY r.name COLLATE NOCASE",
-                    (wsl_name, user),
-                ).fetchall()
-            else:
-                rows = con.execute(
-                    "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
-                    "FROM uses u "
-                    "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                    "JOIN registries r ON r.uuid = u.registry_uuid "
-                    "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE"
-                ).fetchall()
-        if not rows:
-            return "LIST", [["(no entries)"]]
-        records = []
-        W = 13  # max label len: "Registry UUID" / "Registry Name"
-        for r_uuid, r_name, w_uuid, w_name, mounted in rows:
-            records.append([
-                (_lpad("Registry UUID", W), r_uuid),
-                (_lpad("Registry Name", W), r_name),
-                (_lpad("Wsl UUID",      W), w_uuid),
-                (_lpad("Wsl Name",      W), w_name),
-                (_lpad("Mounted",       W), "yes" if mounted else "no"),
-            ])
-        return "LIST", records
-    except Exception as exc:
-        return "LIST", [[f"Error: {exc}"]]
-
-
-def _db_use_list_filtered(mounted: int, wsl_name: str = "", user: str = "") -> "tuple[str, list[list[str]]]":
-    """Like _db_use_list but only returns rows with the given mounted value.
-
-    If wsl_name/user are given, results are also filtered to that WSL.
-    """
-    from commands.common import DB_PATH, connect_db
-    try:
-        with connect_db(DB_PATH) as con:
-            if wsl_name:
-                rows = con.execute(
-                    "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
-                    "FROM uses u "
-                    "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                    "JOIN registries r ON r.uuid = u.registry_uuid "
-                    "WHERE u.mounted = ? AND w.name = ? AND w.user = ? "
-                    "ORDER BY r.name COLLATE NOCASE",
-                    (mounted, wsl_name, user),
-                ).fetchall()
-            else:
-                rows = con.execute(
-                    "SELECT r.uuid, r.name, w.uuid, w.name, u.mounted "
-                    "FROM uses u "
-                    "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                    "JOIN registries r ON r.uuid = u.registry_uuid "
-                    "WHERE u.mounted = ? "
-                    "ORDER BY w.name COLLATE NOCASE, r.name COLLATE NOCASE",
-                    (mounted,),
-                ).fetchall()
-        label = "disabled" if mounted == 0 else "enabled"
-        if not rows:
-            return "LIST", [[f"(no {label} uses)"]]
-        records = []
-        W = 13
-        for r_uuid, r_name, w_uuid, w_name, m in rows:
-            records.append([
-                (_lpad("Registry UUID", W), r_uuid),
-                (_lpad("Registry Name", W), r_name),
-                (_lpad("Wsl UUID",      W), w_uuid),
-                (_lpad("Wsl Name",      W), w_name),
-                (_lpad("Mounted",       W), "yes" if m else "no"),
-            ])
-        return "LIST", records
-    except Exception as exc:
-        return "LIST", [[f"Error: {exc}"]]
-
-
-def _db_wsl_list() -> "tuple[str, list[list[str]]]":
-    """Returns (header, records) where each record is a list of display lines."""
-    from commands.common import DB_PATH, connect_db
-    try:
-        with connect_db(DB_PATH) as con:
-            rows = con.execute(
-                "SELECT uuid, name, user, cli_command FROM wsls ORDER BY name COLLATE NOCASE"
-            ).fetchall()
-        if not rows:
-            return "LIST", [["(no entries)"]]
-        records = []
-        W = 7  # max label len: "CLI cmd"
-        for uuid, name, user, cli_cmd in rows:
-            records.append([
-                (_lpad("UUID",    W), uuid),
-                (_lpad("Name",    W), name),
-                (_lpad("User",    W), user),
-                (_lpad("CLI cmd", W), cli_cmd or ""),
-            ])
-        return "LIST", records
-    except Exception as exc:
-        return "LIST", [[f"Error: {exc}"]]
+def _row_fields(row: dict) -> dict:
+    """Extract {key: value} dict from a row_from_pairs envelope row."""
+    return {f["key"]: f["value"] for f in row.get("fields", [])}
 
 
 _PROTECTED_ALIASES = {"wsl4ai"}  # cannot be removed
-
-
-def _get_aliases_typed() -> "list[tuple[str, str]]":
-    """Return [(name, shell_type), ...] from all managed profile files.
-
-    shell_type is 'bash' (Linux/WSL) or 'ps' (Windows PowerShell).
-    The 'wsl4ai' entry is always included when present — it is protected.
-    """
-    import platform
-    from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
-    from commands.install_alias import _bash_names_from_block, _extract_block
-    result: "list[tuple[str, str]]" = []
-    try:
-        path = bashrc_path()
-        content = path.read_text(encoding="utf-8") if path.exists() else ""
-        _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
-        for name in _bash_names_from_block(block):
-            result.append((name, "bash"))
-    except Exception:
-        pass
-    if platform.system() == "Windows":
-        try:
-            from commands.alias_ps import PS_BEGIN, PS_END, profile_paths
-            from commands.install_alias import _ps_names_from_block
-            for ps_path in profile_paths():
-                content = ps_path.read_text(encoding="utf-8") if ps_path.exists() else ""
-                _, block, _ = _extract_block(content, PS_BEGIN, PS_END)
-                for name in _ps_names_from_block(block):
-                    if (name, "ps") not in result:
-                        result.append((name, "ps"))
-        except Exception:
-            pass
-    return result
-
-
-def _db_mounted_uses(wsl_name: str, user: str) -> "tuple[str, list, list]":
-    """Return (header, display_records, raw_rows) for mounted=1 uses of given WSL.
-
-    raw_rows columns: (r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd)
-    """
-    from commands.common import DB_PATH, connect_db
-    try:
-        with connect_db(DB_PATH) as con:
-            rows = con.execute(
-                "SELECT r.uuid, r.name, r.rel_path_host, r.rel_path_wsl, w.cli_command "
-                "FROM uses u "
-                "JOIN registries r ON r.uuid = u.registry_uuid "
-                "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                "WHERE u.mounted = 1 AND w.name = ? AND w.user = ? "
-                "ORDER BY r.name COLLATE NOCASE",
-                (wsl_name, user),
-            ).fetchall()
-        if not rows:
-            return "LIST", [["(no mounted uses)"]], []
-        base_host, base_wsl = _load_base_paths()
-        W = 13  # "Registry UUID" / "Registry Name"
-        records = []
-        for r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd in rows:
-            records.append([
-                (_lpad("Registry UUID", W), r_uuid),
-                (_lpad("Registry Name", W), r_name),
-                (_lpad("Path Host",     W), f"{base_host}{rel_path_host or ''}"),
-                (_lpad("Path Wsl",      W), f"{base_wsl}{rel_path_wsl or ''}"),
-            ])
-        return "LIST", records, list(rows)
-    except Exception as exc:
-        return "LIST", [[f"Error: {exc}"]], []
 
 
 # ─── Widgets ──────────────────────────────────────────────────────────────────
@@ -1132,28 +886,28 @@ if _HAS_TEXTUAL:
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
     class RegistryRemoveDialog(ListDialog):
-        """Registry Remove — list view with Cancel/Remove buttons.
-
-        Enter on a selected record confirms removal; Esc dismisses.
-        Refuses removal when the registry still has use links.
-        """
+        """Registry Remove — list view with Cancel/Remove buttons."""
 
         def __init__(self, breadcrumb: str) -> None:
-            hdr, recs = _db_registry_list()
+            from commands.interface import interface_registry_list
+            from commands.tui_decorator import registry_list_records
+            env = interface_registry_list()
+            hdr, recs = registry_list_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
-            self._buttons   = ["Cancel", "Remove"]
-            self._btn_focus = 0
+            self._buttons    = ["Cancel", "Remove"]
+            self._btn_focus  = 0
+            from commands.interface import rows_of
+            self._env_rows   = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
-                if not self._records:
+                if not self._env_rows or self._cursor >= len(self._env_rows):
                     return
-                uuid = self._records[self._cursor][0][1]
-                name = self._records[self._cursor][1][1]
-                self._confirm_remove(uuid, name)
+                f = _row_fields(self._env_rows[self._cursor])
+                self._confirm_remove(f.get("registryUuid", ""), f.get("registryName", ""))
             else:
                 self._navigate(key)
 
@@ -1167,21 +921,19 @@ if _HAS_TEXTUAL:
                 self.app.notify(f"Error: {exc}", timeout=4)
                 return
             if n_use > 0:
-                self.app.notify(
-                    f"Cannot remove '{name}': still has use links", timeout=4
-                )
+                self.app.notify(f"Cannot remove '{name}': still has use links", timeout=4)
                 return
 
             def _do_remove(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                try:
-                    with connect_db(DB_PATH) as con:
-                        con.execute("DELETE FROM registries WHERE uuid = ?", (uuid,))
+                from commands.interface import interface_registry_remove, message_of, status_of
+                env = interface_registry_remove(registry_uuid=uuid)
+                if status_of(env) == 0:
                     self.app.notify(f"Removed registry: {name}", timeout=3)
                     self.dismiss(None)
-                except Exception as exc:
-                    self.app.notify(f"Remove failed: {exc}", timeout=4)
+                else:
+                    self.app.notify(f"Remove failed: {message_of(env)}", timeout=4)
 
             self.app.push_screen(ConfirmDialog(f"Remove '{name}'?"), _do_remove)
 
@@ -1263,17 +1015,13 @@ if _HAS_TEXTUAL:
             def _do_save(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.common import DB_PATH, connect_db
-                try:
-                    with connect_db(DB_PATH) as con:
-                        con.execute(
-                            "UPDATE wsls SET cli_command = ? WHERE uuid = ?",
-                            (cli_val, self._wsl_uuid),
-                        )
+                from commands.interface import interface_wsl_set, message_of, status_of
+                env = interface_wsl_set(cli_val, wsl_uuid=self._wsl_uuid)
+                if status_of(env) == 0:
                     self.app.notify(f"Updated CLI cmd for '{self._wsl_name}'", timeout=3)
                     self.dismiss(None)
-                except Exception as exc:
-                    self.app.notify(f"Save failed: {exc}", timeout=4)
+                else:
+                    self.app.notify(f"Save failed: {message_of(env)}", timeout=4)
 
             self.app.push_screen(ConfirmDialog(f"Save CLI cmd for '{self._wsl_name}'?"), _do_save)
 
@@ -1281,33 +1029,31 @@ if _HAS_TEXTUAL:
         """Select a WSL entry to edit its CLI command."""
 
         def __init__(self, breadcrumb: str) -> None:
-            hdr, recs = _db_wsl_list()
+            from commands.interface import interface_wsl_list, rows_of
+            from commands.tui_decorator import wsl_list_records
+            env = interface_wsl_list()
+            hdr, recs = wsl_list_records(env)
             super().__init__(breadcrumb, hdr, recs)
             self._buttons   = ["Cancel", "Set"]
             self._btn_focus = 0
-            self._raw_rows  = self._fetch_raw()
-
-        @staticmethod
-        def _fetch_raw() -> list:
-            from commands.common import DB_PATH, connect_db
-            try:
-                with connect_db(DB_PATH) as con:
-                    return con.execute(
-                        "SELECT uuid, name, user, cli_command FROM wsls ORDER BY name COLLATE NOCASE"
-                    ).fetchall()
-            except Exception:
-                return []
+            self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
-                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                if not self._env_rows or self._cursor >= len(self._env_rows):
                     return
-                uuid, name, user, cli_cmd = self._raw_rows[self._cursor]
+                f = _row_fields(self._env_rows[self._cursor])
+                uuid    = f.get("wslUuid", "")
+                name    = f.get("wslName", "")
+                user    = f.get("wslUser", "")
+                cli_cmd = f.get("cliCommand", "")
+                if cli_cmd == "<unset>":
+                    cli_cmd = ""
                 self.app.push_screen(
-                    WslSetFormDialog(f"Wsl > Set > {name}", uuid, name, user, cli_cmd or ""),
+                    WslSetFormDialog(f"Wsl > Set > {name}", uuid, name, user, cli_cmd),
                     lambda _: None,
                 )
             elif key in ("up", "down"):
@@ -1337,7 +1083,9 @@ if _HAS_TEXTUAL:
             self._field_focus    = 0              # active input index (0-2)
             self._cursor_visible = True
             self._blink_timer    = None
-            base_host, base_wsl  = _load_base_paths()
+            from commands.common import expand_path_template, load_local_env_paths
+            bh, bw = load_local_env_paths()
+            base_host, base_wsl = expand_path_template(bh), expand_path_template(bw)
             self._base_host      = base_host
             self._base_wsl       = base_wsl
 
@@ -1415,28 +1163,13 @@ if _HAS_TEXTUAL:
             if not name or not host or not wsl:
                 self.app.notify("All fields are required", timeout=3)
                 return
-
-            import uuid as _uuid
-            from commands.common import DB_PATH, connect_db
-            uid = str(_uuid.uuid4())
-            try:
-                with connect_db(DB_PATH) as con:
-                    taken = con.execute(
-                        "SELECT name FROM registries WHERE LOWER(name) = LOWER(?) LIMIT 1",
-                        (name,),
-                    ).fetchone()
-                    if taken:
-                        self.app.notify(f"Name already taken: {taken[0]!r}", timeout=4)
-                        return
-                    con.execute(
-                        "INSERT INTO registries (uuid, name, rel_path_host, rel_path_wsl)"
-                        " VALUES (?, ?, ?, ?)",
-                        (uid, name, host, wsl),
-                    )
+            from commands.interface import interface_registry_add, message_of, status_of
+            env = interface_registry_add(name, host, wsl)
+            if status_of(env) == 0:
                 self.app.notify(f"Registry added: {name}", timeout=3)
                 self.dismiss(None)
-            except Exception as exc:
-                self.app.notify(f"Add failed: {exc}", timeout=4)
+            else:
+                self.app.notify(message_of(env), timeout=4)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1468,82 +1201,46 @@ if _HAS_TEXTUAL:
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
     class UseAddDialog(ListDialog):
-        """Select a registry to add a use link for the current WSL.
-
-        Only shows registries not yet linked to the given WSL.
-        """
+        """Select a registry to add a use link for the current WSL."""
 
         def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
             self._wsl_name = wsl_name
             self._user     = user
-            hdr, recs = _db_registry_list_available(wsl_name, user)
+            from commands.interface import interface_registry_list_available, rows_of
+            from commands.tui_decorator import registry_available_records
+            env = interface_registry_list_available(wsl_name, user)
+            hdr, recs = registry_available_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", "Add"]
             self._btn_focus = 0
-            self._raw_rows  = self._fetch_raw_available(wsl_name, user)
-
-        @staticmethod
-        def _fetch_raw_available(wsl_name: str, user: str) -> list:
-            from commands.common import DB_PATH, connect_db
-            try:
-                with connect_db(DB_PATH) as con:
-                    return con.execute(
-                        "SELECT r.uuid, r.name FROM registries r "
-                        "WHERE NOT EXISTS ("
-                        "  SELECT 1 FROM uses u "
-                        "  JOIN wsls w ON w.uuid = u.wsl_uuid "
-                        "  WHERE u.registry_uuid = r.uuid AND w.name = ? AND w.user = ?"
-                        ") ORDER BY r.name COLLATE NOCASE",
-                        (wsl_name, user),
-                    ).fetchall()
-            except Exception:
-                return []
+            self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
-                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                if not self._env_rows or self._cursor >= len(self._env_rows):
                     return
-                r_uuid, r_name = self._raw_rows[self._cursor]
-                self._do_add(r_uuid, r_name)
+                f = _row_fields(self._env_rows[self._cursor])
+                self._do_add(f.get("registryUuid", ""), f.get("registryName", ""))
             else:
                 self._navigate(key)
 
         def _do_add(self, r_uuid: str, r_name: str) -> None:
             ri = self.app._cli_args.runtime_identity
-            from commands.common import DB_PATH, connect_db
-            from commands.wsl_db import resolve_wsl_uuid
-            try:
-                with connect_db(DB_PATH) as con:
-                    w_uuid, w_err = resolve_wsl_uuid(
-                        con,
-                        wsl_uuid="",
-                        wsl_name=ri.wsl_name,
-                        runtime_user=ri.user,
-                        runtime_wsl_name=ri.wsl_name,
-                        create_if_missing=True,
-                        msg_prefix="use add",
-                    )
-                    if w_err:
-                        self.app.notify(f"WSL error: {w_err}", timeout=4)
-                        return
-                    existing = con.execute(
-                        "SELECT 1 FROM uses WHERE wsl_uuid = ? AND registry_uuid = ?",
-                        (w_uuid, r_uuid),
-                    ).fetchone()
-                    if existing:
-                        self.app.notify(f"Use already exists: {r_name}", timeout=4)
-                        return
-                    con.execute(
-                        "INSERT INTO uses (wsl_uuid, registry_uuid, mounted) VALUES (?, ?, 0)",
-                        (w_uuid, r_uuid),
-                    )
+            from commands.interface import interface_use_add, message_of, status_of
+            env = interface_use_add(
+                registry_uuid=r_uuid,
+                wsl_name=ri.wsl_name,
+                user=ri.user,
+                runtime_wsl_name=ri.wsl_name,
+            )
+            if status_of(env) == 0:
                 self.app.notify(f"Use added: {r_name}", timeout=3)
                 self.dismiss(None)
-            except Exception as exc:
-                self.app.notify(f"Add failed: {exc}", timeout=4)
+            else:
+                self.app.notify(message_of(env), timeout=4)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1551,38 +1248,31 @@ if _HAS_TEXTUAL:
         """Select a use link to remove (filtered to current WSL)."""
 
         def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
-            hdr, recs = _db_use_list(wsl_name, user)
+            from commands.interface import interface_use_list, rows_of
+            from commands.tui_decorator import use_list_records
+            env = interface_use_list(
+                wsl_uuid="", wsl_name=wsl_name, user=user,
+                runtime_wsl_name=wsl_name, use_all=False, mounted_filter=None,
+            )
+            hdr, recs = use_list_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", "Remove"]
             self._btn_focus = 0
-            self._raw_rows  = self._fetch_raw(wsl_name, user)
-
-        @staticmethod
-        def _fetch_raw(wsl_name: str, user: str) -> list:
-            from commands.common import DB_PATH, connect_db
-            try:
-                with connect_db(DB_PATH) as con:
-                    return con.execute(
-                        "SELECT r.uuid, r.name, w.uuid, u.mounted "
-                        "FROM uses u "
-                        "JOIN registries r ON r.uuid = u.registry_uuid "
-                        "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                        "WHERE w.name = ? AND w.user = ? "
-                        "ORDER BY r.name COLLATE NOCASE",
-                        (wsl_name, user),
-                    ).fetchall()
-            except Exception:
-                return []
+            self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
-                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                if not self._env_rows or self._cursor >= len(self._env_rows):
                     return
-                r_uuid, r_name, w_uuid, mounted = self._raw_rows[self._cursor]
-                if mounted:
+                f = _row_fields(self._env_rows[self._cursor])
+                r_uuid  = f.get("registryUuid", "")
+                r_name  = f.get("registryName", "")
+                w_uuid  = f.get("wslUuid", "")
+                mounted = f.get("mounted", "0")
+                if mounted == "1":
                     self.app.notify(f"Cannot remove: '{r_name}' is mounted", timeout=4)
                     return
                 self._confirm_remove(r_uuid, r_name, w_uuid)
@@ -1593,17 +1283,13 @@ if _HAS_TEXTUAL:
             def _do_remove(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.common import DB_PATH, connect_db
-                try:
-                    with connect_db(DB_PATH) as con:
-                        con.execute(
-                            "DELETE FROM uses WHERE wsl_uuid = ? AND registry_uuid = ?",
-                            (w_uuid, r_uuid),
-                        )
+                from commands.interface import interface_use_remove, message_of, status_of
+                env = interface_use_remove(r_uuid, w_uuid)
+                if status_of(env) == 0:
                     self.app.notify(f"Removed use: {r_name}", timeout=3)
                     self.dismiss(None)
-                except Exception as exc:
-                    self.app.notify(f"Remove failed: {exc}", timeout=4)
+                else:
+                    self.app.notify(message_of(env), timeout=4)
 
             self.app.push_screen(ConfirmDialog(f"Remove use for '{r_name}'?"), _do_remove)
 
@@ -1612,65 +1298,56 @@ if _HAS_TEXTUAL:
     class _UseToggleDialog(ListDialog):
         """Base for Enable/Disable: shows uses filtered by target mounted state."""
 
-        # Subclasses set these:
-        _TARGET_MOUNTED: int = 0    # rows shown have this mounted value
-        _NEW_MOUNTED:    int = 1    # value to SET on confirmation
+        _TARGET_MOUNTED: int = 0
+        _NEW_MOUNTED:    int = 1
         _ACTION_LABEL:   str = "Enable"
 
         def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
-            hdr, recs = _db_use_list_filtered(self._TARGET_MOUNTED, wsl_name, user)
+            from commands.interface import interface_use_list, rows_of
+            from commands.tui_decorator import use_list_records
+            env = interface_use_list(
+                wsl_uuid="", wsl_name=wsl_name, user=user,
+                runtime_wsl_name=wsl_name, use_all=False,
+                mounted_filter=self._TARGET_MOUNTED,
+            )
+            hdr, recs = use_list_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", self._ACTION_LABEL]
             self._btn_focus = 0
-            self._raw_rows  = self._fetch_raw_filtered(self._TARGET_MOUNTED, wsl_name, user)
-
-        @staticmethod
-        def _fetch_raw_filtered(mounted: int, wsl_name: str, user: str) -> list:
-            from commands.common import DB_PATH, connect_db
-            try:
-                with connect_db(DB_PATH) as con:
-                    return con.execute(
-                        "SELECT r.uuid, r.name, w.uuid, u.mounted "
-                        "FROM uses u "
-                        "JOIN registries r ON r.uuid = u.registry_uuid "
-                        "JOIN wsls w ON w.uuid = u.wsl_uuid "
-                        "WHERE u.mounted = ? AND w.name = ? AND w.user = ? "
-                        "ORDER BY r.name COLLATE NOCASE",
-                        (mounted, wsl_name, user),
-                    ).fetchall()
-            except Exception:
-                return []
+            self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
-                if not self._raw_rows or self._cursor >= len(self._raw_rows):
+                if not self._env_rows or self._cursor >= len(self._env_rows):
                     return
-                r_uuid, r_name, w_uuid, _mounted = self._raw_rows[self._cursor]
-                self._confirm_toggle(r_uuid, r_name, w_uuid)
+                f = _row_fields(self._env_rows[self._cursor])
+                self._confirm_toggle(
+                    f.get("registryUuid", ""),
+                    f.get("registryName", ""),
+                    f.get("wslUuid", ""),
+                )
             else:
                 self._navigate(key)
 
         def _confirm_toggle(self, r_uuid: str, r_name: str, w_uuid: str) -> None:
-            new_val  = self._NEW_MOUNTED
-            action   = self._ACTION_LABEL.lower()
+            action = self._ACTION_LABEL.lower()
 
             def _do_toggle(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.common import DB_PATH, connect_db
-                try:
-                    with connect_db(DB_PATH) as con:
-                        con.execute(
-                            "UPDATE uses SET mounted = ? WHERE wsl_uuid = ? AND registry_uuid = ?",
-                            (new_val, w_uuid, r_uuid),
-                        )
+                from commands.interface import (
+                    interface_use_disable, interface_use_enable, message_of, status_of,
+                )
+                fn = interface_use_enable if self._NEW_MOUNTED == 1 else interface_use_disable
+                env = fn(r_uuid, w_uuid)
+                if status_of(env) == 0:
                     self.app.notify(f"{self._ACTION_LABEL}d: {r_name}", timeout=3)
                     self.dismiss(None)
-                except Exception as exc:
-                    self.app.notify(f"{action} failed: {exc}", timeout=4)
+                else:
+                    self.app.notify(message_of(env), timeout=4)
 
             self.app.push_screen(
                 ConfirmDialog(f"{self._ACTION_LABEL} use for '{r_name}'?"),
@@ -1693,16 +1370,10 @@ if _HAS_TEXTUAL:
         """Show aliases with Name / Type fields."""
 
         def __init__(self, breadcrumb: str) -> None:
-            aliases = _get_aliases_typed()
-            W = 4  # len("Name") == len("Type")
-            if aliases:
-                records = [
-                    [(_lpad("Name", W), name), (_lpad("Type", W), stype)]
-                    for name, stype in aliases
-                ]
-            else:
-                records = [["(no aliases defined)"]]
-            super().__init__(breadcrumb, "LIST", records)
+            from commands.interface import interface_alias_list
+            from commands.tui_decorator import alias_list_records
+            hdr, recs = alias_list_records(interface_alias_list())
+            super().__init__(breadcrumb, hdr, recs)
 
         def _handle_key(self, event: "events.Key") -> None:
             if not self._navigate(event.key):
@@ -1768,33 +1439,13 @@ if _HAS_TEXTUAL:
             if name in _PROTECTED_ALIASES:
                 self.app.notify(f"'{name}' is a protected alias", timeout=4)
                 return
-
-            from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
-            from commands.install_alias import (
-                _bash_names_from_block, _build_bash_block,
-                _extract_block, _script_and_python,
-            )
-            try:
-                path = bashrc_path()
-                path.parent.mkdir(parents=True, exist_ok=True)
-                content = path.read_text(encoding="utf-8") if path.exists() else ""
-                _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
-                names = _bash_names_from_block(block)
-                if name in names:
-                    self.app.notify(f"Alias already exists: {name}", timeout=4)
-                    return
-                names.append(name)
-                script_path, python_exe = _script_and_python()
-                new_block = _build_bash_block(names, script_path, python_exe)
-                before, _, after = _extract_block(content, BASH_BEGIN, BASH_END)
-                updated = before + ("\n\n" if before else "") + new_block
-                if after:
-                    updated += ("\n" if not updated.endswith("\n") else "") + "\n" + after
-                path.write_text(updated, encoding="utf-8")
+            from commands.interface import interface_alias_add, message_of, status_of
+            env = interface_alias_add([name])
+            if status_of(env) == 0:
                 self.app.notify(f"Alias added: {name}", timeout=3)
                 self.dismiss(None)
-            except Exception as exc:
-                self.app.notify(f"Add failed: {exc}", timeout=4)
+            else:
+                self.app.notify(message_of(env), timeout=4)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1802,28 +1453,24 @@ if _HAS_TEXTUAL:
         """Select an alias to remove. Shows Name / Type. Protected aliases blocked."""
 
         def __init__(self, breadcrumb: str) -> None:
-            aliases = _get_aliases_typed()
-            W = 4
-            if aliases:
-                records = [
-                    [(_lpad("Name", W), name), (_lpad("Type", W), stype)]
-                    for name, stype in aliases
-                ]
-            else:
-                records = [["(no aliases defined)"]]
-            super().__init__(breadcrumb, "LIST", records)
-            self._buttons  = ["Cancel", "Remove"]
+            from commands.interface import interface_alias_list, rows_of
+            from commands.tui_decorator import alias_list_records
+            env = interface_alias_list()
+            hdr, recs = alias_list_records(env)
+            super().__init__(breadcrumb, hdr, recs)
+            self._buttons   = ["Cancel", "Remove"]
             self._btn_focus = 0
-            self._aliases  = aliases   # list of (name, stype)
+            self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
             if key == "escape":
                 self.dismiss(None)
             elif key == "enter":
-                if not self._aliases or self._cursor >= len(self._aliases):
+                if not self._env_rows or self._cursor >= len(self._env_rows):
                     return
-                alias, _stype = self._aliases[self._cursor]
+                f = _row_fields(self._env_rows[self._cursor])
+                alias = f.get("name", "")
                 if alias in _PROTECTED_ALIASES:
                     self.app.notify(f"'{alias}' is a protected alias", timeout=4)
                     return
@@ -1835,33 +1482,13 @@ if _HAS_TEXTUAL:
             def _do_remove(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.alias_bash import BASH_BEGIN, BASH_END, bashrc_path
-                from commands.install_alias import (
-                    _bash_names_from_block, _build_bash_block,
-                    _extract_block, _script_and_python,
-                )
-                try:
-                    path = bashrc_path()
-                    content = path.read_text(encoding="utf-8") if path.exists() else ""
-                    _, block, _ = _extract_block(content, BASH_BEGIN, BASH_END)
-                    names = [n for n in _bash_names_from_block(block) if n != alias]
-                    script_path, python_exe = _script_and_python()
-                    before, _, after = _extract_block(content, BASH_BEGIN, BASH_END)
-                    if names:
-                        new_block = _build_bash_block(names, script_path, python_exe)
-                        updated = before + ("\n\n" if before else "") + new_block
-                        if after:
-                            updated += ("\n" if not updated.endswith("\n") else "") + "\n" + after
-                    else:
-                        updated = before
-                        if after:
-                            updated = (updated + "\n\n" + after) if updated else after
-                        updated = updated.rstrip() + ("\n" if updated else "")
-                    path.write_text(updated, encoding="utf-8")
+                from commands.interface import interface_alias_remove, message_of, status_of
+                env = interface_alias_remove([alias])
+                if status_of(env) == 0:
                     self.app.notify(f"Alias removed: {alias}", timeout=3)
                     self.dismiss(None)
-                except Exception as exc:
-                    self.app.notify(f"Remove failed: {exc}", timeout=4)
+                else:
+                    self.app.notify(message_of(env), timeout=4)
 
             self.app.push_screen(ConfirmDialog(f"Remove alias '{alias}'?"), _do_remove)
 
@@ -1928,20 +1555,9 @@ if _HAS_TEXTUAL:
     class StartDialog(ListDialog):
         """Select a mounted use to start."""
 
-        def __init__(self, breadcrumb: str, raw_rows: list) -> None:
+        def __init__(self, breadcrumb: str, header: str, records: list, raw_rows: list) -> None:
             # raw_rows: list of (r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd)
-            W = 13  # "Registry UUID" / "Registry Name"
-            records = []
-            for r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd in raw_rows:
-                records.append([
-                    (_lpad("Registry UUID", W), r_uuid),
-                    (_lpad("Registry Name", W), r_name),
-                    (_lpad("Path Host",     W), rel_path_host or ""),
-                    (_lpad("Path Wsl",      W), rel_path_wsl  or ""),
-                ])
-            if not records:
-                records = [["(no mounted uses)"]]
-            super().__init__(breadcrumb, "LIST", records, width=78)
+            super().__init__(breadcrumb, header, records, width=78)
             self._buttons   = ["Cancel", "Start"]
             self._btn_focus = 0
             self._raw_rows  = raw_rows
@@ -2143,7 +1759,9 @@ if _HAS_TEXTUAL:
 
             # ── List dialogs ───────────────────────────────────────────────────
             if path == ["Registry", "List"]:
-                hdr, recs = _db_registry_list()
+                from commands.interface import interface_registry_list
+                from commands.tui_decorator import registry_list_records
+                hdr, recs = registry_list_records(interface_registry_list())
                 self.push_screen(ListDialog(breadcrumb, hdr, recs, width=80))
                 return
             if path == ["Registry", "Remove"]:
@@ -2156,7 +1774,13 @@ if _HAS_TEXTUAL:
                 ri = self._cli_args.runtime_identity
                 wn, usr = ri.wsl_name, ri.user
                 if path == ["Use", "List"]:
-                    hdr, recs = _db_use_list(wn, usr)
+                    from commands.interface import interface_use_list
+                    from commands.tui_decorator import use_list_records
+                    env = interface_use_list(
+                        wsl_uuid="", wsl_name=wn, user=usr,
+                        runtime_wsl_name=wn, use_all=False, mounted_filter=None,
+                    )
+                    hdr, recs = use_list_records(env)
                     self.push_screen(ListDialog(breadcrumb, hdr, recs))
                     return
                 if path == ["Use", "Add"]:
@@ -2172,35 +1796,38 @@ if _HAS_TEXTUAL:
                     self.push_screen(UseDisableDialog(breadcrumb, wn, usr))
                     return
             if path == ["Wsl", "List"]:
-                hdr, recs = _db_wsl_list()
+                from commands.interface import interface_wsl_list
+                from commands.tui_decorator import wsl_list_records
+                hdr, recs = wsl_list_records(interface_wsl_list())
                 self.push_screen(ListDialog(breadcrumb, hdr, recs))
                 return
             if path == ["Wsl", "Set"]:
                 ri = self._cli_args.runtime_identity
-                from commands.common import DB_PATH, connect_db
-                try:
-                    with connect_db(DB_PATH) as con:
-                        row = con.execute(
-                            "SELECT uuid, name, user, cli_command FROM wsls"
-                            " WHERE name = ? AND user = ?",
-                            (ri.wsl_name, ri.user),
-                        ).fetchone()
-                except Exception as exc:
-                    self.notify(f"DB error: {exc}", timeout=4)
-                    return
-                if not row:
+                from commands.interface import interface_wsl_list, rows_of
+                env = interface_wsl_list()
+                env_rows = rows_of(env)
+                row_match = next(
+                    (r for r in env_rows
+                     if _row_fields(r).get("wslName") == ri.wsl_name
+                     and _row_fields(r).get("wslUser") == ri.user),
+                    None,
+                )
+                if not row_match:
                     self.notify(
                         f"WSL '{ri.wsl_name}' not found in DB — run 'use add' first",
                         timeout=4,
                     )
                     return
-                uuid, name, user, cli_cmd = row
+                f = _row_fields(row_match)
+                cli_cmd = f.get("cliCommand", "")
+                if cli_cmd == "<unset>":
+                    cli_cmd = ""
                 self.push_screen(WslSetFormDialog(
                     breadcrumb,
-                    uuid    or "",
-                    name    or ri.wsl_name or "",   # fallback to runtime if NULL in DB
-                    user    or ri.user     or "",
-                    cli_cmd or "",
+                    f.get("wslUuid", ""),
+                    f.get("wslName", "") or ri.wsl_name,
+                    f.get("wslUser", "") or ri.user,
+                    cli_cmd,
                 ))
                 return
 
@@ -2208,19 +1835,12 @@ if _HAS_TEXTUAL:
                 def _do_install_db(result: "str | None") -> None:
                     if result != "Ok":
                         return
-                    from commands.common import DB_PATH, TABLE_DDL, connect_db
-                    try:
-                        if DB_PATH.is_file():
-                            self.notify("Database already exists", timeout=4)
-                            return
-                        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-                        con = connect_db(DB_PATH)
-                        con.executescript(TABLE_DDL)
-                        con.commit()
-                        con.close()
-                        self.notify("Database created", timeout=3)
-                    except Exception as exc:
-                        self.notify(f"Database error: {exc}", timeout=5)
+                    from commands.interface import interface_install_database, message_of, status_of
+                    env = interface_install_database(force=False)
+                    if status_of(env) == 0:
+                        self.notify(message_of(env), timeout=3)
+                    else:
+                        self.notify(f"Database error: {message_of(env)}", timeout=5)
                 self.push_screen(ConfirmDialog("Create database?"), _do_install_db)
                 return
 
@@ -2236,26 +1856,23 @@ if _HAS_TEXTUAL:
 
             if path == ["Start"]:
                 ri = self._cli_args.runtime_identity
-                from commands.common import DB_PATH, connect_db
-                try:
-                    with connect_db(DB_PATH) as con:
-                        row = con.execute(
-                            "SELECT cli_command FROM wsls WHERE name = ? AND user = ?",
-                            (ri.wsl_name, ri.user),
-                        ).fetchone()
-                except Exception as exc:
-                    self.notify(f"DB error: {exc}", timeout=4)
+                from commands.interface import (
+                    interface_start_prepare, interface_use_list_mounted, message_of, status_of,
+                )
+                env_prep = interface_start_prepare(ri.wsl_name, ri.user)
+                if status_of(env_prep) != 0:
+                    self.notify(message_of(env_prep), timeout=5)
                     return
-                if not row or not (row[0] or "").strip():
-                    self.notify(
-                        "No CLI command set — configure it via Wsl > Set",
-                        timeout=5,
-                    )
+                env_mount = interface_use_list_mounted(ri.wsl_name, ri.user)
+                if status_of(env_mount) != 0:
+                    self.notify(message_of(env_mount), timeout=4)
                     return
-                hdr, recs, raw = _db_mounted_uses(ri.wsl_name, ri.user)
-                if not raw:
+                raw_rows = env_mount.get("output", {}).get("data", {}).get("raw_rows", [])
+                if not raw_rows:
                     self.notify("No mounted uses for current WSL", timeout=4)
                     return
+                from commands.tui_decorator import use_list_mounted_records
+                hdr, recs = use_list_mounted_records(env_mount)
 
                 def _on_start(selected: "tuple | None") -> None:
                     if selected is None:
@@ -2276,7 +1893,7 @@ if _HAS_TEXTUAL:
                     self._pending_start = {"cli": cli, "workdir": workdir, "name": r_name}
                     self.exit()
 
-                self.push_screen(StartDialog(breadcrumb, raw), _on_start)
+                self.push_screen(StartDialog(breadcrumb, hdr, recs, raw_rows), _on_start)
                 return
 
             self.notify(f"→ {action}", timeout=3)
