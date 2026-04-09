@@ -37,6 +37,10 @@ def _resolve_log_path(file_val: str) -> Path:
     p = Path(s)
     if not p.is_absolute():
         p = _TOOL_DIR / p
+    # If the resolved path is (or would be) a directory, append the default filename.
+    # Handles edge cases like "." or paths ending with "/".
+    if p.is_dir() or not p.suffix:
+        p = p / _LOG_DEFAULT
     return p
 
 
