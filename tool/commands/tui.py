@@ -6,8 +6,8 @@ import logging
 from argparse import Namespace
 from pathlib import Path
 
-_LOG_CONF    = Path(__file__).resolve().parent.parent / "conf" / "config.json"
 _TOOL_DIR    = Path(__file__).resolve().parent.parent   # tool/  (where wsl4ai.py lives)
+_LOG_CONF    = _TOOL_DIR.parent / "conf" / "config.json"
 _LOG_DEFAULT = "wsl4ai.log"
 
 _log = logging.getLogger("TUI")
