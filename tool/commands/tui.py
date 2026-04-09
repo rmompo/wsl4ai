@@ -2349,6 +2349,7 @@ def cmd_tui(args: Namespace) -> int:
             print(f"start: target directory not found: {workdir}")
             last_rc = 1
             continue  # return to TUI even on error
+        print("\033[2J\033[H", end="", flush=True)
         print(f"Starting '{name}' in {workdir} …")
         try:
             proc = subprocess.run(cli, shell=True, cwd=workdir, check=False)
