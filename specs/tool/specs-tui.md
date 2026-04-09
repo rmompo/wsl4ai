@@ -201,6 +201,22 @@ Log format:
 
 Named loggers: `TUI` (tui.py) · `interface` (interface.py).
 
+### 8.1 Log viewer (`Others › Log › View`)
+
+- Opens `LogViewDialog`: shows last N lines of the log file, **newest at top**.
+- Auto-refreshes every 2 seconds. Displays up to 500 lines, 20 visible at a time.
+- Scroll with Up/Down (Up=older, Down=newer), Home/End for extremes.
+- Lines are color-coded by level keyword in the line text.
+- Escape or Enter closes the viewer.
+
+### 8.2 Log level selector (`Others › Log › Setup`)
+
+- Opens `LogSetupDialog`: a list picker of `DEBUG · INFO · WARNING · ERROR · NONE`.
+- Current level (from `conf/config.json`) is pre-selected.
+- Enter confirms the selection; Escape cancels.
+- On confirm: writes new level to `conf/config.json` and updates all running loggers immediately (no restart needed).
+- `NONE` disables all logging output.
+
 ---
 
 ## 9. English text policy
@@ -242,6 +258,10 @@ Others
             ├─ ─────────
             ├─ Add
             └─ Remove
+  ├─ ─────────
+  ├─ Log
+  │    ├─ View
+  │    └─ Setup
   ├─ ─────────
   └─ Theme
 

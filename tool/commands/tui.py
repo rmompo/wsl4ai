@@ -253,6 +253,8 @@ MENU: list = [
             ("Alias", ["List", None, "Add", "Remove"]),
         ]),
         None,
+        ("Log", ["View", None, "Setup"]),
+        None,
         "Theme",
     ]),
     "Exit",
@@ -1570,6 +1572,166 @@ if _HAS_TEXTUAL:
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    class LogViewDialog(Wsl4aiDialog):
+        """Live log viewer — newest lines at top, auto-refreshes every 2 s."""
+
+        _REFRESH    = 2.0   # seconds between auto-refreshes
+        _MAX_LINES  = 500   # keep last N lines in memory
+        _VISIBLE    = 20    # lines shown at once
+
+        def __init__(self, breadcrumb: str) -> None:
+            # body = info_line + separator + _VISIBLE content lines
+            super().__init__(breadcrumb, width=100, body_rows=self._VISIBLE + 2, buttons=["Close"])
+            self._lines: list[str] = []
+            self._scroll = 0
+
+        def on_mount(self) -> None:
+            self._load_lines()
+            self.set_interval(self._REFRESH, self._on_refresh)
+
+        def _log_file_path(self) -> "Path | None":
+            try:
+                cfg = json.loads(_LOG_CONF.read_text(encoding="utf-8"))
+                file_val = str(cfg.get("log", {}).get("file", _LOG_DEFAULT)).strip() or _LOG_DEFAULT
+            except Exception:
+                file_val = _LOG_DEFAULT
+            p = _resolve_log_path(file_val)
+            return p if p.is_file() else None
+
+        def _load_lines(self) -> None:
+            p = self._log_file_path()
+            if p is None:
+                self._lines = ["(log file not found — set log.level ≠ NONE and restart TUI)"]
+                return
+            try:
+                raw = p.read_text(encoding="utf-8", errors="replace").splitlines()
+                # Newest first; keep last _MAX_LINES entries
+                self._lines = list(reversed(raw[-self._MAX_LINES:]))
+            except Exception as exc:
+                self._lines = [f"(error reading log: {exc})"]
+
+        def _on_refresh(self) -> None:
+            old_len = len(self._lines)
+            self._load_lines()
+            # If new lines appeared, scroll stays at top (0) so newest is always visible
+            if len(self._lines) > old_len:
+                self._scroll = 0
+            self._refresh_dlg()
+
+        def body_lines(self) -> list:
+            cw = self._dlg_w - 4
+            total = len(self._lines)
+            max_scroll = max(0, total - self._VISIBLE)
+            info = f"Lines: {total}  │  ↑↓ scroll  │  auto-refresh {self._REFRESH:.0f}s  │  pos {self._scroll + 1}-{min(self._scroll + self._VISIBLE, total)}"
+            result: list = [
+                [(info[:cw].ljust(cw), _S["label"])],
+                [("─" * cw, _S["lines"])],
+            ]
+            visible = self._lines[self._scroll:self._scroll + self._VISIBLE]
+            for line in visible:
+                # Colour-code by level keyword
+                if " ERROR " in line or " CRITICAL " in line:
+                    sty = _S["text_err"]
+                elif " WARNING " in line:
+                    sty = _S["text_hl"]
+                elif " DEBUG " in line:
+                    sty = _S["lines"]
+                else:
+                    sty = _S["text"]
+                result.append([(line[:cw].ljust(cw), sty)])
+            # Pad to fill body height
+            while len(result) < self._body_rows:
+                result.append("")
+            return result[:self._body_rows]
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            max_scroll = max(0, len(self._lines) - self._VISIBLE)
+            if key in ("escape", "enter"):
+                self.dismiss(None)
+            elif key == "up":
+                self._scroll = min(max_scroll, self._scroll + 1)
+                self._refresh_dlg()
+            elif key == "down":
+                self._scroll = max(0, self._scroll - 1)
+                self._refresh_dlg()
+            elif key == "home":
+                self._scroll = 0
+                self._refresh_dlg()
+            elif key == "end":
+                self._scroll = max_scroll
+                self._refresh_dlg()
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+    _LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "NONE"]
+
+    class LogSetupDialog(Wsl4aiDialog):
+        """Select log level — applied immediately to running logger and saved to config."""
+
+        def __init__(self, breadcrumb: str) -> None:
+            current = "WARNING"
+            try:
+                cfg = json.loads(_LOG_CONF.read_text(encoding="utf-8"))
+                current = str(cfg.get("log", {}).get("level", "WARNING")).strip().upper()
+            except Exception:
+                pass
+            n = len(_LOG_LEVELS)
+            super().__init__(breadcrumb, width=32, body_rows=n + 2, buttons=["Cancel", "Apply"])
+            self._cursor = _LOG_LEVELS.index(current) if current in _LOG_LEVELS else 2
+            self._btn_focus = 1  # Apply highlighted
+
+        def body_lines(self) -> list:
+            cw = self._dlg_w - 4
+            result: list = [[(("Select log level:").ljust(cw), _S["label"])]]
+            result.append([("─" * cw, _S["lines"])])
+            for i, level in enumerate(_LOG_LEVELS):
+                cell = f"  {level}  ".ljust(cw)
+                sty  = _S["item_sel"] if i == self._cursor else _S["item"]
+                result.append([(cell, sty)])
+            return result
+
+        def _handle_key(self, event: "events.Key") -> None:
+            key = event.key
+            n = len(_LOG_LEVELS)
+            if key == "up":
+                self._cursor = (self._cursor - 1) % n
+                self._refresh_dlg()
+            elif key == "down":
+                self._cursor = (self._cursor + 1) % n
+                self._refresh_dlg()
+            elif key == "escape":
+                self.dismiss(None)
+            elif key == "enter":
+                self.dismiss(_LOG_LEVELS[self._cursor])
+
+        @staticmethod
+        def _apply_level(level_name: str) -> None:
+            """Write to config.json and update the running root + named loggers."""
+            try:
+                try:
+                    cfg = json.loads(_LOG_CONF.read_text(encoding="utf-8"))
+                except Exception:
+                    cfg = {}
+                cfg.setdefault("log", {})["level"] = level_name
+                _LOG_CONF.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception as exc:
+                _log.warning("LogSetupDialog: could not write config: %s", exc)
+
+            import logging as _logging
+            if level_name == "NONE":
+                _logging.disable(_logging.CRITICAL)
+            else:
+                numeric = getattr(_logging, level_name, _logging.WARNING)
+                _logging.disable(_logging.NOTSET)
+                _logging.getLogger().setLevel(numeric)
+                for name in ("TUI", "interface"):
+                    _logging.getLogger(name).setLevel(numeric)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
     class ThemeDialog(Wsl4aiDialog):
         """Theme picker with live preview on navigation.
 
@@ -1928,6 +2090,18 @@ if _HAS_TEXTUAL:
                 return
             if path == ["Others", "Install", "Alias", "Remove"]:
                 self.push_screen(AliasRemoveDialog(breadcrumb))
+                return
+
+            if path == ["Others", "Log", "View"]:
+                self.push_screen(LogViewDialog(breadcrumb))
+                return
+
+            if path == ["Others", "Log", "Setup"]:
+                def _on_log_setup(level_name: "str | None") -> None:
+                    if level_name:
+                        LogSetupDialog._apply_level(level_name)
+                        self.notify(f"Log level set to: {level_name}", timeout=3)
+                self.push_screen(LogSetupDialog(breadcrumb), _on_log_setup)
                 return
 
             if path == ["Start"]:
