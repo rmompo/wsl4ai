@@ -10,17 +10,18 @@ _LOG_CONF    = Path(__file__).resolve().parent.parent / "conf" / "config.json"
 _TOOL_DIR    = Path(__file__).resolve().parent.parent   # tool/  (where wsl4ai.py lives)
 _LOG_DEFAULT = "wsl4ai.log"
 
+_log = logging.getLogger("TUI")
+
 
 def _resolve_log_path(file_val: str) -> Path:
     """Resolve log.file value to an absolute Path.
 
-    Relative paths and "." are resolved relative to the tool/ directory
+    Relative paths are resolved relative to the tool/ directory
     (the folder that contains wsl4ai.py).
 
     Examples (tool/ = /path/to/wsl4ai/tool):
       "wsl4ai.log"      → tool/wsl4ai.log
       "logs/wsl4ai.log" → tool/logs/wsl4ai.log
-      "."               → tool/wsl4ai.log
       "/var/log/x.log"  → /var/log/x.log   (absolute, used as-is)
 
     ``~``, ``$HOME``, and ``${HOME}`` are expanded in all cases.
@@ -33,9 +34,6 @@ def _resolve_log_path(file_val: str) -> Path:
         s = s.replace("${HOME}", home).replace("$HOME", home)
     s = os.path.expandvars(s)
 
-    if s == ".":
-        return _TOOL_DIR / _LOG_DEFAULT
-
     p = Path(s)
     if not p.is_absolute():
         p = _TOOL_DIR / p
@@ -43,11 +41,11 @@ def _resolve_log_path(file_val: str) -> Path:
 
 
 def _configure_logging() -> None:
-    """Read log.level and log.file from config.json and configure the root logger.
+    """Read log.level and log.file from config.json and configure logging.
 
     Supported levels: DEBUG, INFO, WARNING, ERROR, NONE (disables all logging).
     Defaults to WARNING when the key is absent or unrecognised.
-    log.file defaults to '.' (same folder as config.json).
+    log.file is relative to tool/ (where wsl4ai.py lives); defaults to wsl4ai.log.
     The log directory is created automatically if it does not exist.
     """
     level_name = "WARNING"
@@ -56,7 +54,7 @@ def _configure_logging() -> None:
         cfg        = json.loads(_LOG_CONF.read_text(encoding="utf-8"))
         log_cfg    = cfg.get("log", {})
         level_name = str(log_cfg.get("level", "WARNING")).strip().upper()
-        file_val   = str(log_cfg.get("file",  ".")).strip() or "."
+        file_val   = str(log_cfg.get("file", _LOG_DEFAULT)).strip() or _LOG_DEFAULT
     except Exception:
         pass
 
@@ -73,7 +71,7 @@ def _configure_logging() -> None:
     numeric = getattr(logging, level_name, logging.WARNING)
     logging.basicConfig(
         filename=log_path, level=numeric,
-        format="%(asctime)s %(levelname)s %(message)s",
+        format="%(asctime)s [%(name)s] %(levelname)-7s %(module)s.%(funcName)s:%(lineno)d | %(message)s",
         filemode="a",
     )
 
@@ -154,8 +152,8 @@ def _load_theme() -> None:
         _THEME_DARK = bool(data["dark"])
     else:
         _THEME_DARK = "light" not in theme_id.lower()
-    logging.debug("_load_theme: theme_id=%s  dark_key_in_file=%r  _THEME_DARK=%s", theme_id, data.get("dark", "MISSING"), _THEME_DARK)
-    logging.debug("_load_theme: item=%r  lines=%r", raw.get("item"), raw.get("lines"))
+    _log.debug("_load_theme: theme_id=%s  dark_key_in_file=%r  _THEME_DARK=%s", theme_id, data.get("dark", "MISSING"), _THEME_DARK)
+    _log.debug("_load_theme: item=%r  lines=%r", raw.get("item"), raw.get("lines"))
     _S["lines"]  = raw.get("lines",  "dim")
     _S["item"]   = raw.get("item",   "")
     _S["label"]  = raw.get("label",  "bold")
@@ -226,12 +224,12 @@ def _save_theme(theme_id: str) -> None:
         cfg.setdefault("tui", {})["theme"] = theme_id
         _THEME_CFG.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
     except Exception as exc:
-        logging.warning("_save_theme: could not write config: %s", exc)
+        _log.warning("_save_theme: could not write config: %s", exc)
 
 
 def _notify_err(app_or_widget, msg: str, timeout: int = 4) -> None:
     """Log an error and show it as a Textual notification."""
-    logging.error(msg)
+    _log.error(msg)
     app_or_widget.notify(msg, timeout=timeout)
 
 
@@ -1669,9 +1667,9 @@ if _HAS_TEXTUAL:
 
         def on_mount(self) -> None:
             target = "textual-light" if not _THEME_DARK else "textual-dark"
-            logging.debug("on_mount: _THEME_DARK=%s  setting theme=%s", _THEME_DARK, target)
+            _log.debug("on_mount: _THEME_DARK=%s  setting theme=%s", _THEME_DARK, target)
             self.theme = target
-            logging.debug("on_mount: self.theme after set=%s  current_theme.dark=%s", self.theme, self.current_theme.dark)
+            _log.debug("on_mount: self.theme after set=%s  current_theme.dark=%s", self.theme, self.current_theme.dark)
 
         def compose(self) -> ComposeResult:
             yield Banner()
@@ -1770,7 +1768,7 @@ if _HAS_TEXTUAL:
             # Natural y = sum of heights of all already-mounted above-layer widgets.
             natural_y = sum(len(dd._items) + 1 + (1 if dd._cascade else 0) for dd in self._stack)
             y_rel = y_abs - natural_y
-            logging.debug("_push_cascade: y_abs=%d  natural_y=%d  y_rel=%d  x=%d", y_abs, natural_y, y_rel, x)
+            _log.debug("_push_cascade: y_abs=%d  natural_y=%d  y_rel=%d  x=%d", y_abs, natural_y, y_rel, x)
             dd = DropdownMenu(kids, x, y_abs, cascade=True)
             dd._y_rel = y_rel
             self._stack.append(dd)

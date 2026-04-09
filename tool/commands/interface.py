@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import logging
 import os
+
+_log = logging.getLogger("interface")
 import platform
 import shutil
 import sqlite3
@@ -596,7 +598,7 @@ def interface_use_enable(
         if path_err:
             return _err(cmd, sub, f"use enable: {path_err}")
 
-        logging.debug("use enable: host=%s wsl=%s", host_path, wsl_path)
+        _log.debug("use enable: host=%s wsl=%s", host_path, wsl_path)
 
         if not os.path.isdir(host_path):
             return _err(cmd, sub, f"use enable: host path not found: {host_path}")
@@ -611,10 +613,10 @@ def interface_use_enable(
                 ["sudo", "mount", "--bind", host_path, wsl_path],
                 check=True, capture_output=True,
             )
-            logging.debug("use enable: mount ok stdout=%s", result.stdout.decode().strip())
+            _log.debug("use enable: mount ok stdout=%s", result.stdout.decode().strip())
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.decode().strip() if exc.stderr else str(exc)
-            logging.error("use enable: mount failed: %s", stderr)
+            _log.error("use enable: mount failed: %s", stderr)
             return _err(cmd, sub, f"use enable: mount failed: {stderr}")
 
         with connect_db(DB_PATH) as con:
@@ -672,13 +674,13 @@ def interface_use_disable(
         if path_err:
             return _err(cmd, sub, f"use disable: {path_err}")
 
-        logging.debug("use disable: wsl=%s", wsl_path)
+        _log.debug("use disable: wsl=%s", wsl_path)
         umount_err = None
         try:
             subprocess.run(["sudo", "umount", wsl_path], check=True, capture_output=True)
         except subprocess.CalledProcessError as exc:
             umount_err = exc.stderr.decode().strip() if exc.stderr else str(exc)
-            logging.error("use disable: umount failed: %s", umount_err)
+            _log.error("use disable: umount failed: %s", umount_err)
 
         with connect_db(DB_PATH) as con:
             con.execute(
