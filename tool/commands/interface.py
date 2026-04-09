@@ -22,6 +22,7 @@ Consumers:
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import shutil
@@ -595,13 +596,25 @@ def interface_use_enable(
         if path_err:
             return _err(cmd, sub, f"use enable: {path_err}")
 
+        logging.debug("use enable: host=%s wsl=%s", host_path, wsl_path)
+
+        if not os.path.isdir(host_path):
+            return _err(cmd, sub, f"use enable: host path not found: {host_path}")
+
         try:
-            subprocess.run(
+            os.makedirs(wsl_path, exist_ok=True)
+        except OSError as exc:
+            return _err(cmd, sub, f"use enable: could not create wsl path {wsl_path}: {exc}")
+
+        try:
+            result = subprocess.run(
                 ["sudo", "mount", "--bind", host_path, wsl_path],
                 check=True, capture_output=True,
             )
+            logging.debug("use enable: mount ok stdout=%s", result.stdout.decode().strip())
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.decode().strip() if exc.stderr else str(exc)
+            logging.error("use enable: mount failed: %s", stderr)
             return _err(cmd, sub, f"use enable: mount failed: {stderr}")
 
         with connect_db(DB_PATH) as con:
@@ -659,11 +672,13 @@ def interface_use_disable(
         if path_err:
             return _err(cmd, sub, f"use disable: {path_err}")
 
+        logging.debug("use disable: wsl=%s", wsl_path)
         umount_err = None
         try:
             subprocess.run(["sudo", "umount", wsl_path], check=True, capture_output=True)
         except subprocess.CalledProcessError as exc:
             umount_err = exc.stderr.decode().strip() if exc.stderr else str(exc)
+            logging.error("use disable: umount failed: %s", umount_err)
 
         with connect_db(DB_PATH) as con:
             con.execute(
