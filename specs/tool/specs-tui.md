@@ -204,7 +204,7 @@ Named loggers: `TUI` (tui.py) · `interface` (interface.py).
 ### 8.1 Log viewer (`Others › Log › View`)
 
 - Opens `LogViewDialog`: shows last N lines of the log file, **newest at top**.
-- Auto-refreshes every 2 seconds. Displays up to 500 lines, 20 visible at a time.
+- Auto-refreshes every 2 seconds. Displays up to 500 lines, 35 visible at a time (width 160).
 - Scroll with Up/Down (Up=older, Down=newer), Home/End for extremes.
 - Lines are color-coded by level keyword in the line text.
 - Escape or Enter closes the viewer.

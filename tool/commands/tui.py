@@ -1579,11 +1579,11 @@ if _HAS_TEXTUAL:
 
         _REFRESH    = 2.0   # seconds between auto-refreshes
         _MAX_LINES  = 500   # keep last N lines in memory
-        _VISIBLE    = 20    # lines shown at once
+        _VISIBLE    = 35    # lines shown at once
 
         def __init__(self, breadcrumb: str) -> None:
             # body = info_line + separator + _VISIBLE content lines
-            super().__init__(breadcrumb, width=100, body_rows=self._VISIBLE + 2, buttons=["Close"])
+            super().__init__(breadcrumb, width=160, body_rows=self._VISIBLE + 2, buttons=["Close"])
             self._lines: list[str] = []
             self._scroll = 0
 
