@@ -21,8 +21,12 @@ Scope rule: `registry` is global and does not expose WSL target selectors (`--ws
 Purpose: query registry rows with resolved full paths and linked usage information.
 
 - Invocation: `wsl4ai registry list` · `wsl4ai rl`
-- Options: none.
 - Output contract: always `output.result` + `output.data.rows` (query operation).
+
+### Options
+
+None.
+
 
 Behavior:
 
@@ -66,10 +70,17 @@ flowchart LR
 
 Purpose: insert one registry definition (DB only — no filesystem changes at this stage).
 
-- Invocation: `wsl4ai registry add -n <name> -H <host_rel> -w <wsl_rel> [--force]` · `wsl4ai ra ...`
-- Required options: `-n/--name`, `-H/--host`, `-w/--wsl`
-- Optional: `-f/--force` (skip host-path existence check)
+- Invocation: `wsl4ai registry add -n <name> -H <host_rel> -w <wsl_rel> [-f]` · `wsl4ai ra ...`
 - Output contract: always `output.result`; `output.result.uuid` contains the new UUID.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-n` | `--name` | NAME | **yes** | Name for the registry (case-insensitive unique) |
+| `-H` | `--host` | PATH | **yes** | Host-side folder segment appended to `HOST_PROJECTS` |
+| `-w` | `--wsl` | PATH | **yes** | WSL-side folder segment appended to `WSL_PROJECTS` |
+| `-f` | `--force` | — | no | Skip host-path existence check |
 
 Rules:
 
@@ -107,9 +118,17 @@ flowchart LR
 
 Purpose: remove one registry row when no active use links exist.
 
-- Invocation: `wsl4ai registry remove -u <uuid>` · `wsl4ai registry remove -n <name>` · `wsl4ai rr ...`
-- Selectors: `-u/--uuid` or `-n/--name` (at least one required; uuid takes precedence if both given).
+- Invocation: `wsl4ai registry remove (-u <uuid> | -n <name>)` · `wsl4ai rr ...`
 - Output contract: always `output.result`.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-u` | `--uuid` | UUID | one of -u / -n | Select registry by UUID |
+| `-n` | `--name` | NAME | one of -u / -n | Select registry by name (case-insensitive) |
+
+At least one of `-u` / `-n` must be provided. If both are given, `-u` takes precedence.
 
 Rules:
 

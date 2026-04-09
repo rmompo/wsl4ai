@@ -18,9 +18,15 @@ Command group for setup and shell integration tasks.
 
 ## 2. `install database`
 
+- Invocation: `wsl4ai install database [-f]` · `wsl4ai id [-f]`
 - Purpose: initialize database or reset it.
-- Options: optional `-f/--force` for destructive overwrite.
 - Output contract: always `output.result`.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-f` | `--force` | — | no | Overwrite existing database (destructive reset) |
 
 ```mermaid
 flowchart LR
@@ -50,11 +56,18 @@ flowchart LR
 
 ## 3. `install alias`
 
+- Invocation: `wsl4ai install alias -a <action> [-n <name>] ...` · `wsl4ai ia ...`
 - Purpose: add/remove/list aliases in shell profile targets.
 - Target file: `~/.startup-wsl4ai.sh` (Linux) or PowerShell profile (Windows); auto-detected from OS — no `--type` option.
-- Required options:
-  - `-a/--action` → `add|remove|list`
-  - `-n/--name` → repeatable alias names (required only for `add` and `remove`)
+- Output contract: always `output.result`; `list` action includes `output.data.rows`.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-a` | `--action` | ACTION | **yes** | Operation: `list` · `add` · `remove` |
+| `-n` | `--name` | NAME | for add/remove | Alias name (repeatable; multiple `-n name` allowed) |
+
 - Validation rules:
   - `add`: existing alias → error
   - `remove`: missing alias → error
@@ -107,16 +120,23 @@ flowchart LR
 
 ## 4. `install update`
 
+- Invocation: `wsl4ai install update [--check]` · `wsl4ai iu [--check]`
 - Purpose: check for and apply a new version of the tool from GitHub.
-- Options: optional `--check` — print available version without applying the update.
-- Behavior:
-  1. Delegates immediately to `conf/wsl4ai-update.py` via `os.execv`.
-  2. The updater downloads `wsl4ai.py` from GitHub to extract the remote `__version__`.
-  3. If remote version is not superior, exits with no changes.
-  4. With `--check`: prints available version and exits.
-  5. If updating: clones repository to `.tmp/`, replaces `tool/`, cleans up. `conf/` is never touched.
 - Output contract: plain text (not JSON — delegated to external script).
 - **TUI**: not available; CLI-only.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| — | `--check` | — | no | Print available version without applying the update |
+
+Behavior:
+1. Delegates immediately to `conf/wsl4ai-update.py` via `os.execv`.
+2. The updater downloads `wsl4ai.py` from GitHub to extract the remote `__version__`.
+3. If remote version is not superior, exits with no changes.
+4. With `--check`: prints available version and exits.
+5. If updating: clones repository to `.tmp/`, replaces `tool/`, cleans up. `conf/` is never touched.
 
 ```mermaid
 flowchart LR

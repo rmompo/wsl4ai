@@ -25,9 +25,23 @@ The lifecycle of a use link follows a strict state machine. Each step owns speci
 
 ## 1. Shared flags
 
-- **Registry (required** for `add`, `remove`, `enable`, `disable`**):** exactly one of **`-ru/--registry-uuid`** or **`-rn/--registry-name`** (case-insensitive name).
-- **WSL (optional):** at most one of **`-wu/--wsl-uuid`** or **`-wn/--wsl-name`**. If neither is set, the target `wsls` row is resolved by **`wsl_name` + `user`** from runtime identity.
-- This follows the global rule in [`specs.md`](specs.md): optional WSL selectors default to runtime target when omitted.
+### 1.1 Registry selector (required for `add`, `remove`, `enable`, `disable`)
+
+| Flag | Long | Metavar | Description |
+|------|------|---------|-------------|
+| `-ru` | `--registry-uuid` | UUID | Select registry by UUID |
+| `-rn` | `--registry-name` | NAME | Select registry by name (case-insensitive) |
+
+Exactly one of `-ru` / `-rn` must be provided.
+
+### 1.2 WSL selector (optional for all subcommands except `list`)
+
+| Flag | Long | Metavar | Description |
+|------|------|---------|-------------|
+| `-wu` | `--wsl-uuid` | UUID | Target WSL by UUID |
+| `-wn` | `--wsl-name` | NAME | Target WSL by name |
+
+At most one may be provided. If omitted, the target is resolved from runtime identity (`wsl_name` + `user`). Follows the global rule in [`specs.md`](specs.md) §2.1.a.
 
 ---
 
@@ -35,11 +49,18 @@ The lifecycle of a use link follows a strict state machine. Each step owns speci
 
 Query all usage links (`uses` rows) with joined registry/WSL context.
 
-- Shortcut: `wsl4ai ul`
-- Optional WSL filters: `--wsl-uuid`, `--wsl-name`
-- Optional scope override: `-a/--all` (list links for all WSLs; cannot combine with WSL filters)
-- Default: scoped to runtime WSL when no filter is given.
+- Invocation: `wsl4ai use list` · `wsl4ai ul`
 - Output contract: always `output.result` + `output.data.rows`.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-wu` | `--wsl-uuid` | UUID | no | Filter by WSL UUID (mutually exclusive with `-a`) |
+| `-wn` | `--wsl-name` | NAME | no | Filter by WSL name (mutually exclusive with `-a`) |
+| `-a` | `--all` | — | no | List links for **all** WSLs; cannot combine with `-wu`/`-wn`; **CLI-only** |
+
+Default (no filter): scoped to runtime WSL.
 
 Row fields: `wslUuid`, `wslName`, `wslUser`, `registryUuid`, `registryName`, `mounted`.
 
@@ -72,13 +93,23 @@ flowchart LR
 
 ## 3. `use add`
 
+- Invocation: `wsl4ai use add (-ru <uuid> | -rn <name>) [-wu <uuid> | -wn <name>]` · `wsl4ai ua ...`
+- Output contract: always `output.result`; `output.result.uuid` contains the new `uses` row UUID.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-ru` | `--registry-uuid` | UUID | one of -ru/-rn | Registry UUID to link |
+| `-rn` | `--registry-name` | NAME | one of -ru/-rn | Registry name to link |
+| `-wu` | `--wsl-uuid` | UUID | no | Target WSL UUID (default: runtime WSL) |
+| `-wn` | `--wsl-name` | NAME | no | Target WSL name (default: runtime WSL) |
+
 **Execution order (strict):**
 1. Resolve `registry_uuid`. Resolve `wsl_uuid` via `resolve_wsl_uuid` with **`create_if_missing=True`**: insert **`wsls`** (`cli_command NULL`) if missing.
 2. If **`uses`** already has `(wsl_uuid, registry_uuid)` → error.
 3. **Create WSL directory**: `os.makedirs(WSL_PROJECTS/rel_path_wsl, exist_ok=True)`.
 4. **`INSERT INTO uses (wsl_uuid, registry_uuid, mounted)`** with **`mounted=0`**.
-
-WSL target selectors are optional. Shortcuts: `wsl4ai ua`.
 
 ```mermaid
 flowchart LR
@@ -113,14 +144,24 @@ flowchart LR
 
 ## 4. `use remove`
 
+- Invocation: `wsl4ai use remove (-ru <uuid> | -rn <name>) [-wu <uuid> | -wn <name>]` · `wsl4ai ur ...`
+- Output contract: always `output.result`.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-ru` | `--registry-uuid` | UUID | one of -ru/-rn | Registry UUID to unlink |
+| `-rn` | `--registry-name` | NAME | one of -ru/-rn | Registry name to unlink |
+| `-wu` | `--wsl-uuid` | UUID | no | Target WSL UUID (default: runtime WSL) |
+| `-wn` | `--wsl-name` | NAME | no | Target WSL name (default: runtime WSL) |
+
 **Execution order (strict):**
 1. Resolve `wsl_uuid` (no auto-create) and `registry_uuid`.
 2. If no `uses` row → error.
 3. If `mounted=1` → error (`use disable` first).
 4. **Remove WSL directory**: `shutil.rmtree(WSL_PROJECTS/rel_path_wsl)`.
 5. **`DELETE`** that `uses` row from DB.
-
-WSL target selectors are optional. Shortcuts: `wsl4ai ur`.
 
 ```mermaid
 flowchart LR
@@ -157,6 +198,18 @@ flowchart LR
 
 Activates one `uses` link: bind-mounts the host path onto the existing WSL directory.
 
+- Invocation: `wsl4ai use enable (-ru <uuid> | -rn <name>) [-wu <uuid> | -wn <name>]` · `wsl4ai ue ...`
+- Output contract: always `output.result`.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-ru` | `--registry-uuid` | UUID | one of -ru/-rn | Registry UUID of the use to enable |
+| `-rn` | `--registry-name` | NAME | one of -ru/-rn | Registry name of the use to enable |
+| `-wu` | `--wsl-uuid` | UUID | no | Target WSL UUID (default: runtime WSL) |
+| `-wn` | `--wsl-name` | NAME | no | Target WSL name (default: runtime WSL) |
+
 **Precondition:** `mounted=0`. If `mounted=1` → error.
 
 **Execution order (strict):**
@@ -166,8 +219,6 @@ Activates one `uses` link: bind-mounts the host path onto the existing WSL direc
 4. Ensure `wsl_path` directory exists (`os.makedirs`).
 5. **Mount**: `sudo mount --bind <host_path> <wsl_path>`. On failure → error (DB unchanged).
 6. **Update DB**: `UPDATE uses SET mounted=1` — only on mount success.
-
-WSL target selectors are optional. Shortcuts: `wsl4ai ue`.
 
 ```mermaid
 flowchart LR
@@ -204,6 +255,18 @@ flowchart LR
 
 Deactivates one `uses` link: unmounts. **The WSL directory is not removed.**
 
+- Invocation: `wsl4ai use disable (-ru <uuid> | -rn <name>) [-wu <uuid> | -wn <name>]` · `wsl4ai ud ...`
+- Output contract: always `output.result`.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-ru` | `--registry-uuid` | UUID | one of -ru/-rn | Registry UUID of the use to disable |
+| `-rn` | `--registry-name` | NAME | one of -ru/-rn | Registry name of the use to disable |
+| `-wu` | `--wsl-uuid` | UUID | no | Target WSL UUID (default: runtime WSL) |
+| `-wn` | `--wsl-name` | NAME | no | Target WSL name (default: runtime WSL) |
+
 **Precondition:** `mounted=1`. If `mounted=0` → error.
 
 **Execution order (strict):**
@@ -212,8 +275,6 @@ Deactivates one `uses` link: unmounts. **The WSL directory is not removed.**
 3. Resolve full WSL path from `local.env`.
 4. **Unmount**: `sudo umount <wsl_path>`. On failure → error (DB unchanged).
 5. **Update DB**: `UPDATE uses SET mounted=0` — only on unmount success.
-
-WSL target selectors are optional. Shortcuts: `wsl4ai ud`.
 
 ```mermaid
 flowchart LR
@@ -250,17 +311,24 @@ flowchart LR
 
 Applies `use disable` logic to **all `mounted=1`** uses rows of the runtime WSL. **CLI-only — not available in TUI.**
 
-**Behavior:**
-1. Resolve `wsl_uuid` from runtime identity (optional WSL selectors: `--wsl-uuid` / `--wsl-name`).
-2. Query all `mounted=1` uses rows for that `wsl_uuid`.
-3. For each row: `sudo umount` → `UPDATE uses SET mounted=0`. Continues even if one fails.
-4. Reports total disabled and any errors.
+- Invocation: `wsl4ai use disableall [-q] [-wu <uuid> | -wn <name>]` · `wsl4ai uda ...`
+- Output contract: always `output.result` (unless `-q` suppresses all output).
 
-**Options:** `-q/--quiet` — suppress all output, return exit code only (`0`=all ok, `1`=any failure).
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-q` | `--quiet` | — | no | Suppress all output; return exit code only (`0`=all ok, `1`=any failure) |
+| `-wu` | `--wsl-uuid` | UUID | no | Target WSL UUID (default: runtime WSL) |
+| `-wn` | `--wsl-name` | NAME | no | Target WSL name (default: runtime WSL) |
 
 Called automatically on session start via `.bashrc` with `--quiet`.
 
-Shortcuts: `wsl4ai uda`.
+**Behavior:**
+1. Resolve `wsl_uuid` from runtime identity (or from `-wu`/`-wn`).
+2. Query all `mounted=1` uses rows for that `wsl_uuid`.
+3. For each row: `sudo umount` → `UPDATE uses SET mounted=0`. Continues even if one fails.
+4. Reports total disabled and any errors.
 
 ```mermaid
 flowchart LR

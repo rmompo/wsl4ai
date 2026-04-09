@@ -12,9 +12,18 @@ Launch one concrete mounted `use` in the current terminal session.
 
 ## 2. CLI: inputs and target resolution
 
-- Required selector (exactly one): `-ru/--registry-uuid` or `-rn/--registry-name`
-- Optional WSL selector (at most one): `-wu/--wsl-uuid` or `-wn/--wsl-name`
-- If WSL selector is omitted, runtime identity is used (`RuntimeIdentity` → runtime `wsl_name` + runtime `user`).
+- Invocation: `wsl4ai start (-ru <uuid> | -rn <name>) [-wu <uuid> | -wn <name>]`
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-ru` | `--registry-uuid` | UUID | one of -ru/-rn | Registry UUID of the use to start |
+| `-rn` | `--registry-name` | NAME | one of -ru/-rn | Registry name of the use to start |
+| `-wu` | `--wsl-uuid` | UUID | no | Target WSL UUID (default: runtime WSL) |
+| `-wn` | `--wsl-name` | NAME | no | Target WSL name (default: runtime WSL) |
+
+If WSL selector is omitted, runtime identity is used (`RuntimeIdentity` → runtime `wsl_name` + runtime `user`).
 
 This identifies one concrete `use`: (`wsl_uuid`, `registry_uuid`).
 

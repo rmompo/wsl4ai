@@ -16,9 +16,13 @@ This group follows the global optional-WSL rule in [`specs.md`](specs.md): if WS
 
 ## 2. `wsl list`
 
+- Invocation: `wsl4ai wsl list` · `wsl4ai wl`
 - Purpose: query known `wsls` rows and `cli_command` values.
-- Options: none.
 - Output contract: always `output.result` + `output.data.rows`.
+
+### Options
+
+None.
 
 Row fields: `wslUuid`, `wslName`, `wslUser`, `cliCommand`.
 
@@ -55,12 +59,18 @@ flowchart LR
 
 ## 3. `wsl set`
 
+- Invocation: `wsl4ai wsl set -c <value> [-wu <uuid> | -wn <name>]` · `wsl4ai ws ...`
 - Purpose: update `wsls.cli_command` for a target WSL row.
-- Required options: `-c/--cli`
-- Optional target selectors: `-wu/--wsl-uuid`, `-wn/--wsl-name`
-- Default: resolved from runtime identity when selectors are omitted.
 - Does not auto-create `wsls` rows.
 - Output contract: always `output.result`.
+
+### Options
+
+| Flag | Long | Metavar | Required | Description |
+|------|------|---------|----------|-------------|
+| `-c` | `--cli` | VALUE | **yes** | Command this WSL workspace should run when invoked |
+| `-wu` | `--wsl-uuid` | UUID | no | Target WSL UUID (default: runtime WSL) |
+| `-wn` | `--wsl-name` | NAME | no | Target WSL name (default: runtime WSL) |
 
 ```mermaid
 flowchart LR
