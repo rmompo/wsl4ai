@@ -3,6 +3,7 @@
     "theme": "normal_dark"
   },
   "log": {
-    "level": "WARNING"
+    "level": "WARNING",
+    "file": "."
   }
 }

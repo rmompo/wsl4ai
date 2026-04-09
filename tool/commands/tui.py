@@ -6,28 +6,69 @@ import logging
 from argparse import Namespace
 from pathlib import Path
 
-_LOG      = Path("/tmp/wsl4ai_tui.log")
-_LOG_CONF = Path(__file__).resolve().parent.parent / "conf" / "config.json"
+_LOG_CONF    = Path(__file__).resolve().parent.parent / "conf" / "config.json"
+_CONF_DIR    = _LOG_CONF.parent
+_LOG_DEFAULT = "wsl4ai_tui.log"
+
+
+def _resolve_log_path(file_val: str) -> Path:
+    """Resolve log.file value to an absolute Path.
+
+    Rules:
+      "."            → <conf_dir>/wsl4ai_tui.log   (same folder as config.json)
+      relative path  → relative to <conf_dir>
+      absolute path  → as-is
+    ``~`` and ``$HOME`` / ``${HOME}`` are expanded in all cases.
+    """
+    import os
+    s = file_val.strip()
+    # expand ~ and $HOME
+    s = os.path.expanduser(s)
+    home = os.environ.get("HOME") or os.environ.get("USERPROFILE") or ""
+    if home:
+        s = s.replace("${HOME}", home).replace("$HOME", home)
+    s = os.path.expandvars(s)
+
+    if s == ".":
+        return _CONF_DIR / _LOG_DEFAULT
+
+    p = Path(s)
+    if not p.is_absolute():
+        p = _CONF_DIR / p
+    return p
 
 
 def _configure_logging() -> None:
-    """Read log.level from config.json and configure the root logger.
+    """Read log.level and log.file from config.json and configure the root logger.
 
     Supported levels: DEBUG, INFO, WARNING, ERROR, NONE (disables all logging).
     Defaults to WARNING when the key is absent or unrecognised.
+    log.file defaults to '.' (same folder as config.json).
+    The log directory is created automatically if it does not exist.
     """
     level_name = "WARNING"
+    file_val   = "."
     try:
-        cfg = json.loads(_LOG_CONF.read_text(encoding="utf-8"))
-        level_name = str(cfg.get("log", {}).get("level", "WARNING")).strip().upper()
+        cfg        = json.loads(_LOG_CONF.read_text(encoding="utf-8"))
+        log_cfg    = cfg.get("log", {})
+        level_name = str(log_cfg.get("level", "WARNING")).strip().upper()
+        file_val   = str(log_cfg.get("file",  ".")).strip() or "."
     except Exception:
         pass
+
     if level_name == "NONE":
         logging.disable(logging.CRITICAL)
         return
+
+    log_path = _resolve_log_path(file_val)
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass  # fall through; basicConfig will fail gracefully if dir is unwritable
+
     numeric = getattr(logging, level_name, logging.WARNING)
     logging.basicConfig(
-        filename=_LOG, level=numeric,
+        filename=log_path, level=numeric,
         format="%(asctime)s %(levelname)s %(message)s",
         filemode="a",
     )
