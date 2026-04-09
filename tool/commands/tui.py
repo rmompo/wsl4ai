@@ -546,6 +546,79 @@ def _render_dialog(
     return t
 
 
+def _render_log_view(
+    breadcrumb: str,
+    info_text: str,
+    display_lines: "list[tuple[str,str]]",
+    cursor_in_view: int,
+    width: int,
+    height: int,
+) -> "Text":
+    """Render the fullscreen log viewer (no button area).
+
+    Layout (H = terminal height):
+        ╔╣ breadcrumb ╠════...════╗   header    (1)
+        ║ info line               ║   info       (1)
+        ╠═════════════════════════╣   sep        (1)
+        ║ log line 0              ║   content  (H-6)
+        ║ ...                     ║
+        ╠═════════════════════════╣   sep        (1)
+        ║  Esc · Enter to close   ║   footer     (1)
+        ╚═════════════════════════╝   bottom     (1)
+    """
+    L   = _S["lines"]
+    LBL = _S["label"]
+    SEL = _S["item_sel"]
+
+    iw = width - 2
+    cw = max(1, width - 4)
+    content_h = max(1, height - 6)
+
+    t = Text()
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    bc   = f" {breadcrumb} "
+    fill = max(0, width - 4 - len(bc))
+    t.append("╔╣",        style=L)
+    t.append(bc,          style=LBL)
+    t.append("╠" + "═" * fill + "╗\n", style=L)
+
+    # ── Info line ─────────────────────────────────────────────────────────────
+    t.append("║ ", style=L)
+    t.append(info_text[:cw].ljust(cw), style=LBL)
+    t.append(" ║\n", style=L)
+
+    # ── Separator ─────────────────────────────────────────────────────────────
+    t.append("╠" + "═" * iw + "╣\n", style=L)
+
+    # ── Content lines ─────────────────────────────────────────────────────────
+    shown = display_lines[:content_h]
+    for i, (text, sty) in enumerate(shown):
+        padded = text[:cw].ljust(cw)
+        t.append("║ ", style=L)
+        if i == cursor_in_view:
+            t.append(padded, style=SEL)
+        else:
+            t.append(padded, style=sty)
+        t.append(" ║\n", style=L)
+    for _ in range(content_h - len(shown)):
+        t.append("║" + " " * iw + "║\n", style=L)
+
+    # ── Separator ─────────────────────────────────────────────────────────────
+    t.append("╠" + "═" * iw + "╣\n", style=L)
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    footer = "  ↑↓ move cursor  │  PgUp / PgDn page  │  Home newest  │  End oldest  │  Esc · Enter close"
+    t.append("║ ", style=L)
+    t.append(footer[:cw].ljust(cw), style=LBL)
+    t.append(" ║\n", style=L)
+
+    # ── Bottom ────────────────────────────────────────────────────────────────
+    t.append("╚" + "═" * iw + "╝", style=L)
+
+    return t
+
+
 # ─── Data helpers ─────────────────────────────────────────────────────────────
 
 def _lpad(label: str, width: int) -> str:
@@ -1574,22 +1647,75 @@ if _HAS_TEXTUAL:
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
-    class LogViewDialog(Wsl4aiDialog):
-        """Live log viewer — newest lines at top, auto-refreshes every 2 s."""
+    class _LogViewWidget(Widget):
+        """Full-screen render widget for LogViewDialog."""
 
-        _REFRESH    = 2.0   # seconds between auto-refreshes
-        _MAX_LINES  = 500   # keep last N lines in memory
-        _VISIBLE    = 35    # lines shown at once
+        DEFAULT_CSS = "_LogViewWidget { width: 100%; height: 100%; background: $surface; }"
+
+        def __init__(self, dlg: "LogViewDialog") -> None:
+            super().__init__()
+            self._dlg = dlg
+
+        def render(self) -> "Text":
+            d = self._dlg
+            w = self.size.width
+            h = self.size.height
+            d._dlg_w     = w
+            d._content_h = max(1, h - 6)
+            d._rebuild_display(w)
+            total_d = len(d._display_lines)
+            max_scroll = max(0, total_d - d._content_h)
+            d._scroll = min(d._scroll, max_scroll)
+            d._cursor = min(d._cursor, max(0, total_d - 1))
+            # ensure cursor is within scroll window
+            if d._cursor < d._scroll:
+                d._scroll = d._cursor
+            elif d._cursor >= d._scroll + d._content_h:
+                d._scroll = d._cursor - d._content_h + 1
+            d._scroll = max(0, min(d._scroll, max_scroll))
+
+            pos_end = min(d._scroll + d._content_h, total_d)
+            info = (
+                f"Lines: {len(d._lines)}  disp: {total_d}"
+                f"  │  {d._scroll + 1}-{pos_end}"
+                f"  │  auto-refresh {d._REFRESH:.0f}s"
+                f"  │  cursor {d._cursor + 1}"
+            )
+            visible = d._display_lines[d._scroll:d._scroll + d._content_h]
+            cursor_in_view = d._cursor - d._scroll
+            return _render_log_view(d._breadcrumb, info, visible, cursor_in_view, w, h)
+
+    class LogViewDialog(Wsl4aiDialog):
+        """Live log viewer — fullscreen, newest at top, cursor + wrap, auto-refresh."""
+
+        DEFAULT_CSS = "LogViewDialog { align: left top; }"
+
+        _REFRESH   = 2.0    # seconds between auto-refreshes
+        _MAX_LINES = 1000   # raw lines kept in memory
 
         def __init__(self, breadcrumb: str) -> None:
-            # body = info_line + separator + _VISIBLE content lines
-            super().__init__(breadcrumb, width=160, body_rows=self._VISIBLE + 2, buttons=["Close"])
-            self._lines: list[str] = []
-            self._scroll = 0
+            super().__init__(breadcrumb, width=80, body_rows=20, buttons=["Close"])
+            self._lines:        list[str]              = []
+            self._display_lines: list[tuple[str, str]] = []
+            self._last_cw  = -1
+            self._scroll   = 0
+            self._cursor   = 0
+            self._content_h = 1
+
+        def compose(self) -> "ComposeResult":
+            yield _LogViewWidget(self)
+
+        def _refresh_dlg(self) -> None:
+            try:
+                self.query_one(_LogViewWidget).refresh()
+            except Exception:
+                pass
 
         def on_mount(self) -> None:
             self._load_lines()
             self.set_interval(self._REFRESH, self._on_refresh)
+
+        # ── helpers ───────────────────────────────────────────────────────────
 
         def _log_file_path(self) -> "Path | None":
             try:
@@ -1600,69 +1726,95 @@ if _HAS_TEXTUAL:
             p = _resolve_log_path(file_val)
             return p if p.is_file() else None
 
+        @staticmethod
+        def _line_style(line: str) -> str:
+            if " ERROR " in line or " CRITICAL " in line:
+                return _S["text_err"]
+            if " WARNING " in line:
+                return _S["text_hl"]
+            if " DEBUG " in line:
+                return _S["lines"]
+            return _S["text"]
+
         def _load_lines(self) -> None:
             p = self._log_file_path()
             if p is None:
                 self._lines = ["(log file not found — set log.level ≠ NONE and restart TUI)"]
+                self._last_cw = -1
                 return
             try:
                 raw = p.read_text(encoding="utf-8", errors="replace").splitlines()
-                # Newest first; keep last _MAX_LINES entries
                 self._lines = list(reversed(raw[-self._MAX_LINES:]))
             except Exception as exc:
                 self._lines = [f"(error reading log: {exc})"]
+            self._last_cw = -1  # force rebuild on next render
+
+        def _rebuild_display(self, w: int) -> None:
+            """Wrap raw lines to content width; rebuilds only when width changes."""
+            cw = max(1, w - 4)
+            if cw == self._last_cw:
+                return
+            self._last_cw = cw
+            result: list[tuple[str, str]] = []
+            for line in self._lines:
+                sty = self._line_style(line)
+                if len(line) <= cw:
+                    result.append((line, sty))
+                else:
+                    # wrap to cw, continuation lines indented 2 spaces
+                    result.append((line[:cw], sty))
+                    i = cw
+                    while i < len(line):
+                        result.append(("  " + line[i:i + cw - 2], sty))
+                        i += cw - 2
+            self._display_lines = result
 
         def _on_refresh(self) -> None:
             old_len = len(self._lines)
             self._load_lines()
-            # If new lines appeared, scroll stays at top (0) so newest is always visible
             if len(self._lines) > old_len:
+                # new lines arrived — jump cursor + scroll to top (newest)
+                self._cursor = 0
                 self._scroll = 0
             self._refresh_dlg()
 
-        def body_lines(self) -> list:
-            cw = self._dlg_w - 4
-            total = len(self._lines)
-            max_scroll = max(0, total - self._VISIBLE)
-            info = f"Lines: {total}  │  ↑↓ scroll  │  auto-refresh {self._REFRESH:.0f}s  │  pos {self._scroll + 1}-{min(self._scroll + self._VISIBLE, total)}"
-            result: list = [
-                [(info[:cw].ljust(cw), _S["label"])],
-                [("─" * cw, _S["lines"])],
-            ]
-            visible = self._lines[self._scroll:self._scroll + self._VISIBLE]
-            for line in visible:
-                # Colour-code by level keyword
-                if " ERROR " in line or " CRITICAL " in line:
-                    sty = _S["text_err"]
-                elif " WARNING " in line:
-                    sty = _S["text_hl"]
-                elif " DEBUG " in line:
-                    sty = _S["lines"]
-                else:
-                    sty = _S["text"]
-                result.append([(line[:cw].ljust(cw), sty)])
-            # Pad to fill body height
-            while len(result) < self._body_rows:
-                result.append("")
-            return result[:self._body_rows]
+        # ── keyboard ──────────────────────────────────────────────────────────
 
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
-            max_scroll = max(0, len(self._lines) - self._VISIBLE)
+            total = len(self._display_lines)
+            ch    = self._content_h
+
             if key in ("escape", "enter"):
                 self.dismiss(None)
-            elif key == "up":
-                self._scroll = min(max_scroll, self._scroll + 1)
-                self._refresh_dlg()
+                return
+
+            if total == 0:
+                return
+
+            max_cursor = total - 1
+            max_scroll = max(0, total - ch)
+
+            if key == "up":
+                self._cursor = max(0, self._cursor - 1)
             elif key == "down":
-                self._scroll = max(0, self._scroll - 1)
-                self._refresh_dlg()
+                self._cursor = min(max_cursor, self._cursor + 1)
+            elif key == "pageup":
+                self._cursor = max(0, self._cursor - ch)
+                self._scroll = max(0, self._scroll - ch)
+            elif key == "pagedown":
+                self._cursor = min(max_cursor, self._cursor + ch)
+                self._scroll = min(max_scroll, self._scroll + ch)
             elif key == "home":
+                self._cursor = 0
                 self._scroll = 0
-                self._refresh_dlg()
             elif key == "end":
+                self._cursor = max_cursor
                 self._scroll = max_scroll
-                self._refresh_dlg()
+            else:
+                return
+
+            self._refresh_dlg()
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
