@@ -1,6 +1,6 @@
 # Specification: `wsl4ai use ...`
 
-Core (non-special) commands. Align with **[`specs.md`](specs.md)** §2. Implementation: [`commands/use_commands.py`](../commands/use_commands.py), [`commands/wsl_db.py`](../commands/wsl_db.py). WSL resolution uses **`RuntimeIdentity`** (`args.runtime_identity`: `machine`, `user`, `wsl_name` from `WSL_DISTRO_NAME` or `default`).
+Core (non-special) commands. Align with **[`specs.md`](specs.md)** §2. Implementation: [`commands/use_commands.py`](../commands/use_commands.py), [`commands/interface.py`](../commands/interface.py), [`commands/wsl_db.py`](../commands/wsl_db.py). WSL resolution uses **`RuntimeIdentity`** (`args.runtime_identity`: `machine`, `user`, `wsl_name` from `WSL_DISTRO_NAME` or `default`).
 
 ---
 
@@ -25,9 +25,8 @@ The lifecycle of a use link follows a strict state machine. Each step owns speci
 
 ## 1. Shared flags
 
-- **Registry (required** for `add`, `remove`, `enable`, `disable`**):** exactly one of **`--registry-uuid`** or **`--registry-name`** (case-insensitive name).
-- **WSL (optional):** at most one of **`--wsl-uuid`** or **`--wsl-name`**. If neither is set, the target `wsls` row is resolved by **`wsl_name` + `user`** from runtime identity.
-- **`--wsl-name`** matches `wsls` where `LOWER(name)` and **`wsls.user`** equals runtime **`user`**.
+- **Registry (required** for `add`, `remove`, `enable`, `disable`**):** exactly one of **`-ru/--registry-uuid`** or **`-rn/--registry-name`** (case-insensitive name).
+- **WSL (optional):** at most one of **`-wu/--wsl-uuid`** or **`-wn/--wsl-name`**. If neither is set, the target `wsls` row is resolved by **`wsl_name` + `user`** from runtime identity.
 - This follows the global rule in [`specs.md`](specs.md): optional WSL selectors default to runtime target when omitted.
 
 ---
@@ -37,20 +36,37 @@ The lifecycle of a use link follows a strict state machine. Each step owns speci
 Query all usage links (`uses` rows) with joined registry/WSL context.
 
 - Shortcut: `wsl4ai ul`
-- Optional WSL filters:
-  - `--wsl-uuid`
-  - `--wsl-name`
-- Optional scope override:
-  - `-a` / `--all` (list links for all WSLs)
-- Combination rule:
-  - `--all` cannot be combined with `--wsl-uuid` or `--wsl-name`.
-- Default behavior:
-  - If neither `--wsl-uuid` nor `--wsl-name` nor `--all` is passed, list is scoped to runtime WSL.
-  - If `--wsl-uuid`/`--wsl-name` is passed, list is scoped to that WSL.
-  - If `--all` is passed, list is global across all WSLs.
-- Output contract:
-  - Always `output.result`
-  - Include `output.data.rows` (query operation)
+- Optional WSL filters: `--wsl-uuid`, `--wsl-name`
+- Optional scope override: `-a/--all` (list links for all WSLs; cannot combine with WSL filters)
+- Default: scoped to runtime WSL when no filter is given.
+- Output contract: always `output.result` + `output.data.rows`.
+
+Row fields: `wslUuid`, `wslName`, `wslUser`, `registryUuid`, `registryName`, `mounted`.
+
+```mermaid
+flowchart LR
+    subgraph CLI
+        ul["wsl4ai use list\nwsl4ai ul"]
+        cmd["use_commands.cmd_use_list()"]
+        ul --> cmd
+    end
+    subgraph Interface["interface.py"]
+        iface["interface_use_list\n(wsl_uuid, wsl_name, user,\nruntime_wsl_name, use_all,\nmounted_filter)"]
+    end
+    subgraph TUI
+        dispatch["_dispatch(['Use','List'])"]
+        ldiag["ListDialog (read-only)"]
+    end
+    subgraph TUI_Dec["tui_decorator.py"]
+        rec["use_list_records()"]
+    end
+
+    cmd --> iface
+    dispatch --> iface
+    iface -->|"envelope"| cmd
+    iface -->|"envelope"| rec --> ldiag
+    cmd -->|"emit_from_interface()"| stdout([stdout])
+```
 
 ---
 
@@ -59,37 +75,81 @@ Query all usage links (`uses` rows) with joined registry/WSL context.
 **Execution order (strict):**
 1. Resolve `registry_uuid`. Resolve `wsl_uuid` via `resolve_wsl_uuid` with **`create_if_missing=True`**: insert **`wsls`** (`cli_command NULL`) if missing.
 2. If **`uses`** already has `(wsl_uuid, registry_uuid)` → error.
-3. **Create WSL directory**: `os.makedirs(WSL_PROJECTS/rel_path_wsl, exist_ok=True)` — creates all intermediate directories (`mkdir -p` semantics). This is a WSL-local directory that will serve as the mount point.
-4. **`INSERT INTO uses (wsl_uuid, registry_uuid, mounted)`** with **`mounted = 0`**.
+3. **Create WSL directory**: `os.makedirs(WSL_PROJECTS/rel_path_wsl, exist_ok=True)`.
+4. **`INSERT INTO uses (wsl_uuid, registry_uuid, mounted)`** with **`mounted=0`**.
 
-WSL target selectors are optional; if omitted, target WSL is resolved from runtime identity.
+WSL target selectors are optional. Shortcuts: `wsl4ai ua`.
 
-> **Data-safety rule:** the directory created here is a local WSL path only. No host (Windows) path is touched at this stage.
+```mermaid
+flowchart LR
+    subgraph CLI
+        ua["wsl4ai use add\n-ru uuid | -rn name"]
+        cmd["use_commands.cmd_use_add()"]
+        ua --> cmd
+    end
+    subgraph Interface["interface.py"]
+        iface_avail["interface_registry_list_available\n(wsl_name, user)"]
+        iface_add["interface_use_add\n(registry_uuid, wsl_name, user,\nruntime_wsl_name)"]
+    end
+    subgraph TUI
+        dlg_init["UseAddDialog.__init__()\n— registry picker"]
+        dlg_do["UseAddDialog._do_add()"]
+        dlg_init --> dlg_do
+    end
+    subgraph TUI_Dec["tui_decorator.py"]
+        rec["registry_available_records()"]
+    end
 
-**Shortcuts:** `wsl4ai ua`.
-
-Output contract:
-- Always `output.result`
-- No `output.data` (non-query operation)
+    cmd --> iface_add
+    dlg_init --> iface_avail --> rec --> dlg_init
+    dlg_do --> iface_add
+    iface_add -->|"envelope"| cmd
+    iface_add -->|"envelope → status"| dlg_do
+    cmd -->|"emit_from_interface()"| stdout([stdout])
+    dlg_do -->|"notify success/error"| ui([TUI notify])
+```
 
 ---
 
 ## 4. `use remove`
 
 **Execution order (strict):**
-1. Resolve `wsl_uuid` (**no** auto-create) and `registry_uuid`.
-2. If no **`uses`** row → error.
-3. If **`mounted = 1`** → error (`use disable` first).
-4. **Remove WSL directory**: `shutil.rmtree(WSL_PROJECTS/rel_path_wsl)` — removes the mount point directory created by `use add`.
-5. **`DELETE`** that **`uses`** row from DB.
+1. Resolve `wsl_uuid` (no auto-create) and `registry_uuid`.
+2. If no `uses` row → error.
+3. If `mounted=1` → error (`use disable` first).
+4. **Remove WSL directory**: `shutil.rmtree(WSL_PROJECTS/rel_path_wsl)`.
+5. **`DELETE`** that `uses` row from DB.
 
-WSL target selectors are optional.
+WSL target selectors are optional. Shortcuts: `wsl4ai ur`.
 
-**Shortcuts:** `wsl4ai ur`.
+```mermaid
+flowchart LR
+    subgraph CLI
+        ur["wsl4ai use remove\n-ru uuid | -rn name"]
+        cmd["use_commands.cmd_use_remove()"]
+        ur --> cmd
+    end
+    subgraph Interface["interface.py"]
+        iface_list["interface_use_list\n(mounted_filter=None)"]
+        iface_rm["interface_use_remove\n(registry_uuid, wsl_uuid)"]
+    end
+    subgraph TUI
+        dlg_init["UseRemoveDialog.__init__()\n— use picker"]
+        dlg_rm["UseRemoveDialog._confirm_remove()"]
+        dlg_init --> dlg_rm
+    end
+    subgraph TUI_Dec["tui_decorator.py"]
+        rec["use_list_records()"]
+    end
 
-Output contract:
-- Always `output.result`
-- No `output.data` (non-query operation)
+    cmd --> iface_rm
+    dlg_init --> iface_list --> rec --> dlg_init
+    dlg_rm --> iface_rm
+    iface_rm -->|"envelope"| cmd
+    iface_rm -->|"envelope → status"| dlg_rm
+    cmd -->|"emit_from_interface()"| stdout([stdout])
+    dlg_rm -->|"notify success/error"| ui([TUI notify])
+```
 
 ---
 
@@ -97,82 +157,135 @@ Output contract:
 
 Activates one `uses` link: bind-mounts the host path onto the existing WSL directory.
 
-**Precondition:** `mounted = 0`. If `mounted = 1` → error (already mounted).
+**Precondition:** `mounted=0`. If `mounted=1` → error.
 
 **Execution order (strict):**
-1. Resolve `wsl_uuid` and `registry_uuid`; fetch `rel_path_host` and `rel_path_wsl` from `registries`.
-2. If `mounted = 1` → error.
-3. Resolve full paths from **`local.env`** (`HOST_PROJECTS` + `rel_path_host`, `WSL_PROJECTS` + `rel_path_wsl`).
-4. **Mount**: `sudo mount --bind <host_path> <wsl_path>`. If mount fails → error (stop, DB unchanged).
-5. **Update DB**: `UPDATE uses SET mounted = 1` — only on mount success.
+1. Resolve `wsl_uuid` and `registry_uuid`; fetch `rel_path_host` and `rel_path_wsl`.
+2. If `mounted=1` → error.
+3. Resolve full paths from `local.env` (`HOST_PROJECTS` + `rel_path_host`, `WSL_PROJECTS` + `rel_path_wsl`).
+4. Ensure `wsl_path` directory exists (`os.makedirs`).
+5. **Mount**: `sudo mount --bind <host_path> <wsl_path>`. On failure → error (DB unchanged).
+6. **Update DB**: `UPDATE uses SET mounted=1` — only on mount success.
 
-> **Note:** the WSL directory must already exist (created by `use add`). `use enable` does **not** create directories.
+WSL target selectors are optional. Shortcuts: `wsl4ai ue`.
 
-If no `uses` row → error. Path resolution errors (missing `local.env` keys) → error.
+```mermaid
+flowchart LR
+    subgraph CLI
+        ue["wsl4ai use enable\n-ru uuid | -rn name"]
+        cmd["use_commands.cmd_use_enable()"]
+        ue --> cmd
+    end
+    subgraph Interface["interface.py"]
+        iface_list["interface_use_list\n(mounted_filter=0)"]
+        iface_en["interface_use_enable\n(registry_uuid, wsl_uuid)"]
+    end
+    subgraph TUI
+        dlg_init["UseEnableDialog.__init__()\n— filtered picker mounted=0"]
+        dlg_tog["_UseToggleDialog._confirm_toggle()"]
+        dlg_init --> dlg_tog
+    end
+    subgraph TUI_Dec["tui_decorator.py"]
+        rec["use_list_records()"]
+    end
 
-WSL target selectors are optional.
-
-**Shortcuts:** `wsl4ai ue`.
-
-Output contract:
-- Always `output.result`
-- No `output.data` (non-query operation)
+    cmd --> iface_en
+    dlg_init --> iface_list --> rec --> dlg_init
+    dlg_tog --> iface_en
+    iface_en -->|"envelope"| cmd
+    iface_en -->|"envelope → status"| dlg_tog
+    cmd -->|"emit_from_interface()"| stdout([stdout])
+    dlg_tog -->|"notify success/error"| ui([TUI notify])
+```
 
 ---
 
 ## 6. `use disable`
 
-Deactivates one `uses` link: unmounts. **The WSL directory is not removed** — it is preserved as the mount point for future `enable` calls.
+Deactivates one `uses` link: unmounts. **The WSL directory is not removed.**
 
-**Precondition:** `mounted = 1`. If `mounted = 0` → error (not mounted).
+**Precondition:** `mounted=1`. If `mounted=0` → error.
 
 **Execution order (strict):**
-1. Resolve `wsl_uuid` and `registry_uuid`; fetch `rel_path_wsl` from `registries`.
-2. If `mounted = 0` → error.
-3. Resolve full WSL path from **`local.env`** (`WSL_PROJECTS` + `rel_path_wsl`).
-4. **Unmount**: `sudo umount <wsl_path>`. If unmount fails → error (stop, directory and DB unchanged).
-5. **Update DB**: `UPDATE uses SET mounted = 0` — only on unmount success.
+1. Resolve `wsl_uuid` and `registry_uuid`; fetch `rel_path_wsl`.
+2. If `mounted=0` → error.
+3. Resolve full WSL path from `local.env`.
+4. **Unmount**: `sudo umount <wsl_path>`. On failure → error (DB unchanged).
+5. **Update DB**: `UPDATE uses SET mounted=0` — only on unmount success.
 
-The WSL directory is **not removed** by `disable` — it remains as the mount point for future `enable` calls. Directory removal happens in `use remove`.
+WSL target selectors are optional. Shortcuts: `wsl4ai ud`.
 
-If no `uses` row → error.
+```mermaid
+flowchart LR
+    subgraph CLI
+        ud["wsl4ai use disable\n-ru uuid | -rn name"]
+        cmd["use_commands.cmd_use_disable()"]
+        ud --> cmd
+    end
+    subgraph Interface["interface.py"]
+        iface_list["interface_use_list\n(mounted_filter=1)"]
+        iface_dis["interface_use_disable\n(registry_uuid, wsl_uuid)"]
+    end
+    subgraph TUI
+        dlg_init["UseDisableDialog.__init__()\n— filtered picker mounted=1"]
+        dlg_tog["_UseToggleDialog._confirm_toggle()"]
+        dlg_init --> dlg_tog
+    end
+    subgraph TUI_Dec["tui_decorator.py"]
+        rec["use_list_records()"]
+    end
 
-WSL target selectors are optional.
-
-**Shortcuts:** `wsl4ai ud`.
-
-Output contract:
-- Always `output.result`
-- No `output.data` (non-query operation)
+    cmd --> iface_dis
+    dlg_init --> iface_list --> rec --> dlg_init
+    dlg_tog --> iface_dis
+    iface_dis -->|"envelope"| cmd
+    iface_dis -->|"envelope → status"| dlg_tog
+    cmd -->|"emit_from_interface()"| stdout([stdout])
+    dlg_tog -->|"notify success/error"| ui([TUI notify])
+```
 
 ---
 
 ## 7. `use disableall`
 
-Applies `use disable` logic to **all `mounted=1`** `uses` rows of the runtime WSL.
+Applies `use disable` logic to **all `mounted=1`** uses rows of the runtime WSL. **CLI-only — not available in TUI.**
 
 **Behavior:**
-1. Resolve `wsl_uuid` from runtime identity (no WSL selector options).
-2. Query **only `mounted=1`** `uses` rows for that `wsl_uuid`.
-3. For each row, call `_disable_one` (umount → rmtree → update DB).
-4. Continue processing remaining rows even if one fails.
-5. Report total disabled and any errors.
+1. Resolve `wsl_uuid` from runtime identity (optional WSL selectors: `--wsl-uuid` / `--wsl-name`).
+2. Query all `mounted=1` uses rows for that `wsl_uuid`.
+3. For each row: `sudo umount` → `UPDATE uses SET mounted=0`. Continues even if one fails.
+4. Reports total disabled and any errors.
 
-**Options:**
-- `-q` / `--quiet`: suppress all output; return exit code only (`0` = all ok, `1` = any failure).
+**Options:** `-q/--quiet` — suppress all output, return exit code only (`0`=all ok, `1`=any failure).
 
 Called automatically on session start via `.bashrc` with `--quiet`.
 
-**Shortcuts:** `wsl4ai uda`.
+Shortcuts: `wsl4ai uda`.
 
-Output contract:
-- Always `output.result` (unless `--quiet`)
-- `output.data.rows` lists each successfully disabled use (unless `--quiet`)
+```mermaid
+flowchart LR
+    subgraph CLI
+        uda["wsl4ai use disableall\n[-q] [-wu uuid | -wn name]"]
+        cmd["use_commands.cmd_use_disableall()"]
+        uda --> cmd
+    end
+    subgraph Interface["interface.py"]
+        iface["interface_use_disableall\n(wsl_uuid, wsl_name,\nuser, runtime_wsl_name)"]
+        loop["calls interface_use_disable()\nfor each mounted=1 row"]
+        iface --> loop
+    end
+
+    cmd --> iface
+    iface -->|"envelope"| cmd
+    cmd -->|"emit_from_interface()\nor quiet exit code"| stdout([stdout])
+```
 
 ---
 
 ## 8. Implementation reference
 
-- `commands/use_commands.py` — handlers, `_disable_one` helper, argparse.
+- `commands/use_commands.py` — CLI thin wrappers, argparse.
+- `commands/interface.py` — `interface_use_*()` business logic.
+- `commands/tui_decorator.py` — `use_list_records()`, `use_list_mounted_records()`.
 - `commands/wsl_db.py` — `resolve_wsl_uuid`, `resolve_registry_target`.
 - `commands/common.py` — `load_local_env_paths`, `expand_path_template`.

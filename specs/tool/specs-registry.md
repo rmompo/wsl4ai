@@ -6,87 +6,144 @@ Command group for registry lifecycle management.
 
 ## 1. Subcommands
 
-- `registry list` (`rl`)
-- `registry add` (`ra`)
-- `registry remove` (`rr`)
+| Subcommand | Shortcut | Purpose |
+|------------|----------|---------|
+| `registry list` | `rl` | List all registries with resolved paths and in-use status |
+| `registry add` | `ra` | Insert a new registry definition |
+| `registry remove` | `rr` | Delete a registry (only if no use links exist) |
 
-Scope rule:
-
-- `registry` is global and does not expose WSL target selectors (`--wsl-uuid` / `--wsl-name` are not part of this command group).
+Scope rule: `registry` is global and does not expose WSL target selectors (`--wsl-uuid` / `--wsl-name` are not part of this command group).
 
 ---
 
 ## 2. `registry list`
 
-Purpose: query registry rows and linked usage information.
+Purpose: query registry rows with resolved full paths and linked usage information.
 
-- Invocation:
-  - `wsl4ai registry list`
-  - `wsl4ai registry rl`
-  - `wsl4ai rl`
+- Invocation: `wsl4ai registry list` · `wsl4ai rl`
 - Options: none.
-- Output contract:
-  - Always `output.result`
-  - Include `output.data.rows` (query operation)
+- Output contract: always `output.result` + `output.data.rows` (query operation).
 
 Behavior:
 
-1. Requires database file (`ddbb/wsl4ai.db`).
+1. Requires database file (`conf/ddbb/wsl4ai.db`).
 2. Reads `registries` ordered by case-insensitive name.
-3. Resolves host/wsl display paths from `parameters` (`base_path_host`, `base_path_wsl`) with path-template expansion.
-4. For each registry, includes linked `uses` + `wsls` information.
+3. Resolves host/wsl display paths from `conf/local.env` (`HOST_PROJECTS`, `WSL_PROJECTS`) with path-template expansion.
+4. For each registry, checks if any `uses` row exists (in-use indicator).
 5. Empty set is valid success (`status=0` with empty rows).
+
+Row fields: `registryUuid`, `registryName`, `hostPath`, `wslPath`, `inUse`.
+
+```mermaid
+flowchart LR
+    subgraph CLI
+        rl["wsl4ai registry list\nwsl4ai rl"]
+        cmd_list["list_registry.cmd_list()"]
+        rl --> cmd_list
+    end
+    subgraph Interface["interface.py"]
+        iface["interface_registry_list()"]
+    end
+    subgraph TUI
+        dispatch["_dispatch\n(['Registry','List'])"]
+        ldiag["ListDialog\n(read-only)"]
+    end
+    subgraph TUI_Dec["tui_decorator.py"]
+        rec["registry_list_records()"]
+    end
+
+    cmd_list -->|"call"| iface
+    dispatch -->|"call"| iface
+    iface -->|"envelope"| cmd_list
+    iface -->|"envelope"| rec
+    rec --> ldiag
+    cmd_list -->|"emit_from_interface()"| stdout([stdout])
+```
 
 ---
 
 ## 3. `registry add`
 
-Purpose: insert one registry definition.
+Purpose: insert one registry definition (DB only — no filesystem changes at this stage).
 
-- Invocation:
-  - `wsl4ai registry add --name <name> --host <host_segment> --wsl <wsl_segment> [--force]`
-  - `wsl4ai registry ra ...`
-  - `wsl4ai ra ...`
-- Required options:
-  - `-n` / `--name`
-  - `-H` / `--host`
-  - `-w` / `--wsl`
-- Optional:
-  - `-f` / `--force` (skip path existence checks)
-- Output contract:
-  - Always `output.result`
-  - No `output.data` (non-query operation)
+- Invocation: `wsl4ai registry add -n <name> -H <host_rel> -w <wsl_rel> [--force]` · `wsl4ai ra ...`
+- Required options: `-n/--name`, `-H/--host`, `-w/--wsl`
+- Optional: `-f/--force` (skip host-path existence check)
+- Output contract: always `output.result`; `output.result.uuid` contains the new UUID.
 
 Rules:
 
 - Required values must be non-empty after trim.
 - Name uniqueness is case-insensitive.
-- Without `--force`, the resolved host absolute path (`HOST_PROJECTS/rel_path_host`) must exist on disk.
+- Without `--force`, the resolved absolute host path (`HOST_PROJECTS/rel_path_host`) must exist on disk.
 - Insert target table: `registries` (`uuid`, `name`, `rel_path_host`, `rel_path_wsl`).
-- **No filesystem changes**: `registry add` only writes to the database. Directory creation happens in `use add`.
+- **No filesystem changes**: directory creation happens in `use add`.
+
+```mermaid
+flowchart LR
+    subgraph CLI
+        ra["wsl4ai registry add\n-n name -H host -w wsl"]
+        cmd_add["add_remove.cmd_add()"]
+        ra --> cmd_add
+    end
+    subgraph Interface["interface.py"]
+        iface["interface_registry_add\n(name, host_rel, wsl_rel, force)"]
+    end
+    subgraph TUI
+        dlg["RegistryAddDialog\n._try_submit()"]
+    end
+
+    cmd_add -->|"call"| iface
+    dlg -->|"call"| iface
+    iface -->|"envelope"| cmd_add
+    iface -->|"envelope → status"| dlg
+    cmd_add -->|"emit_from_interface()"| stdout([stdout])
+    dlg -->|"notify success/error"| ui([TUI notify])
+```
 
 ---
 
 ## 4. `registry remove`
 
-Purpose: remove one registry row when no active links exist.
+Purpose: remove one registry row when no active use links exist.
 
-- Invocation:
-  - `wsl4ai registry remove --uuid <uuid>`
-  - `wsl4ai registry remove --name <name>`
-  - `wsl4ai registry rr ...`
-  - `wsl4ai rr ...`
-- Selectors:
-  - `-u` / `--uuid`
-  - `-n` / `--name`
-- Rule: at least one selector required; if both are given, lookup is by `uuid`.
-- Output contract:
-  - Always `output.result`
-  - No `output.data` (non-query operation)
+- Invocation: `wsl4ai registry remove -u <uuid>` · `wsl4ai registry remove -n <name>` · `wsl4ai rr ...`
+- Selectors: `-u/--uuid` or `-n/--name` (at least one required; uuid takes precedence if both given).
+- Output contract: always `output.result`.
 
 Rules:
 
-- If linked rows exist in `uses` for the target registry, removal is rejected. Run `use disable` + `use remove` for all linked uses first.
-- If not linked, delete from `registries`.
-- **No filesystem changes**: `registry remove` only deletes from the database. Directory removal happens in `use disable`.
+- If any `uses` row references the target registry, removal is rejected — run `use disable` + `use remove` for all links first.
+- If no links: `DELETE FROM registries`.
+- **No filesystem changes**: `registry remove` only deletes from DB.
 
+```mermaid
+flowchart LR
+    subgraph CLI
+        rr["wsl4ai registry remove\n-u uuid | -n name"]
+        cmd_rm["add_remove.cmd_remove()"]
+        rr --> cmd_rm
+    end
+    subgraph Interface["interface.py"]
+        iface_list["interface_registry_list()"]
+        iface_rm["interface_registry_remove\n(registry_uuid, registry_name)"]
+    end
+    subgraph TUI
+        dlg_init["RegistryRemoveDialog\n.__init__() — load list"]
+        dlg_check["._confirm_remove()\ncount_uses_for_registry()"]
+        dlg_rm["._confirm_remove()\non Ok: remove"]
+        dlg_init --> dlg_check --> dlg_rm
+    end
+    subgraph TUI_Dec["tui_decorator.py"]
+        rec["registry_list_records()"]
+    end
+
+    cmd_rm -->|"call"| iface_rm
+    dlg_init -->|"call"| iface_list
+    dlg_rm -->|"call"| iface_rm
+    iface_list -->|"envelope"| rec --> dlg_init
+    iface_rm -->|"envelope"| cmd_rm
+    iface_rm -->|"envelope → status"| dlg_rm
+    cmd_rm -->|"emit_from_interface()"| stdout([stdout])
+    dlg_rm -->|"notify success/error"| ui([TUI notify])
+```

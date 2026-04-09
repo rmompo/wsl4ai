@@ -1,6 +1,6 @@
 # WSL4AI TUI Specification
 
-This document defines the interactive terminal interface for `wsl4ai tui` (Text User Interface).  
+This document defines the interactive terminal interface for `wsl4ai tui` (Text User Interface).
 All labels, prompts, and messages in this interface must be in English.
 
 ---
@@ -9,8 +9,9 @@ All labels, prompts, and messages in this interface must be in English.
 
 - Primary command: `wsl4ai tui`
 - Purpose: interactive navigation and execution of existing command/subcommand operations
-- Data contract: TUI must consume the same JSON envelope model used by CLI handlers (`runtimeId`, `input`, `output`)
+- Data contract: TUI calls `interface_*()` functions from `interface.py` (same business logic as CLI) and receives JSON envelopes
 - Non-goal: duplicating business logic; TUI is a presentation/input layer
+- Architecture reference: [`specs-architecture.md`](specs-architecture.md)
 
 ---
 
@@ -18,155 +19,130 @@ All labels, prompts, and messages in this interface must be in English.
 
 ### 2.1 Main menu
 
-The main menu must include, at minimum:
+```
+Registry | Use | Wsl | Start | Others | Exit
+```
 
-- `Registry`
-- `Use`
-- `WSL`
-- `Install`
-- `Whoami`
-- `Start`
-- `Theme`
-- `Exit`
+| Entry | Submenu |
+|-------|---------|
+| `Registry` | List · Add · Remove |
+| `Use` | List · Add · Remove · Enable · Disable |
+| `Wsl` | List · Set |
+| `Start` | *(direct action — shows mounted-use picker)* |
+| `Others` | Install › Database · Alias (List · Add · Remove) · Theme |
+| `Exit` | *(exits TUI)* |
 
-### 2.2 Submenus
+### 2.2 Interaction keys
 
-Each domain opens its own submenu with available actions and a `Go back` entry.
-
-Example for `Registry`:
-
-- `List`
-- `Add`
-- `Remove`
-- `Go back`
-
-Example for `Use -> List` behavior:
-
-- Always lists links for the current runtime WSL (default and only scope in TUI)
-- `Go back`
-
-### 2.3 Interaction keys
-
-- Arrow keys: move selection
-- Enter: select/confirm current option
-- Esc: cancel current form/dialog (when applicable)
+- Arrow keys / Tab: move selection
+- Enter: select/confirm
+- Escape: cancel current dialog or close dropdown
 
 ---
 
 ## 3. Input widgets by option type
 
-TUI must choose input controls based on option semantics:
-
-- **Typed enum option** (example: `--type ps|bash`, `--action add|remove`)
-  - Use a single-choice list (no free typing)
-- **Free text option** (example: names, paths, commands)
-  - Use text input with validation
-- **Reference option** (example: registry/wsl UUID selections)
-  - Use list selection populated from query commands
-  - Display human-recognizable labels plus technical id
+| Option type | Widget |
+|-------------|--------|
+| Typed enum (`add|remove|list`) | Single-choice list |
+| Free text (names, paths, commands) | Text input with validation |
+| Reference (registry/wsl UUID) | List selection populated from `interface_*()` query |
 
 ---
 
 ## 4. Destructive action confirmations
 
-Actions with destructive or irreversible impact must require explicit confirmation.
+Actions with destructive or irreversible impact require explicit confirmation via `ConfirmDialog`:
 
-Minimum required confirmations:
+| Action | Dialog prompt |
+|--------|--------------|
+| `registry remove` | "Remove '\<name\>'?" |
+| `use remove` | "Remove use for '\<name\>'?" |
+| `use enable` | "Enable use for '\<name\>'?" |
+| `use disable` | "Disable use for '\<name\>'?" |
+| `install database` | "Create database?" |
+| `install alias remove` | "Remove alias '\<name\>'?" |
 
-- `registry remove`
-- `use remove`
-- `use disableall`
-- `install database --force`
-- `install alias -a remove` (recommended)
-
-Confirmation policy:
-
-- Show clear impact message
-- Default selection must be safe (`No`)
-- `Yes` required to execute
-- If cancelled, operation is not executed
+Default selection is always safe (`Cancel`). `Ok` required to execute.
 
 ---
 
-## 5. JSON/API integration rules
+## 5. TUI scope rules (normative)
 
-### 5.1 Execution flow
+### 5.1 Runtime identity only
 
-For any TUI action:
+- TUI always operates on the local runtime identity (`RuntimeIdentity`).
+- TUI does not prompt for or send WSL target selector options (`--wsl-uuid`, `--wsl-name`).
+- `use list -a/--all` (global scope) is CLI-only and not exposed in TUI.
 
-1. Collect user input from widgets
-2. Build command/subcommand/options payload
-3. Execute existing command handler/API path
-4. Receive JSON envelope
-5. Render via output decorator rules
+### 5.2 Command availability
 
-### 5.1.a TUI WSL scope rule (normative)
+| Command | TUI | CLI |
+|---------|-----|-----|
+| `registry list/add/remove` | ✓ | ✓ |
+| `use list/add/remove/enable/disable` | ✓ | ✓ |
+| `use disableall` | — | ✓ |
+| `wsl list/set` | ✓ | ✓ |
+| `install database` | ✓ | ✓ |
+| `install alias list/add/remove` | ✓ | ✓ |
+| `install update` | — | ✓ |
+| `whoami` | — | ✓ |
+| `start` | ✓ (picker) | ✓ (by name/uuid) |
+| `theme` | ✓ (TUI-only) | — |
 
-- TUI always operates on the local runtime identity.
-- TUI must not prompt for or send WSL target selector options (`--wsl-uuid`, `--wsl-name`).
-- Any command needing WSL context in TUI relies on runtime-default resolution (`RuntimeIdentity`).
-- TUI must not expose global-scope WSL actions such as `use list -a/--all`; that scope is CLI-only.
-- `Start` in TUI is runtime-local and executes in foreground in the same terminal session (not detached).
-- `install alias` in TUI must offer actions `list`, `add`, `remove`. The `--type` (shell type) option must not be exposed; shell type is always resolved from the runtime platform.
-- `install update` must not appear in TUI; it is CLI-only.
+### 5.3 Start behavior
 
-### 5.1.b TUI picker model for `use` operations
+- TUI **Start** shows a picker of all `mounted=1` uses for the runtime WSL.
+- After the user selects and confirms, the TUI exits and `cmd_tui` runs the tool in foreground.
+- When the tool exits, `cmd_tui` relaunches the TUI automatically (loop).
+- The loop only exits when the user quits the TUI without selecting Start.
 
-For `use add`, `use remove`, `use enable`, and `use disable`, the TUI presents a **registry picker** (populated from `registry list`, filtered to registry-only rows). The WSL context is always the runtime identity; only the registry UUID is selected by the user.
+### 5.4 Use pickers
 
-- `use add`: picker shows all registries (the command will reject those already linked).
-- `use enable`: picker shows all registries (command errors if no `mounted=0` link exists for the selected registry + runtime WSL).
-- `use disable`: picker shows all registries (command errors if no `mounted=1` link exists).
-- `use remove`: picker shows all registries (command errors if link does not exist or is `mounted=1`).
-- `use disableall`: no picker; applies to all `mounted=1` links for the runtime WSL.
-- `start`: picker is populated from the **use list** filtered to `mounted=1` entries for the runtime WSL.
-
-### 5.2 Output contract
-
-- `output.result` is always required
-- `output.data` is present only for data queries (for example `list` and explicit lookup operations)
-- TUI rendering must not assume `output.data` exists for write/update/delete operations
+| Action | Picker content |
+|--------|---------------|
+| `use add` | Registries not yet linked to runtime WSL |
+| `use remove` | All use links for runtime WSL |
+| `use enable` | Use links with `mounted=0` for runtime WSL |
+| `use disable` | Use links with `mounted=1` for runtime WSL |
 
 ---
 
-## 6. Rendering rules in TUI
+## 6. Rendering rules
 
 ### 6.1 Result emphasis
 
-- Success result line uses success style (`general_ok` semantic style)
-- Error result line uses error style (`general_error` semantic style)
+- Success notifications use `timeout=3`.
+- Error notifications use `_notify_err()` which logs to the log file **and** shows a Textual notification (`timeout=4` or `5` for critical).
 
 ### 6.2 Data rendering
 
-- Query results render as readable rows/fields
-- Reference pickers must show meaningful labels (name/user/path) and not only UUID
-- Empty lists must show explicit empty-state message (example: `No registries found`)
+- Query results render as selectable rows in `ListDialog`.
+- Reference pickers show meaningful labels (name, path) alongside UUIDs.
+- Empty lists show explicit empty-state message (e.g. `No registries found`).
 
 ---
 
 ## 7. Theme definition
 
-TUI must use a centralized theme token map (no scattered hardcoded colors in screens).  
-All color values use Rich style format: `#rrggbb` for foreground, `#rrggbb on #rrggbb` for foreground + background.  
-The `fg:` questionary prefix is not valid in theme files.
+TUI uses a centralized theme token map in `tool/tui_themes/*.json`. No hardcoded colors in screens.
+All color values use Rich style format: `#rrggbb` or `#rrggbb on #rrggbb`.
 
 ### 7.0 Theme menu options
 
-The `Theme` menu option in the TUI main menu must offer:
+Available in `Others › Theme` via `ThemeDialog` (live preview on navigation):
 
-- `Normal (Dark)`
-- `Normal (Light)`
-- `Bright (Dark)`
-- `Bright (Light)`
-- `Color Blind (Dark)`
-- `Color Blind (Light)`
-- `High Contrast`
-
-`High Contrast` is a standalone theme (no Light variant).
+| Display name | Theme ID |
+|---|---|
+| Dark › Normal | `normal_dark` |
+| Dark › Bright | `bright_dark` |
+| Dark › Color Blind | `color_blind_dark` |
+| Light › Normal | `normal_light` |
+| Light › Bright | `bright_light` |
+| Light › Color Blind | `color_blind_light` |
+| High Contrast | `high_contrast` |
 
 ### 7.1 Style token reference
-
-Each theme file defines a `styles` object with the following tokens:
 
 | # | Token | FC | BC | Description |
 |---|---|---|---|---|
@@ -178,96 +154,96 @@ Each theme file defines a `styles` object with the following tokens:
 | 6 | `button_sel` | auto/override | auto/override | Selected button |
 | 7 | `text` | required | — | General body text |
 | 8 | `text_hl` | required | — | Highlighted/emphasized text |
-| 9 | `text_ok` | required | — | Success message (green or equivalent) |
-| 10 | `text_err` | required | — | Error message (red or equivalent) |
+| 9 | `text_ok` | required | — | Success message |
+| 10 | `text_err` | required | — | Error message |
 | 11 | `input` | required | — | Input field text |
 
-**Auto-computation rules:**
-
-- `item_sel` is always computed as `item + reverse` (FC becomes BC, terminal background becomes FC). It must never appear in theme files.
-- `button_sel` defaults to `button + reverse`. An explicit override may be stored in the theme file when the auto-inversion is insufficient (e.g. `high_contrast`).
-
-**Background policy:**
-
-- TUI renders on a transparent surface — the terminal's native background is not overridden.
-- Tokens that define only FC rely on the terminal background for contrast.
-- The user is responsible for selecting a theme that matches their terminal (dark/light).
-- `label`, `button`, and `button_sel` always carry explicit BC because they are rendered as colored blocks independent of the terminal background.
+**Auto-computation:**
+- `item_sel` = `item + reverse` (never in theme files)
+- `button_sel` = `button + reverse` (override allowed in theme file)
 
 ### 7.2 High Contrast exception
 
-`high_contrast` is the only theme that must define BC on **all** tokens, including those that are FC-only in other themes.  
-The required BC for all FC-only tokens is `#000000` (black).
+`high_contrast` must define BC on **all** tokens (including FC-only tokens in other themes). Required BC: `#000000`.
 
-Rationale: `high_contrast` must guarantee maximum contrast regardless of the user's terminal configuration. It cannot rely on the terminal background color being known or compatible.
+### 7.3 Theme persistence
 
-Example — `lines` in other themes vs `high_contrast`:
-
-```
-normal_dark  →  "lines": "#ff7de9 bold"              (FC only, relies on terminal bg)
-high_contrast → "lines": "#ffffff on #000000 bold"   (FC + BC, self-contained)
-```
-
-This rule applies to: `lines`, `item`, `text`, `text_hl`, `text_ok`, `text_err`, `input`.
-
-### 7.3 Theme baseline mapping
-
-Semantic alignment with existing CLI styles:
-
-- `text_ok` → same semantic as `general_ok`
-- `text_err` → same semantic as `general_error`
-
-### 7.4 Accessibility and compatibility
-
-- Respect `NO_COLOR` when present
-- Provide non-color semantic prefixes (`OK`, `ERROR`, `WARNING`) so meaning is not color-only
-- Use fallback monochrome rendering for unsupported terminals
-
-### 7.5 Theme persistence
-
-- Theme definitions are stored as external JSON files in `tool/tui_themes/`.
-- Selected TUI theme is persisted in `conf/config.json`.
-- Config schema is strict: `{ "tui": { "theme": "<theme_id>" } }`.
-- The saved theme must be loaded automatically on next `wsl4ai tui` startup.
-- If `config.json` is missing/invalid/unknown theme, TUI must rewrite it with default `normal_dark`.
-- No backward compatibility with legacy theme-config file names or legacy key layouts.
+- Theme definitions: `tool/tui_themes/<theme_id>.json`
+- Selected theme persisted in `conf/config.json` at `tui.theme`
+- Default: `normal_dark` (written on first run or if config is missing/invalid)
 
 ---
 
-## 8. English text policy
+## 8. Log configuration
 
-All TUI-visible strings must be English, including:
+TUI logging is configured via `conf/config.json` under the `log` key:
 
-- Menu labels
-- Form labels
-- Validation errors
-- Confirmation dialogs
-- Status/result messages
+```json
+{
+  "tui": { "theme": "normal_dark" },
+  "log": {
+    "level": "WARNING",
+    "file":  "logs/wsl4ai.log"
+  }
+}
+```
 
-No mixed-language UI text is allowed.
+| Key | Values | Default | Notes |
+|-----|--------|---------|-------|
+| `log.level` | `DEBUG` · `INFO` · `WARNING` · `ERROR` · `NONE` | `WARNING` | `NONE` disables all logging |
+| `log.file` | filename or relative path | `logs/wsl4ai.log` | Relative to `tool/`; absolute paths used as-is; `~` and `$HOME` expanded; directory created automatically |
+
+Log format:
+```
+2026-04-09 12:34:56 [TUI] ERROR  tui._confirm_toggle:1345 | mount failed: ...
+2026-04-09 12:34:56 [interface] DEBUG  interface.interface_use_enable:599 | use enable: host=...
+```
+
+Named loggers: `TUI` (tui.py) · `interface` (interface.py).
 
 ---
 
-## 9. Initial screen copy (reference)
+## 9. English text policy
 
-Main title:
+All TUI-visible strings must be English: menu labels, form labels, validation errors, confirmation dialogs, status/result messages.
 
-`WSL4AI Text User Interface`
+---
 
-Main menu entries:
+## 10. Menu reference
 
-- `Registry`
-- `Use`
-- `WSL`
-- `Install`
-- `Whoami`
-- `Start`
-- `Theme`
-- `Exit`
+```
+Registry
+  ├─ List
+  ├─ ─────────
+  ├─ Add
+  └─ Remove
 
-Shared action labels:
+Use
+  ├─ List
+  ├─ ─────────
+  ├─ Add
+  ├─ Remove
+  ├─ ─────────
+  ├─ Enable
+  └─ Disable
 
-- `Go back`
-- `Confirm`
-- `Cancel`
+Wsl
+  ├─ List
+  ├─ ─────────
+  └─ Set
 
+Start  (direct — mounted-use picker)
+
+Others
+  └─ Install
+       ├─ Database
+       └─ Alias
+            ├─ List
+            ├─ ─────────
+            ├─ Add
+            └─ Remove
+  ├─ ─────────
+  └─ Theme
+
+Exit
+```

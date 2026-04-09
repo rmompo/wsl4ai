@@ -215,9 +215,8 @@ For core commands, user-visible **result** lines should reflect success vs failu
 
 | Command                    | Shortcut | Purpose                                                                                                   |
 | -------------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
-| `wsl4ai install tool`      | `it`     | Install/verify WSL4AI tool layout (no options).                                                           |
 | `wsl4ai install database`  | `id`     | Create the database if missing; with `-f/--force`, overwrite (destructive reset).                         |
-| `wsl4ai install alias`     | `ia`     | Add/remove one or more shell aliases in PowerShell or Bash (`-a/-t/-n` required).                         |
+| `wsl4ai install alias`     | `ia`     | Add/remove/list shell aliases in PowerShell or Bash (`-a/-n` required).                                   |
 | `wsl4ai install update`    | `iu`     | Check for and apply a new version of the tool. `--check` flag prints available version without updating.  |
 | `wsl4ai registry list`     | `rl`     | List `registries` rows with resolved paths and linked `wsls` lines (`uses.mounted` on link lines).        |
 | `wsl4ai registry add …`    | `ra`     | Insert a row into `registries` (mount definition).                                                        |
@@ -235,6 +234,8 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | `wsl4ai start`             | -        | Run one mounted use in foreground: cd to resolved WSL path and execute that WSL `cli_command`.           |
 
 The SQLite model uses `**registries**`, `**wsls**`, and `**uses**` (`mounted` only; no `enabled` column). Path bases (`HOST_PROJECTS`, `WSL_PROJECTS`) are read directly from **`conf/local.env`** (never from the database); there is no `parameters` table.
+
+Architecture: see [`specs-architecture.md`](specs-architecture.md) for the CLI/TUI/Interface/Decorator layer diagram.
 
 ---
 
@@ -334,4 +335,4 @@ No redundant "Per-command options" line.
 
 ## 9. Special commands — explicit non-application of §2
 
-`install` (including `install tool`, `install database`, `install alias`, `install update`) is **not** bound by §2 unless a bullet is added here for a specific case.
+`install` (including `install database`, `install alias`, `install update`) is **not** bound by §2 unless a bullet is added here for a specific case.

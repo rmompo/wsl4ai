@@ -8,8 +8,10 @@ Runtime identity introspection command.
 
 Return the current runtime identity values:
 
-- `machine` (runtime identifier)
+- `machine` (runtime identifier per §1.3 of `specs.md`)
 - `user` (effective account)
+
+**CLI only** — not exposed in the TUI menu.
 
 ---
 
@@ -22,9 +24,26 @@ Return the current runtime identity values:
 ## 3. Output contract
 
 - Always `output.result`
-- Includes `output.data.rows` with one record containing:
-  - `machine`
-  - `user`
+- Includes `output.data.rows` with one record containing `machine` and `user`.
 
-Although this is not a `list` command, it is treated as a data query by design.
+Although this is not a list command, it is treated as a data query by design.
 
+---
+
+## 4. Flow
+
+```mermaid
+flowchart LR
+    subgraph CLI
+        wai["wsl4ai whoami\nwsl4ai wai"]
+        cmd["whoami.cmd_whoami()"]
+        wai --> cmd
+    end
+    subgraph Interface["interface.py"]
+        iface["interface_whoami()\nresolve_runtime_identity()"]
+    end
+
+    cmd -->|"call"| iface
+    iface -->|"envelope"| cmd
+    cmd -->|"emit_from_interface(include_data=True)"| stdout([stdout])
+```
