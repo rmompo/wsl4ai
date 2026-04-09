@@ -2003,24 +2003,30 @@ def cmd_tui(args: Namespace) -> int:
         return 1
     _configure_logging()
     _APP_VERSION = getattr(args, "app_version", "")
-    _load_theme()
-    app = Wsl4aiApp(args)
-    app.run()
 
-    pending = getattr(app, "_pending_start", None)
-    if pending:
+    last_rc = 0
+    while True:
+        _load_theme()
+        app = Wsl4aiApp(args)
+        app.run()
+
+        pending = getattr(app, "_pending_start", None)
+        if not pending:
+            # User exited the TUI without launching anything
+            return last_rc
+
         cli     = pending["cli"]
         workdir = pending["workdir"]
         name    = pending.get("name", "")
         if not os.path.isdir(workdir):
             print(f"start: target directory not found: {workdir}")
-            return 1
+            last_rc = 1
+            continue  # return to TUI even on error
         print(f"Starting '{name}' in {workdir} …")
         try:
             proc = subprocess.run(cli, shell=True, cwd=workdir, check=False)
-            return int(proc.returncode)
+            last_rc = int(proc.returncode)
         except Exception as exc:
             print(f"start: execution failed: {exc}")
-            return 1
-
-    return 0
+            last_rc = 1
+        # loop: relaunch TUI after the tool exits
