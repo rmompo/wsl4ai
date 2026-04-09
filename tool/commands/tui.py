@@ -7,22 +7,26 @@ from argparse import Namespace
 from pathlib import Path
 
 _LOG_CONF    = Path(__file__).resolve().parent.parent / "conf" / "config.json"
-_CONF_DIR    = _LOG_CONF.parent
-_LOG_DEFAULT = "wsl4ai_tui.log"
+_TOOL_DIR    = Path(__file__).resolve().parent.parent   # tool/  (where wsl4ai.py lives)
+_LOG_DEFAULT = "wsl4ai.log"
 
 
 def _resolve_log_path(file_val: str) -> Path:
     """Resolve log.file value to an absolute Path.
 
-    Rules:
-      "."            → <conf_dir>/wsl4ai_tui.log   (same folder as config.json)
-      relative path  → relative to <conf_dir>
-      absolute path  → as-is
-    ``~`` and ``$HOME`` / ``${HOME}`` are expanded in all cases.
+    Relative paths and "." are resolved relative to the tool/ directory
+    (the folder that contains wsl4ai.py).
+
+    Examples (tool/ = /path/to/wsl4ai/tool):
+      "wsl4ai.log"      → tool/wsl4ai.log
+      "logs/wsl4ai.log" → tool/logs/wsl4ai.log
+      "."               → tool/wsl4ai.log
+      "/var/log/x.log"  → /var/log/x.log   (absolute, used as-is)
+
+    ``~``, ``$HOME``, and ``${HOME}`` are expanded in all cases.
     """
     import os
     s = file_val.strip()
-    # expand ~ and $HOME
     s = os.path.expanduser(s)
     home = os.environ.get("HOME") or os.environ.get("USERPROFILE") or ""
     if home:
@@ -30,11 +34,11 @@ def _resolve_log_path(file_val: str) -> Path:
     s = os.path.expandvars(s)
 
     if s == ".":
-        return _CONF_DIR / _LOG_DEFAULT
+        return _TOOL_DIR / _LOG_DEFAULT
 
     p = Path(s)
     if not p.is_absolute():
-        p = _CONF_DIR / p
+        p = _TOOL_DIR / p
     return p
 
 

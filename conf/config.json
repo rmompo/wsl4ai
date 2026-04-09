@@ -4,6 +4,6 @@
   },
   "log": {
     "level": "WARNING",
-    "file": "."
+    "file": "wsl4ai.log"
   }
 }
