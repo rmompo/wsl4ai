@@ -2012,7 +2012,8 @@ def cmd_tui(args: Namespace) -> int:
 
         pending = getattr(app, "_pending_start", None)
         if not pending:
-            # User exited the TUI without launching anything
+            # User exited the TUI without launching anything — clear console
+            print("\033[2J\033[H", end="", flush=True)
             return last_rc
 
         cli     = pending["cli"]
