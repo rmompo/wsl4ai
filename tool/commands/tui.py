@@ -6,8 +6,31 @@ import logging
 from argparse import Namespace
 from pathlib import Path
 
-_LOG = Path("/tmp/wsl4ai_tui.log")
-logging.basicConfig(filename=_LOG, level=logging.DEBUG, format="%(asctime)s %(message)s", filemode="w")
+_LOG      = Path("/tmp/wsl4ai_tui.log")
+_LOG_CONF = Path(__file__).resolve().parent.parent / "conf" / "config.json"
+
+
+def _configure_logging() -> None:
+    """Read log.level from config.json and configure the root logger.
+
+    Supported levels: DEBUG, INFO, WARNING, ERROR, NONE (disables all logging).
+    Defaults to WARNING when the key is absent or unrecognised.
+    """
+    level_name = "WARNING"
+    try:
+        cfg = json.loads(_LOG_CONF.read_text(encoding="utf-8"))
+        level_name = str(cfg.get("log", {}).get("level", "WARNING")).strip().upper()
+    except Exception:
+        pass
+    if level_name == "NONE":
+        logging.disable(logging.CRITICAL)
+        return
+    numeric = getattr(logging, level_name, logging.WARNING)
+    logging.basicConfig(
+        filename=_LOG, level=numeric,
+        format="%(asctime)s %(levelname)s %(message)s",
+        filemode="a",
+    )
 
 try:
     from textual.app import App, ComposeResult
@@ -159,6 +182,12 @@ def _save_theme(theme_id: str) -> None:
         _THEME_CFG.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
     except Exception as exc:
         logging.warning("_save_theme: could not write config: %s", exc)
+
+
+def _notify_err(app_or_widget, msg: str, timeout: int = 4) -> None:
+    """Log an error and show it as a Textual notification."""
+    logging.error(msg)
+    app_or_widget.notify(msg, timeout=timeout)
 
 
 # ─── Menu definition ──────────────────────────────────────────────────────────
@@ -918,10 +947,10 @@ if _HAS_TEXTUAL:
                 with connect_db(DB_PATH) as con:
                     n_use = count_uses_for_registry(con, uuid)
             except Exception as exc:
-                self.app.notify(f"Error: {exc}", timeout=4)
+                _notify_err(self.app, f"Error: {exc}")
                 return
             if n_use > 0:
-                self.app.notify(f"Cannot remove '{name}': still has use links", timeout=4)
+                _notify_err(self.app, f"Cannot remove '{name}': still has use links")
                 return
 
             def _do_remove(result: "str | None") -> None:
@@ -933,7 +962,7 @@ if _HAS_TEXTUAL:
                     self.app.notify(f"Removed registry: {name}", timeout=3)
                     self.dismiss(None)
                 else:
-                    self.app.notify(f"Remove failed: {message_of(env)}", timeout=4)
+                    _notify_err(self.app, f"Remove failed: {message_of(env)}")
 
             self.app.push_screen(ConfirmDialog(f"Remove '{name}'?"), _do_remove)
 
@@ -1021,7 +1050,7 @@ if _HAS_TEXTUAL:
                     self.app.notify(f"Updated CLI cmd for '{self._wsl_name}'", timeout=3)
                     self.dismiss(None)
                 else:
-                    self.app.notify(f"Save failed: {message_of(env)}", timeout=4)
+                    _notify_err(self.app, f"Save failed: {message_of(env)}")
 
             self.app.push_screen(ConfirmDialog(f"Save CLI cmd for '{self._wsl_name}'?"), _do_save)
 
@@ -1169,7 +1198,7 @@ if _HAS_TEXTUAL:
                 self.app.notify(f"Registry added: {name}", timeout=3)
                 self.dismiss(None)
             else:
-                self.app.notify(message_of(env), timeout=4)
+                _notify_err(self.app, message_of(env))
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1240,7 +1269,7 @@ if _HAS_TEXTUAL:
                 self.app.notify(f"Use added: {r_name}", timeout=3)
                 self.dismiss(None)
             else:
-                self.app.notify(message_of(env), timeout=4)
+                _notify_err(self.app, message_of(env))
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1273,7 +1302,7 @@ if _HAS_TEXTUAL:
                 w_uuid  = f.get("wslUuid", "")
                 mounted = f.get("mounted", "0")
                 if mounted == "1":
-                    self.app.notify(f"Cannot remove: '{r_name}' is mounted", timeout=4)
+                    _notify_err(self.app, f"Cannot remove: '{r_name}' is mounted")
                     return
                 self._confirm_remove(r_uuid, r_name, w_uuid)
             else:
@@ -1289,7 +1318,7 @@ if _HAS_TEXTUAL:
                     self.app.notify(f"Removed use: {r_name}", timeout=3)
                     self.dismiss(None)
                 else:
-                    self.app.notify(message_of(env), timeout=4)
+                    _notify_err(self.app, message_of(env))
 
             self.app.push_screen(ConfirmDialog(f"Remove use for '{r_name}'?"), _do_remove)
 
@@ -1347,7 +1376,7 @@ if _HAS_TEXTUAL:
                     self.app.notify(f"{self._ACTION_LABEL}d: {r_name}", timeout=3)
                     self.dismiss(None)
                 else:
-                    self.app.notify(message_of(env), timeout=4)
+                    _notify_err(self.app, message_of(env))
 
             self.app.push_screen(
                 ConfirmDialog(f"{self._ACTION_LABEL} use for '{r_name}'?"),
@@ -1437,7 +1466,7 @@ if _HAS_TEXTUAL:
                 self.app.notify("Alias name cannot be empty", timeout=3)
                 return
             if name in _PROTECTED_ALIASES:
-                self.app.notify(f"'{name}' is a protected alias", timeout=4)
+                _notify_err(self.app, f"'{name}' is a protected alias")
                 return
             from commands.interface import interface_alias_add, message_of, status_of
             env = interface_alias_add([name])
@@ -1445,7 +1474,7 @@ if _HAS_TEXTUAL:
                 self.app.notify(f"Alias added: {name}", timeout=3)
                 self.dismiss(None)
             else:
-                self.app.notify(message_of(env), timeout=4)
+                _notify_err(self.app, message_of(env))
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
@@ -1472,7 +1501,7 @@ if _HAS_TEXTUAL:
                 f = _row_fields(self._env_rows[self._cursor])
                 alias = f.get("name", "")
                 if alias in _PROTECTED_ALIASES:
-                    self.app.notify(f"'{alias}' is a protected alias", timeout=4)
+                    _notify_err(self.app, f"'{alias}' is a protected alias")
                     return
                 self._confirm_remove(alias)
             else:
@@ -1488,7 +1517,7 @@ if _HAS_TEXTUAL:
                     self.app.notify(f"Alias removed: {alias}", timeout=3)
                     self.dismiss(None)
                 else:
-                    self.app.notify(message_of(env), timeout=4)
+                    _notify_err(self.app, message_of(env))
 
             self.app.push_screen(ConfirmDialog(f"Remove alias '{alias}'?"), _do_remove)
 
@@ -1840,7 +1869,7 @@ if _HAS_TEXTUAL:
                     if status_of(env) == 0:
                         self.notify(message_of(env), timeout=3)
                     else:
-                        self.notify(f"Database error: {message_of(env)}", timeout=5)
+                        _notify_err(self, f"Database error: {message_of(env)}", timeout=5)
                 self.push_screen(ConfirmDialog("Create database?"), _do_install_db)
                 return
 
@@ -1861,15 +1890,15 @@ if _HAS_TEXTUAL:
                 )
                 env_prep = interface_start_prepare(ri.wsl_name, ri.user)
                 if status_of(env_prep) != 0:
-                    self.notify(message_of(env_prep), timeout=5)
+                    _notify_err(self, message_of(env_prep), timeout=5)
                     return
                 env_mount = interface_use_list_mounted(ri.wsl_name, ri.user)
                 if status_of(env_mount) != 0:
-                    self.notify(message_of(env_mount), timeout=4)
+                    _notify_err(self, message_of(env_mount))
                     return
                 raw_rows = env_mount.get("output", {}).get("data", {}).get("raw_rows", [])
                 if not raw_rows:
-                    self.notify("No mounted uses for current WSL", timeout=4)
+                    _notify_err(self, "No mounted uses for current WSL")
                     return
                 from commands.tui_decorator import use_list_mounted_records
                 hdr, recs = use_list_mounted_records(env_mount)
@@ -1882,12 +1911,12 @@ if _HAS_TEXTUAL:
                     import os
                     cli = (cli_cmd or "").strip()
                     if not cli:
-                        self.notify("CLI command is empty", timeout=4)
+                        _notify_err(self, "CLI command is empty")
                         return
                     _, base_path_wsl = load_local_env_paths()
                     root = expand_path_template(str(base_path_wsl or ""))
                     if not root:
-                        self.notify("Missing WSL_PROJECTS in local.env", timeout=5)
+                        _notify_err(self, "Missing WSL_PROJECTS in local.env", timeout=5)
                         return
                     workdir = os.path.normpath(os.path.join(root, str(rel_path or "").strip()))
                     self._pending_start = {"cli": cli, "workdir": workdir, "name": r_name}
@@ -1925,6 +1954,7 @@ def cmd_tui(args: Namespace) -> int:
     if not _HAS_TEXTUAL:
         print("ERROR: textual is required; run pip install -r requirements.txt")
         return 1
+    _configure_logging()
     _APP_VERSION = getattr(args, "app_version", "")
     _load_theme()
     app = Wsl4aiApp(args)

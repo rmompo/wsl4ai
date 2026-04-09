@@ -1,5 +1,8 @@
 {
   "tui": {
     "theme": "normal_dark"
+  },
+  "log": {
+    "level": "WARNING"
   }
 }
