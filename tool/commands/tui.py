@@ -497,6 +497,7 @@ def _render_dialog(
     body_lines: list,
     buttons: list[str],
     width: int,
+    nav_hints: "list[str] | None" = None,
 ) -> "Text":
     """Render a WSL4AI dialog frame as Rich Text.
 
@@ -507,12 +508,11 @@ def _render_dialog(
         ║ |             | ║  × body_lines
         ║ +-------------+ ║
         ╠═════════════════╣
-        ║ +--buttons----+ ║
-        ║ |       [ OK ]| ║
-        ║ +-------------+ ║
+        ║ [hint] [hint]   [Cancel] [Ok] ║   ← nav_hints left, buttons right
         ╚═════════════════╝
 
     body_lines: list of str | list[tuple[str,style]]
+    nav_hints:  optional list of hint labels shown left-aligned in button row
     """
     L   = _S["lines"]
     T   = _S["text"]
@@ -553,21 +553,28 @@ def _render_dialog(
     # ── Separator ─────────────────────────────────────────────────────────────
     t.append("╠" + "═" * iw + "╣\n", style=L)
 
-    # ── Button row (right-aligned, equal width, 1-space gap between buttons) ─────
+    # ── Button row: nav hints left, action buttons right ─────────────────────
+    hint_chunks: list[tuple[str, str]] = [
+        (f"[{h}]", _S["button"]) for h in (nav_hints or [])
+    ]
     max_bw = max(len(b) for b in buttons) if buttons else 0
-    btn_chunks: list[tuple[str, str]] = []
-    for btn in buttons:
-        cell = f" {btn.center(max_bw)} "          # equal width for all buttons
-        sty  = _S[_button_style_for(btn)]
-        btn_chunks.append((cell, sty))
+    btn_chunks: list[tuple[str, str]] = [
+        (f" {btn.center(max_bw)} ", _S[_button_style_for(btn)]) for btn in buttons
+    ]
 
-    # total width = sum of cells + 1-space gap between each pair
-    total_bw = sum(len(c) for c, _ in btn_chunks) + max(0, len(btn_chunks) - 1)
-    t.append("║ ",                   style=L)
-    t.append(" " * (cw - total_bw), style=T)
+    left_w  = sum(len(c) for c, _ in hint_chunks) + max(0, len(hint_chunks) - 1)
+    right_w = sum(len(c) for c, _ in btn_chunks)  + max(0, len(btn_chunks)  - 1)
+    gap     = max(1, cw - left_w - right_w)
+
+    t.append("║ ", style=L)
+    for i, (cell, sty) in enumerate(hint_chunks):
+        if i > 0:
+            t.append(" ", style=T)
+        t.append(cell, style=sty)
+    t.append(" " * gap, style=T)
     for i, (cell, sty) in enumerate(btn_chunks):
         if i > 0:
-            t.append(" ", style=T)          # 1-space gap between buttons
+            t.append(" ", style=T)
         t.append(cell, style=sty)
     t.append(" ║\n", style=L)
 
@@ -838,7 +845,8 @@ if _HAS_TEXTUAL:
         def render(self) -> "Text":
             d = self._dlg
             return _render_dialog(
-                d._breadcrumb, d.body_lines(), d._buttons, d._dlg_w
+                d._breadcrumb, d.body_lines(), d._buttons, d._dlg_w,
+                nav_hints=d._nav_hints or None,
             )
 
     class Wsl4aiDialog(ModalScreen):
@@ -860,6 +868,7 @@ if _HAS_TEXTUAL:
             self._dlg_w      = width
             self._body_rows  = body_rows
             self._buttons    = buttons or ["Close"]
+            self._nav_hints: list[str] = []   # set by subclasses with navigation
 
         def _height(self) -> int:
             # header + blank + body_rows + separator + btn_row + footer
@@ -953,6 +962,7 @@ if _HAS_TEXTUAL:
             content_rows = min(14, max(3, len(self._flat)))
             # body_rows = header(1) + separator(1) + content rows
             super().__init__(breadcrumb, width=width, body_rows=content_rows + 2, buttons=["Close"])
+            self._nav_hints = ["↑↓ cursor"]
 
         # ── proportional scrollbar ─────────────────────────────────────────────
 
