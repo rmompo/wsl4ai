@@ -555,7 +555,7 @@ def _render_dialog(
 
     # ── Button row: nav hints left, action buttons right ─────────────────────
     hint_chunks: list[tuple[str, str]] = [
-        (f"[{h}]", _S["button"]) for h in (nav_hints or [])
+        (f" {h} ", _S["button"]) for h in (nav_hints or [])
     ]
     max_bw = max(len(b) for b in buttons) if buttons else 0
     btn_chunks: list[tuple[str, str]] = [
@@ -613,7 +613,7 @@ def _render_log_view(
 
     iw        = width - 2
     cw        = max(1, width - 4)
-    tw        = max(1, cw - 1)          # text width — last col is scrollbar
+    tw        = max(1, cw - 2)          # text width — 1 sep + scrollbar on the right
     content_h = max(1, height - 6)
 
     scrollbar = _build_scrollbar_chars(content_h, total_display, scroll)
@@ -643,21 +643,23 @@ def _render_log_view(
         t.append("║ ", style=L)
         is_selected = i < len(raw_idx) and raw_idx[i] == cursor_raw
         t.append(padded, style=SEL if is_selected else sty)
+        t.append(" ",    style=L)   # 1-col separator before scrollbar
         t.append(bar,    style=L)
         t.append(" ║\n", style=L)
     for i in range(content_h - len(shown)):
         bar = scrollbar[len(shown) + i] if len(shown) + i < len(scrollbar) else " "
         t.append("║ ", style=L)
         t.append(" " * tw, style=L)
-        t.append(bar, style=L)
-        t.append(" ║\n", style=L)
+        t.append(" ",      style=L)
+        t.append(bar,      style=L)
+        t.append(" ║\n",   style=L)
 
     # ── Separator ─────────────────────────────────────────────────────────────
     t.append("╠" + "═" * iw + "╣\n", style=L)
 
     # ── Button row: nav hints left, Close right ───────────────────────────────
-    _nav = ["↑↓ cursor", "PgUp/PgDn", "Home/End"]
-    hint_chunks: list[tuple[str, str]] = [(f"[{h}]", _S["button"]) for h in _nav]
+    _nav = ["↑↓ move", "PgUp/PgDn page", "Home newest", "End oldest"]
+    hint_chunks: list[tuple[str, str]] = [(f" {h} ", _S["button"]) for h in _nav]
     close_cell = f" {'Close'.center(5)} "
     btn_chunks: list[tuple[str, str]] = [(close_cell, _S["button_both"])]
 
@@ -976,7 +978,7 @@ if _HAS_TEXTUAL:
             content_rows = min(14, max(3, len(self._flat)))
             # body_rows = header(1) + separator(1) + content rows
             super().__init__(breadcrumb, width=width, body_rows=content_rows + 2, buttons=["Close"])
-            self._nav_hints = ["↑↓ cursor"]
+            self._nav_hints = ["↑↓ move"]
 
         # ── proportional scrollbar ─────────────────────────────────────────────
 
@@ -989,7 +991,7 @@ if _HAS_TEXTUAL:
 
         def body_lines(self) -> list:
             cw           = self._dlg_w - 4   # total content width (as per _render_dialog)
-            tw           = cw - 1            # text width — last column is scrollbar
+            tw           = cw - 2            # text width — 1 sep + scrollbar on the right
             content_rows = self._body_rows - 2
             result: list = []
 
@@ -1000,10 +1002,13 @@ if _HAS_TEXTUAL:
             n_rec = sum(1 for r in self._records if r and not isinstance(r[0], str))
             pos_str  = f"({self._cursor + 1}/{n_rec} entries)" if n_rec > 0 else "(0 entries)"
             hdr_full = f"{self._header}  {pos_str}"
-            result.append([(hdr_full[:tw].ljust(tw), _S["label"]), (scrollbar[0], _S["lines"])])
+            L = _S["lines"]
+            SP = (" ", "")   # 1-col separator between content and scrollbar
+
+            result.append([(hdr_full[:tw].ljust(tw), _S["label"]), SP, (scrollbar[0], L)])
 
             # ── separator ─────────────────────────────────────────────────────
-            result.append([("─" * tw, _S["lines"]), (scrollbar[1], _S["lines"])])
+            result.append([("─" * tw, L), ("─", L), (scrollbar[1], L)])
 
             # ── content window ────────────────────────────────────────────────
             window = self._flat[self._scroll : self._scroll + content_rows]
@@ -1012,14 +1017,14 @@ if _HAS_TEXTUAL:
                 is_sel   = (ri == self._cursor and ri >= 0)
                 bar_char = scrollbar[2 + i]
                 if field is None:
-                    result.append([(" " * tw, _S["text"]), (bar_char, _S["lines"])])
+                    result.append([(" " * tw, _S["text"]), SP, (bar_char, L)])
                 elif isinstance(field, str):
                     sty = _S["item_sel"] if is_sel else _S["text"]
-                    result.append([(field[:tw].ljust(tw), sty), (bar_char, _S["lines"])])
+                    result.append([(field[:tw].ljust(tw), sty), SP, (bar_char, L)])
                 elif is_sel:
                     lbl, val = field
                     full = (lbl + val)[:tw].ljust(tw)
-                    result.append([(full, _S["item_sel"]), (bar_char, _S["lines"])])
+                    result.append([(full, _S["item_sel"]), SP, (bar_char, L)])
                 else:
                     lbl, val = field
                     lbl_w = len(lbl)
@@ -1027,12 +1032,14 @@ if _HAS_TEXTUAL:
                     result.append([
                         (lbl,                       _S["text_hl"]),
                         (val[:val_w].ljust(val_w),  _S["text"]),
-                        (bar_char,                  _S["lines"]),
+                        SP,
+                        (bar_char,                  L),
                     ])
 
-            # ── pad empty rows ─────────────────────────────────────────────────
+            # ── pad empty rows (with scrollbar char to fill full height) ───────
             while len(result) < self._body_rows:
-                result.append("")
+                bar_char = scrollbar[len(result)] if len(result) < len(scrollbar) else " "
+                result.append([(" " * tw, ""), SP, (bar_char, L)])
 
             return result
 
