@@ -177,16 +177,16 @@ flowchart TD
 
 ---
 
-## 7. Base de datos SQLite — restricciones de filesystem
+## 7. SQLite database — filesystem constraints
 
-La DB (`conf/ddbb/wsl4ai.db`) reside en un mount compartido v9fs (Windows-backed, accesible desde múltiples máquinas WSL vía `mount --bind /mnt/c/...`).
+The DB (`conf/ddbb/wsl4ai.db`) lives on a shared v9fs mount (Windows-backed, accessible from multiple WSL machines via `mount --bind /mnt/c/...`).
 
-**`journal_mode=DELETE` es obligatorio.** WAL mode crea un archivo `-shm` que usa shared memory a nivel de OS. v9fs no soporta esta operación entre máquinas distintas; el resultado es `SQLITE_CANTOPEN` ("unable to open database file") al intentar abrir la DB desde cualquier máquina que no la creó, o al reiniciar la sesión WSL.
+**`journal_mode=DELETE` is mandatory.** WAL mode creates a `-shm` file that relies on OS-level shared memory. v9fs does not support this mechanism across machines; the result is `SQLITE_CANTOPEN` ("unable to open database file") when opening the DB from any machine other than the one that created it.
 
-| Modo | Funciona en v9fs compartido | Notas |
-|------|-----------------------------|-------|
-| `DELETE` (default) | Sí | Usado desde v1.6.2 |
-| `WAL` | No | Falla al abrir DB existente entre máquinas |
-| `MEMORY` | Sí | Sin persistencia de journal; no recomendado |
+| Mode | Works on shared v9fs | Notes |
+|------|----------------------|-------|
+| `DELETE` (default) | Yes | Used since v1.6.2 |
+| `WAL` | No | Fails to open existing DB across machines |
+| `MEMORY` | Yes | No journal persistence; not recommended |
 
-La función `connect_db()` en `common.py` es el único punto donde se abre la DB — centraliza esta decisión.
+`connect_db()` in `common.py` is the single point where the DB is opened — this decision is centralised there.
