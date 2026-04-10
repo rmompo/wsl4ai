@@ -252,20 +252,24 @@ CREATE INDEX IF NOT EXISTS idx_uses_wsl
 def connect_db(db_path: Path) -> sqlite3.Connection:
     """Open a SQLite connection configured for WSL4AI usage.
 
+    Uses DELETE journal mode (not WAL) for compatibility with shared v9fs mounts
+    (Windows-backed filesystems accessed from multiple WSL machines).  WAL requires
+    a working ``-shm`` shared-memory file which v9fs does not support reliably.
+
     Args:
         db_path (Path): Absolute or relative path to the SQLite database file.
             Parent directories are created if missing.
 
     Returns:
         sqlite3.Connection: Open connection with PRAGMAs applied:
-            - journal_mode=WAL
+            - journal_mode=DELETE
             - synchronous=NORMAL
             - ``foreign_keys=ON``
             - busy_timeout=5000
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(db_path), timeout=5.0)
-    con.execute("PRAGMA journal_mode=WAL;")
+    con.execute("PRAGMA journal_mode=DELETE;")
     con.execute("PRAGMA synchronous=NORMAL;")
     con.execute("PRAGMA foreign_keys=ON;")
     con.execute("PRAGMA busy_timeout=5000;")
