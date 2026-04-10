@@ -247,14 +247,14 @@ MENU: list = [
     ("Wsl", ["List", None, "Set"]),
     "Start",
     ("Others", [
+        ("Log", ["View", None, "Setup"]),
+        None,
+        "Theme",
+        None,
         ("Install", [
             "Database",
             ("Alias", ["List", None, "Add", "Remove"]),
         ]),
-        None,
-        ("Log", ["View", None, "Setup"]),
-        None,
-        "Theme",
     ]),
     "Exit",
 ]
