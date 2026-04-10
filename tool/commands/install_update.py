@@ -11,8 +11,12 @@ UPDATE_SCRIPT = APP_DIR.parent / "conf" / "wsl4ai-update.py"
 
 
 def cmd_install_update(args: Namespace) -> int:
-    opts = options_from_args(args, [OptionSpec("--check", "check_only", is_flag=True)])
+    opts = options_from_args(args, [
+        OptionSpec("--check", "check_only", is_flag=True),
+        OptionSpec("--force", "force", is_flag=True),
+    ])
     check_only = bool(getattr(args, "check_only", False))
+    force = bool(getattr(args, "force", False))
 
     if not UPDATE_SCRIPT.is_file():
         return emit_envelope(
@@ -23,6 +27,8 @@ def cmd_install_update(args: Namespace) -> int:
     argv = [sys.executable, str(UPDATE_SCRIPT)]
     if check_only:
         argv.append("--check")
+    if force:
+        argv.append("--force")
 
     os.execv(sys.executable, argv)
     # unreachable
