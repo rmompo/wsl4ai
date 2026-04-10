@@ -655,10 +655,24 @@ def _render_log_view(
     # ── Separator ─────────────────────────────────────────────────────────────
     t.append("╠" + "═" * iw + "╣\n", style=L)
 
-    # ── Footer ────────────────────────────────────────────────────────────────
-    footer = "  ↑↓ move cursor  │  PgUp / PgDn page  │  Home newest  │  End oldest  │  Esc · Enter close"
+    # ── Button row: nav hints left, Close right ───────────────────────────────
+    _nav = ["↑↓ cursor", "PgUp/PgDn", "Home/End"]
+    hint_chunks: list[tuple[str, str]] = [(f"[{h}]", _S["button"]) for h in _nav]
+    close_cell = f" {'Close'.center(5)} "
+    btn_chunks: list[tuple[str, str]] = [(close_cell, _S["button_both"])]
+
+    left_w  = sum(len(c) for c, _ in hint_chunks) + max(0, len(hint_chunks) - 1)
+    right_w = len(close_cell)
+    gap     = max(1, cw - left_w - right_w)
+
+    T = _S["text"]
     t.append("║ ", style=L)
-    t.append(footer[:cw].ljust(cw), style=LBL)
+    for i, (cell, sty) in enumerate(hint_chunks):
+        if i > 0:
+            t.append(" ", style=T)
+        t.append(cell, style=sty)
+    t.append(" " * gap, style=T)
+    t.append(close_cell, style=_S["button_both"])
     t.append(" ║\n", style=L)
 
     # ── Bottom ────────────────────────────────────────────────────────────────
