@@ -30,6 +30,9 @@ The `conf/` directory is **never modified by tool updates**. Its contents persis
       }
     ]
   },
+  "runtime": {
+    "mode": "wsl"
+  },
   "tui": {
     "theme": "normal_dark"
   },
@@ -40,12 +43,15 @@ The `conf/` directory is **never modified by tool updates**. Its contents persis
 }
 ```
 
+> **Note:** The `runtime` section is planned (schema `1.1`, not yet implemented). See `specs-mode.md` and `specs-future.md §1`.
+
 ### 2.1 Sections
 
 | Section | Key | Type | Default | Description |
 |---------|-----|------|---------|-------------|
 | `metadata` | `schema_version` | string | *(required)* | Current config schema version (e.g. `"1.0"`) |
 | `metadata` | `changelog` | array | `[]` | Migration history — one entry per applied migration |
+| `runtime` | `mode` | string | `"wsl"` | Runtime storage mode: `wsl` · `docker` *(planned — schema 1.1)* |
 | `tui` | `theme` | string | `"normal_dark"` | Active TUI theme ID (see §7.0 in `specs-tui.md`) |
 | `log` | `level` | string | `"WARNING"` | Log level: `DEBUG` · `INFO` · `WARNING` · `ERROR` · `NONE` |
 | `log` | `file` | string | `"logs/wsl4ai.log"` | Log file path (relative to `tool/` or absolute; `~` and `$HOME` expanded) |
@@ -196,6 +202,7 @@ Each entry is applied only when the current config schema matches `from_version`
 | From | To | Description |
 |------|----|-------------|
 | *(none / pre-1.0)* | `1.0` | Added `metadata` section with `schema_version` and `changelog` |
+| `1.0` | `1.1` | *(planned)* Add `runtime.mode = "wsl"` for Docker mode support — see `specs-mode.md §6` |
 
 ### 5.2 Adding a new migration
 

@@ -16,4 +16,6 @@ Do not add parallel spec files outside `specs/` unless the project convention ch
 | [specs-start.md](specs-start.md) | `wsl4ai start` — run one mounted use in foreground; CLI and TUI flows. |
 | [specs-tui.md](specs-tui.md) | `wsl4ai tui` — TUI specification: menu model, scope rules, theme, log config, Start loop behavior, UI design (banner, menus, dialogs, buttons, style tokens). |
 | [specs-config.md](specs-config.md) | `conf/config.json` — config file structure, schema versioning, update procedure, and config migrations. |
+| [specs-mode.md](specs-mode.md) | *(planned)* `runtime.mode` — `wsl` vs `docker` mode: storage mechanism, installer changes, `defaults-*.env` split, tool changes. |
+| [specs-future.md](specs-future.md) | Planned improvements not yet implemented: Docker mode, and other enhancements. |
 | [specs-version.md](specs-version.md) | `-v` / `--version` flag — version string location and format. |
