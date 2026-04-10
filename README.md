@@ -260,6 +260,28 @@ The updater (`conf/wsl4ai-update.py`) is a standalone script that is **never rep
 
 > **Note:** `install update` is a CLI-only command — it is not available in the TUI.
 
+### Update from a specific branch
+
+Use `-b` / `--branch` to check or apply an update from a branch other than `main` (e.g. a feature or release-candidate branch):
+
+```bash
+wsl4ai install update --branch feature/TUI-Textual
+wsl4ai iu -b feature/TUI-Textual              # shorthand
+
+# check only, without applying
+wsl4ai install update --check --branch feature/TUI-Textual
+wsl4ai iu --check -b feature/TUI-Textual
+```
+
+The updater can also be run directly when the CLI is unavailable:
+
+```bash
+python3 ~/wsl4ai/conf/wsl4ai-update.py -b feature/TUI-Textual
+python3 ~/wsl4ai/conf/wsl4ai-update.py --check -b feature/TUI-Textual
+```
+
+> **Warning:** Branches other than `main` may contain unstable or experimental code. Use only for testing purposes.
+
 ---
 
 ## Usage
