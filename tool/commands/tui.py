@@ -457,6 +457,25 @@ def _render_cascade(items: list, cursor: int, iw: int) -> "Text":
     return t
 
 
+# ─── Scrollbar helper ─────────────────────────────────────────────────────────
+
+def _build_scrollbar_chars(rows: int, total: int, scroll: int) -> "list[str]":
+    """Return a list of `rows` scrollbar characters.
+
+    ▓ = thumb (visible region)   ░ = track (non-visible region)
+    When all items fit, the entire bar is ▓.
+    """
+    if total <= rows:
+        return ["▓"] * rows
+    max_scroll = total - rows
+    thumb_h    = max(1, round(rows * rows / total))
+    thumb_h    = min(thumb_h, rows)
+    track      = rows - thumb_h
+    thumb_start = round(scroll / max_scroll * track) if track > 0 else 0
+    thumb_start = max(0, min(thumb_start, track))
+    return ["▓" if thumb_start <= i < thumb_start + thumb_h else "░" for i in range(rows)]
+
+
 # ─── Dialog renderer ──────────────────────────────────────────────────────────
 
 def _button_style_for(name: str) -> str:
@@ -564,17 +583,19 @@ def _render_log_view(
     display_lines: "list[tuple[str,str]]",
     cursor_raw: int,
     raw_idx: "list[int]",
+    total_display: int,
+    scroll: int,
     width: int,
     height: int,
 ) -> "Text":
-    """Render the fullscreen log viewer (no button area).
+    """Render the fullscreen log viewer.
 
     Layout (H = terminal height):
         ╔╣ breadcrumb ╠════...════╗   header    (1)
         ║ info line               ║   info       (1)
         ╠═════════════════════════╣   sep        (1)
-        ║ log line 0              ║   content  (H-6)
-        ║ ...                     ║
+        ║ log line 0           ▓  ║   content  (H-6)
+        ║ ...                  ░  ║
         ╠═════════════════════════╣   sep        (1)
         ║  Esc · Enter to close   ║   footer     (1)
         ╚═════════════════════════╝   bottom     (1)
@@ -583,9 +604,12 @@ def _render_log_view(
     LBL = _S["label"]
     SEL = _S["item_sel"]
 
-    iw = width - 2
-    cw = max(1, width - 4)
+    iw        = width - 2
+    cw        = max(1, width - 4)
+    tw        = max(1, cw - 1)          # text width — last col is scrollbar
     content_h = max(1, height - 6)
+
+    scrollbar = _build_scrollbar_chars(content_h, total_display, scroll)
 
     t = Text()
 
@@ -607,13 +631,19 @@ def _render_log_view(
     # ── Content lines ─────────────────────────────────────────────────────────
     shown = display_lines[:content_h]
     for i, (text, sty) in enumerate(shown):
-        padded = text[:cw].ljust(cw)
+        padded = text[:tw].ljust(tw)
+        bar    = scrollbar[i] if i < len(scrollbar) else " "
         t.append("║ ", style=L)
         is_selected = i < len(raw_idx) and raw_idx[i] == cursor_raw
         t.append(padded, style=SEL if is_selected else sty)
+        t.append(bar,    style=L)
         t.append(" ║\n", style=L)
-    for _ in range(content_h - len(shown)):
-        t.append("║" + " " * iw + "║\n", style=L)
+    for i in range(content_h - len(shown)):
+        bar = scrollbar[len(shown) + i] if len(shown) + i < len(scrollbar) else " "
+        t.append("║ ", style=L)
+        t.append(" " * tw, style=L)
+        t.append(bar, style=L)
+        t.append(" ║\n", style=L)
 
     # ── Separator ─────────────────────────────────────────────────────────────
     t.append("╠" + "═" * iw + "╣\n", style=L)
@@ -926,27 +956,10 @@ if _HAS_TEXTUAL:
 
         # ── proportional scrollbar ─────────────────────────────────────────────
 
-        def _build_scrollbar(self, content_rows: int) -> "list[str]":
-            """Return a list of content_rows characters for the scrollbar column.
-
-            ▓ = thumb (visible region indicator)
-            ░ = track (non-visible region)
-            Thumb height is proportional to fraction visible.  When everything fits,
-            the entire bar is ▓ (no scrolling needed).
-            """
-            n = len(self._flat)
-            if n <= content_rows:
-                return ["▓"] * content_rows          # everything fits — full thumb
-            max_scroll = n - content_rows
-            thumb_h    = max(1, round(content_rows * content_rows / n))
-            thumb_h    = min(thumb_h, content_rows)
-            track      = content_rows - thumb_h
-            thumb_start = round(self._scroll / max_scroll * track) if track > 0 else 0
-            thumb_start = max(0, min(thumb_start, track))
-            return [
-                "▓" if thumb_start <= i < thumb_start + thumb_h else "░"
-                for i in range(content_rows)
-            ]
+        def _build_scrollbar(self) -> "list[str]":
+            """Return scrollbar chars for the full body height (header + sep + content)."""
+            content_rows = self._body_rows - 2
+            return _build_scrollbar_chars(self._body_rows, len(self._flat), self._scroll)
 
         # ── rendering ─────────────────────────────────────────────────────────
 
@@ -956,48 +969,41 @@ if _HAS_TEXTUAL:
             content_rows = self._body_rows - 2
             result: list = []
 
+            # scrollbar spans the full body height (header + sep + content rows)
+            scrollbar = self._build_scrollbar()
+
             # ── header line (dynamic position counter) ───────────────────────
-            # Count only real records (first field is a tuple, not a plain string)
-            n_rec = sum(
-                1 for r in self._records
-                if r and not isinstance(r[0], str)
-            )
-            if n_rec > 0:
-                pos_str = f"({self._cursor + 1}/{n_rec} entries)"
-            else:
-                pos_str = "(0 entries)"
+            n_rec = sum(1 for r in self._records if r and not isinstance(r[0], str))
+            pos_str  = f"({self._cursor + 1}/{n_rec} entries)" if n_rec > 0 else "(0 entries)"
             hdr_full = f"{self._header}  {pos_str}"
-            result.append([(hdr_full[:tw].ljust(tw), _S["label"]), (" ", "")])
+            result.append([(hdr_full[:tw].ljust(tw), _S["label"]), (scrollbar[0], _S["lines"])])
 
             # ── separator ─────────────────────────────────────────────────────
-            result.append([("─" * tw, _S["lines"]), ("─", _S["lines"])])
+            result.append([("─" * tw, _S["lines"]), (scrollbar[1], _S["lines"])])
 
             # ── content window ────────────────────────────────────────────────
-            window    = self._flat[self._scroll : self._scroll + content_rows]
-            scrollbar = self._build_scrollbar(content_rows)
+            window = self._flat[self._scroll : self._scroll + content_rows]
 
             for i, (field, ri) in enumerate(window):
                 is_sel   = (ri == self._cursor and ri >= 0)
-                bar_char = scrollbar[i]
-                if field is None:              # blank separator row
+                bar_char = scrollbar[2 + i]
+                if field is None:
                     result.append([(" " * tw, _S["text"]), (bar_char, _S["lines"])])
-                elif isinstance(field, str):   # plain-text message (e.g. "(no entries)")
+                elif isinstance(field, str):
                     sty = _S["item_sel"] if is_sel else _S["text"]
                     result.append([(field[:tw].ljust(tw), sty), (bar_char, _S["lines"])])
                 elif is_sel:
-                    # selected: flatten label+value, render as one highlighted block
                     lbl, val = field
                     full = (lbl + val)[:tw].ljust(tw)
                     result.append([(full, _S["item_sel"]), (bar_char, _S["lines"])])
                 else:
-                    # normal: label in text_hl, value in text
                     lbl, val = field
                     lbl_w = len(lbl)
                     val_w = max(0, tw - lbl_w)
                     result.append([
-                        (lbl,                         _S["text_hl"]),
-                        (val[:val_w].ljust(val_w),    _S["text"]),
-                        (bar_char,                    _S["lines"]),
+                        (lbl,                       _S["text_hl"]),
+                        (val[:val_w].ljust(val_w),  _S["text"]),
+                        (bar_char,                  _S["lines"]),
                     ])
 
             # ── pad empty rows ─────────────────────────────────────────────────
@@ -1681,7 +1687,10 @@ if _HAS_TEXTUAL:
             )
             visible  = d._display_lines[d._scroll:d._scroll + d._content_h]
             raw_idx  = d._raw_idx[d._scroll:d._scroll + d._content_h]
-            return _render_log_view(d._breadcrumb, info, visible, d._cursor, raw_idx, w, h)
+            return _render_log_view(
+                d._breadcrumb, info, visible, d._cursor, raw_idx,
+                len(d._display_lines), d._scroll, w, h,
+            )
 
     class LogViewDialog(Wsl4aiDialog):
         """Live log viewer — fullscreen, newest at top, cursor + wrap, auto-refresh."""
