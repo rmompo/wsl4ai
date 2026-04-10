@@ -119,14 +119,16 @@ _DEFAULT_THEME = "normal_dark"
 # item_sel is always auto-computed as the inverse of item (not stored in theme files).
 # button_sel can be overridden per-theme; defaults to the inverse of button.
 _S: dict[str, str] = {
-    "lines":      "dim",
-    "item":       "",
-    "item_sel":   "bold reverse",
-    "label":      "bold",
-    "button":     "bold",
-    "button_sel": "bold reverse",
-    "text":       "",
-    "text_hl":    "bold",
+    "lines":          "dim",
+    "item":           "",
+    "item_sel":       "bold reverse",
+    "label":          "bold",
+    "button":         "bold",
+    "button_default": "bold reverse",
+    "button_cancel":  "bold",
+    "button_both":    "bold",
+    "text":           "",
+    "text_hl":        "bold",
     "text_ok":    "green bold",
     "text_err":   "red bold",
     "input":      "",
@@ -161,7 +163,10 @@ def _load_theme() -> None:
     _S["lines"]  = raw.get("lines",  "dim")
     _S["item"]   = raw.get("item",   "")
     _S["label"]  = raw.get("label",  "bold")
-    _S["button"] = raw.get("button", "bold")
+    _S["button"]         = raw.get("button",         "bold")
+    _S["button_default"] = raw.get("button_default", "bold reverse")
+    _S["button_cancel"]  = raw.get("button_cancel",  "bold")
+    _S["button_both"]    = raw.get("button_both",    "bold")
     _S["text"]     = raw.get("text",     "")
     _S["text_hl"]  = raw.get("text_hl",  "bold")
     _S["text_ok"]  = raw.get("text_ok",  "green bold")
@@ -176,12 +181,6 @@ def _load_theme() -> None:
     # item_sel: always the inverse of item (UX spec — not stored in theme)
     item = _S["item"]
     _S["item_sel"] = (item + " reverse").strip() if item else "bold reverse"
-    # button_sel: explicit theme override or auto-invert from button
-    if "button_sel" in raw:
-        _S["button_sel"] = raw["button_sel"]
-    else:
-        btn = _S["button"]
-        _S["button_sel"] = (btn + " reverse").strip() if btn else "bold reverse"
 
 
 # ─── Theme map ────────────────────────────────────────────────────────────────
@@ -460,11 +459,24 @@ def _render_cascade(items: list, cursor: int, iw: int) -> "Text":
 
 # ─── Dialog renderer ──────────────────────────────────────────────────────────
 
+def _button_style_for(name: str) -> str:
+    """Return the _S key for a button based on its semantic name.
+
+    Cancel  → button_cancel  (dismissed by Esc)
+    Close   → button_both    (dismissed by Esc or Enter)
+    others  → button_default (confirmed by Enter)
+    """
+    if name == "Cancel":
+        return "button_cancel"
+    if name == "Close":
+        return "button_both"
+    return "button_default"
+
+
 def _render_dialog(
     breadcrumb: str,
     body_lines: list,
     buttons: list[str],
-    btn_focus: int,
     width: int,
 ) -> "Text":
     """Render a WSL4AI dialog frame as Rich Text.
@@ -525,9 +537,9 @@ def _render_dialog(
     # ── Button row (right-aligned, equal width, 1-space gap between buttons) ─────
     max_bw = max(len(b) for b in buttons) if buttons else 0
     btn_chunks: list[tuple[str, str]] = []
-    for i, btn in enumerate(buttons):
+    for btn in buttons:
         cell = f" {btn.center(max_bw)} "          # equal width for all buttons
-        sty  = _S["button_sel"] if i == btn_focus else _S["button"]
+        sty  = _S[_button_style_for(btn)]
         btn_chunks.append((cell, sty))
 
     # total width = sum of cells + 1-space gap between each pair
@@ -796,7 +808,7 @@ if _HAS_TEXTUAL:
         def render(self) -> "Text":
             d = self._dlg
             return _render_dialog(
-                d._breadcrumb, d.body_lines(), d._buttons, d._btn_focus, d._dlg_w
+                d._breadcrumb, d.body_lines(), d._buttons, d._dlg_w
             )
 
     class Wsl4aiDialog(ModalScreen):
@@ -818,7 +830,6 @@ if _HAS_TEXTUAL:
             self._dlg_w      = width
             self._body_rows  = body_rows
             self._buttons    = buttons or ["Close"]
-            self._btn_focus  = 0
 
         def _height(self) -> int:
             # header + blank + body_rows + separator + btn_row + footer
@@ -846,7 +857,7 @@ if _HAS_TEXTUAL:
             Tab-based circular input navigation is for ADD dialogs only.
             """
             if event.key == "enter":
-                self.dismiss(self._buttons[self._btn_focus])
+                self.dismiss(self._buttons[-1] if self._buttons else None)
             elif event.key == "escape":
                 self.dismiss(None)
 
@@ -867,7 +878,6 @@ if _HAS_TEXTUAL:
                 buttons=["Cancel", "Ok"],
             )
             self._message = message
-            self._btn_focus = 1   # highlight Ok
 
         def body_lines(self) -> list:
             cw = self._dlg_w - 4
@@ -1045,7 +1055,6 @@ if _HAS_TEXTUAL:
             hdr, recs = registry_list_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons    = ["Cancel", "Remove"]
-            self._btn_focus  = 0
             from commands.interface import rows_of
             self._env_rows   = rows_of(env)
 
@@ -1185,7 +1194,6 @@ if _HAS_TEXTUAL:
             hdr, recs = wsl_list_records(env)
             super().__init__(breadcrumb, hdr, recs)
             self._buttons   = ["Cancel", "Set"]
-            self._btn_focus = 0
             self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
@@ -1362,7 +1370,6 @@ if _HAS_TEXTUAL:
             hdr, recs = registry_available_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", "Add"]
-            self._btn_focus = 0
             self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
@@ -1407,7 +1414,6 @@ if _HAS_TEXTUAL:
             hdr, recs = use_list_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", "Remove"]
-            self._btn_focus = 0
             self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
@@ -1463,7 +1469,6 @@ if _HAS_TEXTUAL:
             hdr, recs = use_list_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", self._ACTION_LABEL]
-            self._btn_focus = 0
             self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
@@ -1609,7 +1614,6 @@ if _HAS_TEXTUAL:
             hdr, recs = alias_list_records(env)
             super().__init__(breadcrumb, hdr, recs)
             self._buttons   = ["Cancel", "Remove"]
-            self._btn_focus = 0
             self._env_rows  = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
@@ -1863,7 +1867,6 @@ if _HAS_TEXTUAL:
             n = len(_LOG_LEVELS)
             super().__init__(breadcrumb, width=32, body_rows=n + 2, buttons=["Cancel", "Apply"])
             self._cursor = _LOG_LEVELS.index(current) if current in _LOG_LEVELS else 2
-            self._btn_focus = 1  # Apply highlighted
 
         def body_lines(self) -> list:
             cw = self._dlg_w - 4
@@ -1930,7 +1933,6 @@ if _HAS_TEXTUAL:
             # pre-select active theme
             ids = [tid for _, tid in _THEME_LIST]
             self._cursor = ids.index(self._original_id) if self._original_id in ids else 0
-            self._btn_focus = 1   # Apply highlighted by default
 
         def body_lines(self) -> list:
             cw = self._dlg_w - 4
@@ -1979,7 +1981,6 @@ if _HAS_TEXTUAL:
             # raw_rows: list of (r_uuid, r_name, rel_path_host, rel_path_wsl, cli_cmd)
             super().__init__(breadcrumb, header, records, width=78)
             self._buttons   = ["Cancel", "Start"]
-            self._btn_focus = 0
             self._raw_rows  = raw_rows
 
         def _handle_key(self, event: "events.Key") -> None:

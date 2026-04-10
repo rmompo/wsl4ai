@@ -2,15 +2,18 @@
   "name": "Color Blind (Light)",
   "dark": false,
   "styles": {
-    "lines": "#7c3aed bold",
-    "item": "#111827",
-    "label": "#f5f7fa on #005f8a",
-    "button": "#f5f7fa on #a05a00",
-    "text": "#111827",
-    "text_hl": "#000000 bold",
-    "text_ok": "#2a7f62 bold",
-    "text_err": "#b45309 bold",
-    "input": "#1f2937",
-    "input_sel": "#ffffff on #1f2937 bold"
+    "lines":          "#7c3aed bold",
+    "item":           "#111827",
+    "label":          "#f5f7fa on #005f8a",
+    "button":         "#f5f7fa on #888888",
+    "button_default": "#f5f7fa on #005f8a",
+    "button_cancel":  "#f5f7fa on #b45309",
+    "button_both":    "#f5f7fa on #a05a00",
+    "text":           "#111827",
+    "text_hl":        "#000000 bold",
+    "text_ok":        "#2a7f62 bold",
+    "text_err":       "#b45309 bold",
+    "input":          "#1f2937",
+    "input_sel":      "#ffffff on #1f2937 bold"
   }
 }

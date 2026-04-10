@@ -2,15 +2,18 @@
   "name": "Normal (Light)",
   "dark": false,
   "styles": {
-    "lines":     "#9b005f bold",
-    "item":      "#102030",
-    "label":     "#f5f7fa on #005f87",
-    "button":    "#f5f7fa on #9a5a00",
-    "text":      "#102030",
-    "text_hl":   "#000000 bold",
-    "text_ok":   "#007a3d bold",
-    "text_err":  "#b00040 bold",
-    "input":     "#1a365d",
-    "input_sel": "#ffffff on #1a365d bold"
+    "lines":          "#9b005f bold",
+    "item":           "#102030",
+    "label":          "#f5f7fa on #005f87",
+    "button":         "#f5f7fa on #888888",
+    "button_default": "#f5f7fa on #007a3d",
+    "button_cancel":  "#f5f7fa on #b00040",
+    "button_both":    "#f5f7fa on #9a5a00",
+    "text":           "#102030",
+    "text_hl":        "#000000 bold",
+    "text_ok":        "#007a3d bold",
+    "text_err":       "#b00040 bold",
+    "input":          "#1a365d",
+    "input_sel":      "#ffffff on #1a365d bold"
   }
 }
