@@ -550,7 +550,8 @@ def _render_log_view(
     breadcrumb: str,
     info_text: str,
     display_lines: "list[tuple[str,str]]",
-    cursor_in_view: int,
+    cursor_raw: int,
+    raw_idx: "list[int]",
     width: int,
     height: int,
 ) -> "Text":
@@ -596,10 +597,8 @@ def _render_log_view(
     for i, (text, sty) in enumerate(shown):
         padded = text[:cw].ljust(cw)
         t.append("║ ", style=L)
-        if i == cursor_in_view:
-            t.append(padded, style=SEL)
-        else:
-            t.append(padded, style=sty)
+        is_selected = i < len(raw_idx) and raw_idx[i] == cursor_raw
+        t.append(padded, style=SEL if is_selected else sty)
         t.append(" ║\n", style=L)
     for _ in range(content_h - len(shown)):
         t.append("║" + " " * iw + "║\n", style=L)
@@ -1663,27 +1662,22 @@ if _HAS_TEXTUAL:
             d._dlg_w     = w
             d._content_h = max(1, h - 6)
             d._rebuild_display(w)
-            total_d = len(d._display_lines)
+            total_d   = len(d._display_lines)
+            total_raw = len(d._lines)
             max_scroll = max(0, total_d - d._content_h)
-            d._scroll = min(d._scroll, max_scroll)
-            d._cursor = min(d._cursor, max(0, total_d - 1))
-            # ensure cursor is within scroll window
-            if d._cursor < d._scroll:
-                d._scroll = d._cursor
-            elif d._cursor >= d._scroll + d._content_h:
-                d._scroll = d._cursor - d._content_h + 1
-            d._scroll = max(0, min(d._scroll, max_scroll))
+            d._scroll  = max(0, min(d._scroll, max_scroll))
+            d._cursor  = max(0, min(d._cursor, max(0, total_raw - 1)))
 
             pos_end = min(d._scroll + d._content_h, total_d)
             info = (
-                f"Lines: {len(d._lines)}  disp: {total_d}"
+                f"Lines: {total_raw}  disp: {total_d}"
                 f"  │  {d._scroll + 1}-{pos_end}"
                 f"  │  auto-refresh {d._REFRESH:.0f}s"
                 f"  │  cursor {d._cursor + 1}"
             )
-            visible = d._display_lines[d._scroll:d._scroll + d._content_h]
-            cursor_in_view = d._cursor - d._scroll
-            return _render_log_view(d._breadcrumb, info, visible, cursor_in_view, w, h)
+            visible  = d._display_lines[d._scroll:d._scroll + d._content_h]
+            raw_idx  = d._raw_idx[d._scroll:d._scroll + d._content_h]
+            return _render_log_view(d._breadcrumb, info, visible, d._cursor, raw_idx, w, h)
 
     class LogViewDialog(Wsl4aiDialog):
         """Live log viewer — fullscreen, newest at top, cursor + wrap, auto-refresh."""
@@ -1695,11 +1689,13 @@ if _HAS_TEXTUAL:
 
         def __init__(self, breadcrumb: str) -> None:
             super().__init__(breadcrumb, width=80, body_rows=20, buttons=["Close"])
-            self._lines:        list[str]              = []
-            self._display_lines: list[tuple[str, str]] = []
-            self._last_cw  = -1
-            self._scroll   = 0
-            self._cursor   = 0
+            self._lines:         list[str]              = []
+            self._display_lines: list[tuple[str, str]]  = []
+            self._raw_idx:       list[int]              = []  # display_idx → raw line idx
+            self._raw_to_display: list[int]             = []  # raw_idx → first display line idx
+            self._last_cw   = -1
+            self._scroll    = 0
+            self._cursor    = 0   # raw line index
             self._content_h = 1
 
         def compose(self) -> "ComposeResult":
@@ -1755,19 +1751,27 @@ if _HAS_TEXTUAL:
             if cw == self._last_cw:
                 return
             self._last_cw = cw
-            result: list[tuple[str, str]] = []
-            for line in self._lines:
+            result:   list[tuple[str, str]] = []
+            raw_idx:  list[int]             = []
+            raw_to_display: list[int]       = []
+            for raw_i, line in enumerate(self._lines):
+                raw_to_display.append(len(result))
                 sty = self._line_style(line)
                 if len(line) <= cw:
                     result.append((line, sty))
+                    raw_idx.append(raw_i)
                 else:
                     # wrap to cw, continuation lines indented 2 spaces
                     result.append((line[:cw], sty))
+                    raw_idx.append(raw_i)
                     i = cw
                     while i < len(line):
                         result.append(("  " + line[i:i + cw - 2], sty))
+                        raw_idx.append(raw_i)
                         i += cw - 2
-            self._display_lines = result
+            self._display_lines  = result
+            self._raw_idx        = raw_idx
+            self._raw_to_display = raw_to_display
 
         def _on_refresh(self) -> None:
             old_len = len(self._lines)
@@ -1780,36 +1784,62 @@ if _HAS_TEXTUAL:
 
         # ── keyboard ──────────────────────────────────────────────────────────
 
+        def _clamp_cursor(self) -> None:
+            """Clamp raw cursor to valid range."""
+            max_raw = max(0, len(self._lines) - 1)
+            self._cursor = max(0, min(self._cursor, max_raw))
+
+        def _scroll_to_cursor(self) -> None:
+            """Adjust scroll so all display lines of the current raw cursor are visible."""
+            ch = self._content_h
+            total_disp = len(self._display_lines)
+            max_scroll = max(0, total_disp - ch)
+            if not self._raw_to_display or self._cursor >= len(self._raw_to_display):
+                return
+            first = self._raw_to_display[self._cursor]
+            if self._cursor + 1 < len(self._raw_to_display):
+                last = self._raw_to_display[self._cursor + 1] - 1
+            else:
+                last = total_disp - 1
+            if first < self._scroll:
+                self._scroll = first
+            elif last >= self._scroll + ch:
+                self._scroll = min(max_scroll, last - ch + 1)
+
         def _handle_key(self, event: "events.Key") -> None:
             key = event.key
-            total = len(self._display_lines)
-            ch    = self._content_h
+            total_disp = len(self._display_lines)
+            total_raw  = len(self._lines)
+            ch         = self._content_h
 
             if key in ("escape", "enter"):
                 self.dismiss(None)
                 return
 
-            if total == 0:
+            if total_raw == 0:
                 return
 
-            max_cursor = total - 1
-            max_scroll = max(0, total - ch)
+            max_scroll = max(0, total_disp - ch)
 
             if key == "up":
                 self._cursor = max(0, self._cursor - 1)
+                self._scroll_to_cursor()
             elif key == "down":
-                self._cursor = min(max_cursor, self._cursor + 1)
+                self._cursor = min(total_raw - 1, self._cursor + 1)
+                self._scroll_to_cursor()
             elif key == "pageup":
-                self._cursor = max(0, self._cursor - ch)
                 self._scroll = max(0, self._scroll - ch)
+                if self._raw_idx and self._scroll < len(self._raw_idx):
+                    self._cursor = self._raw_idx[self._scroll]
             elif key == "pagedown":
-                self._cursor = min(max_cursor, self._cursor + ch)
                 self._scroll = min(max_scroll, self._scroll + ch)
+                if self._raw_idx and self._scroll < len(self._raw_idx):
+                    self._cursor = self._raw_idx[self._scroll]
             elif key == "home":
                 self._cursor = 0
                 self._scroll = 0
             elif key == "end":
-                self._cursor = max_cursor
+                self._cursor = max(0, total_raw - 1)
                 self._scroll = max_scroll
             else:
                 return

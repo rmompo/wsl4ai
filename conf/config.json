@@ -1,4 +1,14 @@
 {
+  "metadata": {
+    "schema_version": "1.0",
+    "changelog": [
+      {
+        "schema_version": "1.0",
+        "datetime": "2026-04-10T00:00:00",
+        "comment": "initial config created"
+      }
+    ]
+  },
   "tui": {
     "theme": "normal_dark"
   },

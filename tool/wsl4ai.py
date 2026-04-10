@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """WSL4AI CLI entrypoint and command registration."""
 
+import json
 import sys
 from contextlib import redirect_stdout
 from io import StringIO
@@ -18,11 +19,50 @@ from commands.help_md import root_description_short, root_epilog_short
 from commands.install import register_install_command
 from commands.output_decorator import format_envelope_for_cli, try_parse_envelope
 
-__version__ = "1.5.87"
+__version__ = "1.5.88"
+__config_version__ = "1.0"
 
 APP_DIR = Path(__file__).resolve().parent
 CONF_DIR = APP_DIR.parent / "conf"
 DDBB_DIR = CONF_DIR / "ddbb"
+
+_INSTALL_COMMANDS = {"install", "it", "id", "ia", "iu"}
+
+
+def _parse_config_version(v: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(x) for x in v.split("."))
+    except (ValueError, AttributeError):
+        return ()
+
+
+def _check_config_version(command: str) -> None:
+    """Abort if config.json schema version is older than required.
+
+    Skipped for install commands — they handle setup and migration.
+    Skipped if config.json does not yet exist (fresh install).
+    """
+    if command in _INSTALL_COMMANDS:
+        return
+    config_path = CONF_DIR / "config.json"
+    if not config_path.is_file():
+        return
+    try:
+        cfg = json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    meta = cfg.get("metadata")
+    if not meta or not meta.get("schema_version"):
+        raise SystemExit(
+            "Error: config.json has no schema version. Run: wsl4ai install update"
+        )
+    local_v = _parse_config_version(meta["schema_version"])
+    required_v = _parse_config_version(__config_version__)
+    if not local_v or local_v < required_v:
+        raise SystemExit(
+            f"Error: config schema is {meta['schema_version']} but tool requires "
+            f"{__config_version__}. Run: wsl4ai install update"
+        )
 
 
 def _ensure_layout() -> None:
@@ -88,6 +128,7 @@ def main() -> int:
             return 1
 
         _ensure_layout()
+        _check_config_version(args.command)
         args.app_version = __version__
         ri = resolve_runtime_identity()
         args.runtime_identity = ri
