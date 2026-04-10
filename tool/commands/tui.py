@@ -1790,29 +1790,36 @@ if _HAS_TEXTUAL:
             self._last_cw = -1  # force rebuild on next render
 
         def _rebuild_display(self, w: int) -> None:
-            """Wrap raw lines to content width; rebuilds only when width changes."""
+            """Wrap raw lines to content width; rebuilds only when width changes.
+
+            Uses tw (text width) = cw-2 to match _render_log_view, which reserves
+            1 col for the separator and 1 col for the scrollbar character.
+            Wrapping at cw would cause the last 2 chars of every first segment to be
+            silently clipped by the [:tw] trim in the renderer.
+            """
             cw = max(1, w - 4)
-            if cw == self._last_cw:
+            tw = max(1, cw - 2)   # mirrors: tw = max(1, cw - 2) in _render_log_view
+            if tw == self._last_cw:
                 return
-            self._last_cw = cw
+            self._last_cw = tw
             result:   list[tuple[str, str]] = []
             raw_idx:  list[int]             = []
             raw_to_display: list[int]       = []
             for raw_i, line in enumerate(self._lines):
                 raw_to_display.append(len(result))
                 sty = self._line_style(line)
-                if len(line) <= cw:
+                if len(line) <= tw:
                     result.append((line, sty))
                     raw_idx.append(raw_i)
                 else:
-                    # wrap to cw, continuation lines indented 2 spaces
-                    result.append((line[:cw], sty))
+                    # wrap to tw; continuation lines indented 2 spaces
+                    result.append((line[:tw], sty))
                     raw_idx.append(raw_i)
-                    i = cw
+                    i = tw
                     while i < len(line):
-                        result.append(("  " + line[i:i + cw - 2], sty))
+                        result.append(("  " + line[i:i + tw - 2], sty))
                         raw_idx.append(raw_i)
-                        i += cw - 2
+                        i += tw - 2
             self._display_lines  = result
             self._raw_idx        = raw_idx
             self._raw_to_display = raw_to_display
