@@ -14,5 +14,6 @@ Do not add parallel spec files outside `specs/` unless the project convention ch
 | [specs-wsl.md](specs-wsl.md) | `wsl4ai wsl ...` — `list` and `set`, including `--cli`, optional WSL selectors, and runtime default target resolution. |
 | [specs-whoami.md](specs-whoami.md) | `wsl4ai whoami` / `wai` runtime identity output contract (CLI only). |
 | [specs-start.md](specs-start.md) | `wsl4ai start` — run one mounted use in foreground; CLI and TUI flows. |
-| [specs-tui.md](specs-tui.md) | `wsl4ai tui` — TUI specification: menu model, scope rules, theme, log config, Start loop behavior. |
+| [specs-tui.md](specs-tui.md) | `wsl4ai tui` — TUI specification: menu model, scope rules, theme, log config, Start loop behavior, UI design (banner, menus, dialogs, buttons, style tokens). |
+| [specs-config.md](specs-config.md) | `conf/config.json` — config file structure, schema versioning, update procedure, and config migrations. |
 | [specs-version.md](specs-version.md) | `-v` / `--version` flag — version string location and format. |

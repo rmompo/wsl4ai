@@ -19,7 +19,7 @@ from commands.help_md import root_description_short, root_epilog_short
 from commands.install import register_install_command
 from commands.output_decorator import format_envelope_for_cli, try_parse_envelope
 
-__version__ = "1.5.96"
+__version__ = "1.5.97"
 __config_version__ = "1.0"
 
 APP_DIR = Path(__file__).resolve().parent
