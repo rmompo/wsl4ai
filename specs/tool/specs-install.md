@@ -52,6 +52,30 @@ flowchart LR
     confirm -->|"notify success/error"| ui([TUI notify])
 ```
 
+### SQLite journal mode — compatibilidad con mount compartido v9fs
+
+La base de datos usa `PRAGMA journal_mode=DELETE` (no WAL).
+
+**Por qué no WAL:** WAL mode requiere un archivo `-shm` (shared memory mapeada en memoria) junto al `.db`. En un filesystem v9fs — el tipo usado por los mounts Windows-backed en WSL2 (`mount --bind /mnt/c/...`) — el mecanismo de shared memory no funciona correctamente entre máquinas. Síntoma: `sqlite3.OperationalError: unable to open database file` al intentar abrir una DB existente en modo WAL, incluso desde máquinas distintas de la que la creó.
+
+**Regla de implementación:** `connect_db()` en `common.py` siempre establece `journal_mode=DELETE`. No cambiar a WAL aunque ofrezca mejor concurrencia, ya que el escenario de uso implica una DB en un mount compartido entre múltiples instancias WSL.
+
+**Migración de DBs existentes en WAL:** Si una DB fue creada con WAL (versiones anteriores a v1.6.2), no puede abrirse directamente desde v9fs. Procedimiento de recuperación:
+
+```bash
+# Copiar a filesystem Linux nativo, migrar, devolver
+cp /ruta/al/mount/wsl4ai.db /tmp/migrate.db
+python3 -c "
+import sqlite3
+con = sqlite3.connect('/tmp/migrate.db')
+con.execute('PRAGMA journal_mode=DELETE;')
+con.commit()
+con.close()
+"
+cp /tmp/migrate.db /ruta/al/mount/wsl4ai.db
+rm /tmp/migrate.db
+```
+
 ---
 
 ## 3. `install alias`

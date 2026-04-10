@@ -174,3 +174,19 @@ flowchart TD
 | `tool/commands/api_json.py` | Envelope builders, OptionSpec |
 | `conf/config.json` | TUI theme + log config |
 | `conf/local.env` | HOST_PROJECTS, WSL_PROJECTS |
+
+---
+
+## 7. Base de datos SQLite — restricciones de filesystem
+
+La DB (`conf/ddbb/wsl4ai.db`) reside en un mount compartido v9fs (Windows-backed, accesible desde múltiples máquinas WSL vía `mount --bind /mnt/c/...`).
+
+**`journal_mode=DELETE` es obligatorio.** WAL mode crea un archivo `-shm` que usa shared memory a nivel de OS. v9fs no soporta esta operación entre máquinas distintas; el resultado es `SQLITE_CANTOPEN` ("unable to open database file") al intentar abrir la DB desde cualquier máquina que no la creó, o al reiniciar la sesión WSL.
+
+| Modo | Funciona en v9fs compartido | Notas |
+|------|-----------------------------|-------|
+| `DELETE` (default) | Sí | Usado desde v1.6.2 |
+| `WAL` | No | Falla al abrir DB existente entre máquinas |
+| `MEMORY` | Sí | Sin persistencia de journal; no recomendado |
+
+La función `connect_db()` en `common.py` es el único punto donde se abre la DB — centraliza esta decisión.
