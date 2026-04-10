@@ -983,9 +983,9 @@ if _HAS_TEXTUAL:
         # ── proportional scrollbar ─────────────────────────────────────────────
 
         def _build_scrollbar(self) -> "list[str]":
-            """Return scrollbar chars for the full body height (header + sep + content)."""
+            """Return scrollbar chars for the content rows only (excludes header and separator)."""
             content_rows = self._body_rows - 2
-            return _build_scrollbar_chars(self._body_rows, len(self._flat), self._scroll)
+            return _build_scrollbar_chars(content_rows, len(self._flat), self._scroll)
 
         # ── rendering ─────────────────────────────────────────────────────────
 
@@ -995,27 +995,26 @@ if _HAS_TEXTUAL:
             content_rows = self._body_rows - 2
             result: list = []
 
-            # scrollbar spans the full body height (header + sep + content rows)
+            # scrollbar spans only the content rows (not header or separator)
             scrollbar = self._build_scrollbar()
+            L  = _S["lines"]
+            SP = (" ", "")   # 1-col separator between content and scrollbar
 
-            # ── header line (dynamic position counter) ───────────────────────
+            # ── header line — full width, no scrollbar ────────────────────────
             n_rec = sum(1 for r in self._records if r and not isinstance(r[0], str))
             pos_str  = f"({self._cursor + 1}/{n_rec} entries)" if n_rec > 0 else "(0 entries)"
             hdr_full = f"{self._header}  {pos_str}"
-            L = _S["lines"]
-            SP = (" ", "")   # 1-col separator between content and scrollbar
+            result.append([(hdr_full[:cw].ljust(cw), _S["label"])])
 
-            result.append([(hdr_full[:tw].ljust(tw), _S["label"]), SP, (scrollbar[0], L)])
-
-            # ── separator ─────────────────────────────────────────────────────
-            result.append([("─" * tw, L), ("─", L), (scrollbar[1], L)])
+            # ── separator — full width, no scrollbar ──────────────────────────
+            result.append([("─" * cw, L)])
 
             # ── content window ────────────────────────────────────────────────
             window = self._flat[self._scroll : self._scroll + content_rows]
 
             for i, (field, ri) in enumerate(window):
                 is_sel   = (ri == self._cursor and ri >= 0)
-                bar_char = scrollbar[2 + i]
+                bar_char = scrollbar[i]
                 if field is None:
                     result.append([(" " * tw, _S["text"]), SP, (bar_char, L)])
                 elif isinstance(field, str):
@@ -1036,9 +1035,10 @@ if _HAS_TEXTUAL:
                         (bar_char,                  L),
                     ])
 
-            # ── pad empty rows (with scrollbar char to fill full height) ───────
+            # ── pad empty rows (with scrollbar char to fill full content height) ─
             while len(result) < self._body_rows:
-                bar_char = scrollbar[len(result)] if len(result) < len(scrollbar) else " "
+                content_idx = len(result) - 2   # subtract header + separator
+                bar_char = scrollbar[content_idx] if 0 <= content_idx < len(scrollbar) else " "
                 result.append([(" " * tw, ""), SP, (bar_char, L)])
 
             return result
