@@ -2,12 +2,12 @@
 
 from argparse import Namespace, _SubParsersAction
 
-from commands.interface import emit_from_interface, interface_whoami
+from commands.api import emit_from_api, api_whoami
 
 
 def cmd_whoami(args: Namespace) -> int:
     """Return runtime `machine` and `user` identity as JSON envelope."""
-    return emit_from_interface(args, interface_whoami(), [], include_data=True)
+    return emit_from_api(args, api_whoami(), [], include_data=True)
 
 
 def register_whoami_command(subparsers: _SubParsersAction) -> None:

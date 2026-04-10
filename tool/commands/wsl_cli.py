@@ -4,10 +4,10 @@ from argparse import Namespace, _SubParsersAction
 
 from commands.api_json import OptionSpec, options_from_args
 from commands.help_md import help_summary_for_root, parser_description_from_manual
-from commands.interface import (
-    emit_from_interface,
-    interface_wsl_list,
-    interface_wsl_set,
+from commands.api import (
+    emit_from_api,
+    api_wsl_list,
+    api_wsl_set,
 )
 
 
@@ -21,19 +21,19 @@ def cmd_wsl_set(args: Namespace) -> int:
         ],
     )
     ri = args.runtime_identity
-    env = interface_wsl_set(
+    env = api_wsl_set(
         cli_command=(getattr(args, "wsl_cli", None) or "").strip(),
         wsl_uuid=getattr(args, "wsl_set_wsl_uuid", "") or "",
         wsl_name=getattr(args, "wsl_set_wsl_name", "") or "",
         user=ri.user,
         runtime_wsl_name=ri.wsl_name,
     )
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def cmd_wsl_list(args: Namespace) -> int:
     """List all known WSL rows and their launch commands."""
-    return emit_from_interface(args, interface_wsl_list(), [])
+    return emit_from_api(args, api_wsl_list(), [])
 
 
 def _add_wsl_set_args(p) -> None:

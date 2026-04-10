@@ -17,11 +17,11 @@ This document describes the layered architecture introduced in v1.5.74, where CL
                    │                          │
                    ▼                          ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                      interface.py                                │
+│                      api.py                                │
 │            Business logic — returns JSON envelope                │
-│  interface_registry_*  interface_use_*  interface_wsl_*          │
-│  interface_alias_*     interface_install_*  interface_whoami()   │
-│  interface_start_prepare()  interface_use_list_mounted()         │
+│  api_registry_*  api_use_*  api_wsl_*                            │
+│  api_alias_*     api_install_*  api_whoami()                     │
+│  api_start_prepare()  api_use_list_mounted()                     │
 └──────────────────┬──────────────────────────┬────────────────────┘
                    │                          │
                    ▼                          ▼
@@ -29,7 +29,7 @@ This document describes the layered architecture introduced in v1.5.74, where CL
 │    CLI Decorator         │    │         TUI Decorator           │
 │  output_decorator.py     │    │       tui_decorator.py          │
 │  format_envelope_for_cli │    │  registry_list_records()        │
-│  emit_from_interface()   │    │  use_list_records()             │
+│  emit_from_api()   │    │  use_list_records()             │
 │                          │    │  wsl_list_records()             │
 │                          │    │  alias_list_records()           │
 │                          │    │  use_list_mounted_records()     │
@@ -58,27 +58,27 @@ flowchart TB
         end
     end
 
-    subgraph Interface["interface.py — Business Logic Layer"]
+    subgraph Interface["api.py — Business Logic Layer"]
         direction LR
-        i_reg["interface_registry_*()"]
-        i_use["interface_use_*()"]
-        i_wsl["interface_wsl_*()"]
-        i_inst["interface_alias_*()\ninterface_install_database()"]
-        i_misc["interface_whoami()\ninterface_start_prepare()\ninterface_use_list_mounted()"]
+        i_reg["api_registry_*()"]
+        i_use["api_use_*()"]
+        i_wsl["api_wsl_*()"]
+        i_inst["api_alias_*()\napi_install_database()"]
+        i_misc["api_whoami()\napi_start_prepare()\napi_use_list_mounted()"]
     end
 
     subgraph Decorators["Decorators"]
         subgraph CLI_Dec["CLI Decorator (output_decorator.py)"]
-            emit["emit_from_interface()\nformat_envelope_for_cli()"]
+            emit["emit_from_api()\nformat_envelope_for_cli()"]
         end
         subgraph TUI_Dec["TUI Decorator (tui_decorator.py)"]
             rec["*_records() functions\n→ list[list[tuple]]"]
         end
     end
 
-    cli_cmd -->|"interface_*()"| Interface
-    tui_disp -->|"interface_*()"| Interface
-    tui_dlg -->|"interface_*()"| Interface
+    cli_cmd -->|"api_*()"| Interface
+    tui_disp -->|"api_*()"| Interface
+    tui_dlg -->|"api_*()"| Interface
 
     Interface -->|"JSON envelope dict"| cli_cmd
     Interface -->|"JSON envelope dict"| tui_disp
@@ -93,7 +93,7 @@ flowchart TB
 
 ## 3. JSON envelope (shared contract)
 
-Every `interface_*()` function returns a dict with this shape:
+Every `api_*()` function returns a dict with this shape:
 
 ```json
 {
@@ -106,14 +106,14 @@ Every `interface_*()` function returns a dict with this shape:
 }
 ```
 
-Helpers exposed by `interface.py`:
+Helpers exposed by `api.py`:
 
 | Function | Returns |
 |----------|---------|
 | `status_of(env)` | `int` — `env["output"]["result"]["status"]` |
 | `message_of(env)` | `str` — `env["output"]["result"]["message"]` |
 | `rows_of(env)` | `list` — `env["output"]["data"]["rows"]` |
-| `emit_from_interface(args, env, opts)` | `int` — patches opts into env, calls `emit_envelope()` |
+| `emit_from_api(args, env, opts)` | `int` — patches opts into env, calls `emit_envelope()` |
 
 ---
 
@@ -156,7 +156,7 @@ flowchart TD
 | File | Role |
 |------|------|
 | `tool/wsl4ai.py` | Entrypoint, version, argument parser |
-| `tool/commands/interface.py` | Business logic layer |
+| `tool/commands/api.py` | Business logic layer |
 | `tool/commands/tui_decorator.py` | TUI record converters |
 | `tool/commands/tui.py` | Textual TUI — menus, dialogs, cmd_tui |
 | `tool/commands/output_decorator.py` | CLI envelope formatter |

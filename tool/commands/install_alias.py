@@ -121,13 +121,13 @@ def cmd_install_alias(args: Namespace) -> int:
     names = [str(x).strip() for x in (getattr(args, "alias_names", []) or []) if str(x).strip()]
     action = (getattr(args, "alias_action", "") or "").strip().lower()
     opts = options_from_args(args, [OptionSpec("--action", "alias_action"), OptionSpec("--name", "alias_names")])
-    from commands.interface import emit_from_interface, interface_alias_add, interface_alias_list, interface_alias_remove
+    from commands.api import emit_from_api, api_alias_add, api_alias_list, api_alias_remove
     if action == "list":
-        return emit_from_interface(args, interface_alias_list(), opts, include_data=True)
+        return emit_from_api(args, api_alias_list(), opts, include_data=True)
     if action == "add":
-        return emit_from_interface(args, interface_alias_add(names), opts)
+        return emit_from_api(args, api_alias_add(names), opts)
     if action == "remove":
-        return emit_from_interface(args, interface_alias_remove(names), opts)
+        return emit_from_api(args, api_alias_remove(names), opts)
     from commands.api_json import emit_envelope
     return emit_envelope(args=args, command="install", subcommand="alias", options=opts, status=1, message="install alias: --action is required")
 

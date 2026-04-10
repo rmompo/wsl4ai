@@ -5,7 +5,7 @@ from argparse import Namespace, _SubParsersAction
 from commands.api_json import OptionSpec, options_from_args
 from commands.common import load_local_env_paths
 from commands.help_md import help_summary_for_root, parser_description_from_manual
-from commands.interface import emit_from_interface, interface_registry_add, interface_registry_remove
+from commands.api import emit_from_api, api_registry_add, api_registry_remove
 
 
 def cmd_add(args: Namespace) -> int:
@@ -18,13 +18,13 @@ def cmd_add(args: Namespace) -> int:
             OptionSpec("--force", "force", is_flag=True),
         ],
     )
-    env = interface_registry_add(
+    env = api_registry_add(
         name=(args.name or "").strip(),
         host_rel=(args.host or "").strip(),
         wsl_rel=(args.wsl or "").strip(),
         force=bool(getattr(args, "force", False)),
     )
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def cmd_remove(args: Namespace) -> int:
@@ -35,11 +35,11 @@ def cmd_remove(args: Namespace) -> int:
             OptionSpec("--name", "remove_name"),
         ],
     )
-    env = interface_registry_remove(
+    env = api_registry_remove(
         registry_uuid=(getattr(args, "remove_uuid", None) or "").strip(),
         registry_name=(getattr(args, "remove_name", None) or "").strip(),
     )
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def register_add_command(

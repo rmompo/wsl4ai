@@ -35,8 +35,8 @@ flowchart LR
         cmd["install_database.cmd_install_database()"]
         id --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface["interface_install_database(force)"]
+    subgraph Interface["api.py"]
+        iface["api_install_database(force)"]
     end
     subgraph TUI
         dispatch["_dispatch\n(['Others','Install','Database'])"]
@@ -48,7 +48,7 @@ flowchart LR
     confirm --> iface
     iface -->|"envelope"| cmd
     iface -->|"envelope → status"| confirm
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
     confirm -->|"notify success/error"| ui([TUI notify])
 ```
 
@@ -111,10 +111,10 @@ flowchart LR
         cmd["install_alias.cmd_install_alias()"]
         ia --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface_list["interface_alias_list()"]
-        iface_add["interface_alias_add(names)"]
-        iface_rm["interface_alias_remove(names)"]
+    subgraph Interface["api.py"]
+        iface_list["api_alias_list()"]
+        iface_add["api_alias_add(names)"]
+        iface_rm["api_alias_remove(names)"]
     end
     subgraph TUI
         alist["AliasListDialog.__init__()"]
@@ -135,7 +135,7 @@ flowchart LR
     aadd --> iface_add
     arm_do --> iface_rm
     iface_list -->|"envelope"| cmd
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
     aadd -->|"notify success/error"| ui([TUI notify])
     arm_do -->|"notify success/error"| ui
 ```

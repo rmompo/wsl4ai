@@ -39,11 +39,11 @@ flowchart LR
         cmd["whoami.cmd_whoami()"]
         wai --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface["interface_whoami()\nresolve_runtime_identity()"]
+    subgraph Interface["api.py"]
+        iface["api_whoami()\nresolve_runtime_identity()"]
     end
 
     cmd -->|"call"| iface
     iface -->|"envelope"| cmd
-    cmd -->|"emit_from_interface(include_data=True)"| stdout([stdout])
+    cmd -->|"emit_from_api(include_data=True)"| stdout([stdout])
 ```

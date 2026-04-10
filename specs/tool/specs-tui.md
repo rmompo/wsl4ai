@@ -9,7 +9,7 @@ All labels, prompts, and messages in this interface must be in English.
 
 - Primary command: `wsl4ai tui`
 - Purpose: interactive navigation and execution of existing command/subcommand operations
-- Data contract: TUI calls `interface_*()` functions from `interface.py` (same business logic as CLI) and receives JSON envelopes
+- Data contract: TUI calls `api_*()` functions from `api.py` (same business logic as CLI) and receives JSON envelopes
 - Non-goal: duplicating business logic; TUI is a presentation/input layer
 - Architecture reference: [`specs-architecture.md`](specs-architecture.md)
 
@@ -46,7 +46,7 @@ Registry | Use | Wsl | Start | Others | Exit
 |-------------|--------|
 | Typed enum (`add|remove|list`) | Single-choice list |
 | Free text (names, paths, commands) | Text input with validation |
-| Reference (registry/wsl UUID) | List selection populated from `interface_*()` query |
+| Reference (registry/wsl UUID) | List selection populated from `api_*()` query |
 
 ---
 
@@ -199,10 +199,10 @@ TUI logging is configured via `conf/config.json` under the `log` key:
 Log format:
 ```
 2026-04-09 12:34:56 [TUI] ERROR  tui._confirm_toggle:1345 | mount failed: ...
-2026-04-09 12:34:56 [interface] DEBUG  interface.interface_use_enable:599 | use enable: host=...
+2026-04-09 12:34:56 [interface] DEBUG  interface.api_use_enable:599 | use enable: host=...
 ```
 
-Named loggers: `TUI` (tui.py) · `interface` (interface.py).
+Named loggers: `TUI` (tui.py) · `interface` (api.py).
 
 ### 8.1 Log viewer (`Others › Log › View`)
 

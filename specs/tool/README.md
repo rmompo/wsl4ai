@@ -7,7 +7,7 @@ Do not add parallel spec files outside `specs/` unless the project convention ch
 | Document | Contents |
 | -------- | -------- |
 | [specs.md](specs.md) | Global index: **§1** runtime identity, **§2** shared core rules (JSON/exit/output), **§4** command inventory, **§5** grouped command specs, **§7** style constants, **§8** CLI help/error formatting, **§9** special-command scope. |
-| [specs-architecture.md](specs-architecture.md) | Layer diagram: CLI Consumer → interface.py → TUI Consumer / Decorators. Mermaid diagrams, JSON envelope contract, file map. |
+| [specs-architecture.md](specs-architecture.md) | Layer diagram: CLI Consumer → api.py → TUI Consumer / Decorators. Mermaid diagrams, JSON envelope contract, file map. |
 | [specs-install.md](specs-install.md) | `wsl4ai install ...` — `database`, `alias`, `update` and related rules. |
 | [specs-registry.md](specs-registry.md) | `wsl4ai registry ...` — global command group (`list`, `add`, `remove`) with no WSL target selectors. |
 | [specs-use.md](specs-use.md) | `wsl4ai use ...` — `list`, `add`, `remove`, `enable`, `disable`, `disableall` with optional WSL selectors, runtime default, and lifecycle state machine. |

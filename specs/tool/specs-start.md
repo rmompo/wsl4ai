@@ -52,7 +52,7 @@ The command is fail-closed: any missing/invalid dependency prevents execution.
 
 ## 5. CLI flow
 
-The CLI `start` command accesses the database directly (does not use the interface layer).
+The CLI `start` command accesses the database directly (does not use the api layer).
 
 ```mermaid
 flowchart LR
@@ -85,8 +85,8 @@ In the TUI, **Start** is a menu item (not a dialog with selectors). It shows all
 flowchart TD
     subgraph TUI_Consumer["TUI Consumer (tui.py)"]
         dispatch["_dispatch(['Start'])"]
-        prep["interface_start_prepare\n(wsl_name, user)\n— validates cli_command"]
-        mnt["interface_use_list_mounted\n(wsl_name, user)\n— mounted=1 rows"]
+        prep["api_start_prepare\n(wsl_name, user)\n— validates cli_command"]
+        mnt["api_use_list_mounted\n(wsl_name, user)\n— mounted=1 rows"]
         diag["StartDialog\n— picker"]
         pending["_pending_start =\n{cli, workdir, name}"]
         exit_app["Wsl4aiApp.exit()"]

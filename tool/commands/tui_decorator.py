@@ -1,6 +1,6 @@
-"""TUI Decorator — convert interface envelope dicts to ListDialog record format.
+"""TUI Decorator — convert api envelope dicts to ListDialog record format.
 
-Each function accepts a JSON envelope dict returned by an ``interface_*()`` function
+Each function accepts a JSON envelope dict returned by an ``api_*()`` function
 and returns ``(header: str, records: list)`` suitable for ``ListDialog``.
 
 Record format (matches what tui.py ListDialog expects)::
@@ -18,7 +18,7 @@ The label strings are right-padded via ``_lpad(label, width)`` (same helper used
 """
 from __future__ import annotations
 
-from commands.interface import message_of, rows_of, status_of
+from commands.api import message_of, rows_of, status_of
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ def _empty_record(message: str = "(no entries)") -> tuple[str, list]:
 # ─── Registry ─────────────────────────────────────────────────────────────────
 
 def registry_list_records(envelope: dict) -> tuple[str, list]:
-    """Convert ``interface_registry_list()`` envelope to ListDialog records.
+    """Convert ``api_registry_list()`` envelope to ListDialog records.
 
     Fields per row: UUID / Name / Path Host / Path Wsl / In Use
     """
@@ -68,7 +68,7 @@ def registry_list_records(envelope: dict) -> tuple[str, list]:
 
 
 def registry_available_records(envelope: dict) -> tuple[str, list]:
-    """Convert ``interface_registry_list_available()`` envelope to ListDialog records.
+    """Convert ``api_registry_list_available()`` envelope to ListDialog records.
 
     Fields per row: UUID / Name / Path Host / Path Wsl
     """
@@ -93,7 +93,7 @@ def registry_available_records(envelope: dict) -> tuple[str, list]:
 # ─── Use ──────────────────────────────────────────────────────────────────────
 
 def use_list_records(envelope: dict) -> tuple[str, list]:
-    """Convert ``interface_use_list()`` envelope to ListDialog records.
+    """Convert ``api_use_list()`` envelope to ListDialog records.
 
     Fields per row: Registry UUID / Registry Name / Wsl UUID / Wsl Name / Mounted
     """
@@ -118,7 +118,7 @@ def use_list_records(envelope: dict) -> tuple[str, list]:
 
 
 def use_list_mounted_records(envelope: dict) -> tuple[str, list]:
-    """Convert ``interface_use_list_mounted()`` envelope to ListDialog records.
+    """Convert ``api_use_list_mounted()`` envelope to ListDialog records.
 
     Fields per row: Registry UUID / Registry Name / Path Host / Path Wsl
     """
@@ -143,7 +143,7 @@ def use_list_mounted_records(envelope: dict) -> tuple[str, list]:
 # ─── WSL ──────────────────────────────────────────────────────────────────────
 
 def wsl_list_records(envelope: dict) -> tuple[str, list]:
-    """Convert ``interface_wsl_list()`` envelope to ListDialog records.
+    """Convert ``api_wsl_list()`` envelope to ListDialog records.
 
     Fields per row: UUID / Name / User / CLI cmd
     """
@@ -168,7 +168,7 @@ def wsl_list_records(envelope: dict) -> tuple[str, list]:
 # ─── Alias ────────────────────────────────────────────────────────────────────
 
 def alias_list_records(envelope: dict) -> tuple[str, list]:
-    """Convert ``interface_alias_list()`` envelope to ListDialog records.
+    """Convert ``api_alias_list()`` envelope to ListDialog records.
 
     Fields per row: Name / Type
     """

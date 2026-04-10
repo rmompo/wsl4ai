@@ -1,6 +1,6 @@
 # Specification: `wsl4ai use ...`
 
-Core (non-special) commands. Align with **[`specs.md`](specs.md)** §2. Implementation: [`commands/use_commands.py`](../commands/use_commands.py), [`commands/interface.py`](../commands/interface.py), [`commands/wsl_db.py`](../commands/wsl_db.py). WSL resolution uses **`RuntimeIdentity`** (`args.runtime_identity`: `machine`, `user`, `wsl_name` from `WSL_DISTRO_NAME` or `default`).
+Core (non-special) commands. Align with **[`specs.md`](specs.md)** §2. Implementation: [`commands/use_commands.py`](../commands/use_commands.py), [`commands/api.py`](../commands/api.py), [`commands/wsl_db.py`](../commands/wsl_db.py). WSL resolution uses **`RuntimeIdentity`** (`args.runtime_identity`: `machine`, `user`, `wsl_name` from `WSL_DISTRO_NAME` or `default`).
 
 ---
 
@@ -71,8 +71,8 @@ flowchart LR
         cmd["use_commands.cmd_use_list()"]
         ul --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface["interface_use_list\n(wsl_uuid, wsl_name, user,\nruntime_wsl_name, use_all,\nmounted_filter)"]
+    subgraph Interface["api.py"]
+        iface["api_use_list\n(wsl_uuid, wsl_name, user,\nruntime_wsl_name, use_all,\nmounted_filter)"]
     end
     subgraph TUI
         dispatch["_dispatch(['Use','List'])"]
@@ -86,7 +86,7 @@ flowchart LR
     dispatch --> iface
     iface -->|"envelope"| cmd
     iface -->|"envelope"| rec --> ldiag
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
 ```
 
 ---
@@ -118,9 +118,9 @@ flowchart LR
         cmd["use_commands.cmd_use_add()"]
         ua --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface_avail["interface_registry_list_available\n(wsl_name, user)"]
-        iface_add["interface_use_add\n(registry_uuid, wsl_name, user,\nruntime_wsl_name)"]
+    subgraph Interface["api.py"]
+        iface_avail["api_registry_list_available\n(wsl_name, user)"]
+        iface_add["api_use_add\n(registry_uuid, wsl_name, user,\nruntime_wsl_name)"]
     end
     subgraph TUI
         dlg_init["UseAddDialog.__init__()\n— registry picker"]
@@ -136,7 +136,7 @@ flowchart LR
     dlg_do --> iface_add
     iface_add -->|"envelope"| cmd
     iface_add -->|"envelope → status"| dlg_do
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
     dlg_do -->|"notify success/error"| ui([TUI notify])
 ```
 
@@ -170,9 +170,9 @@ flowchart LR
         cmd["use_commands.cmd_use_remove()"]
         ur --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface_list["interface_use_list\n(mounted_filter=None)"]
-        iface_rm["interface_use_remove\n(registry_uuid, wsl_uuid)"]
+    subgraph Interface["api.py"]
+        iface_list["api_use_list\n(mounted_filter=None)"]
+        iface_rm["api_use_remove\n(registry_uuid, wsl_uuid)"]
     end
     subgraph TUI
         dlg_init["UseRemoveDialog.__init__()\n— use picker"]
@@ -188,7 +188,7 @@ flowchart LR
     dlg_rm --> iface_rm
     iface_rm -->|"envelope"| cmd
     iface_rm -->|"envelope → status"| dlg_rm
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
     dlg_rm -->|"notify success/error"| ui([TUI notify])
 ```
 
@@ -227,9 +227,9 @@ flowchart LR
         cmd["use_commands.cmd_use_enable()"]
         ue --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface_list["interface_use_list\n(mounted_filter=0)"]
-        iface_en["interface_use_enable\n(registry_uuid, wsl_uuid)"]
+    subgraph Interface["api.py"]
+        iface_list["api_use_list\n(mounted_filter=0)"]
+        iface_en["api_use_enable\n(registry_uuid, wsl_uuid)"]
     end
     subgraph TUI
         dlg_init["UseEnableDialog.__init__()\n— filtered picker mounted=0"]
@@ -245,7 +245,7 @@ flowchart LR
     dlg_tog --> iface_en
     iface_en -->|"envelope"| cmd
     iface_en -->|"envelope → status"| dlg_tog
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
     dlg_tog -->|"notify success/error"| ui([TUI notify])
 ```
 
@@ -283,9 +283,9 @@ flowchart LR
         cmd["use_commands.cmd_use_disable()"]
         ud --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface_list["interface_use_list\n(mounted_filter=1)"]
-        iface_dis["interface_use_disable\n(registry_uuid, wsl_uuid)"]
+    subgraph Interface["api.py"]
+        iface_list["api_use_list\n(mounted_filter=1)"]
+        iface_dis["api_use_disable\n(registry_uuid, wsl_uuid)"]
     end
     subgraph TUI
         dlg_init["UseDisableDialog.__init__()\n— filtered picker mounted=1"]
@@ -301,7 +301,7 @@ flowchart LR
     dlg_tog --> iface_dis
     iface_dis -->|"envelope"| cmd
     iface_dis -->|"envelope → status"| dlg_tog
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
     dlg_tog -->|"notify success/error"| ui([TUI notify])
 ```
 
@@ -337,15 +337,15 @@ flowchart LR
         cmd["use_commands.cmd_use_disableall()"]
         uda --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface["interface_use_disableall\n(wsl_uuid, wsl_name,\nuser, runtime_wsl_name)"]
-        loop["calls interface_use_disable()\nfor each mounted=1 row"]
+    subgraph Interface["api.py"]
+        iface["api_use_disableall\n(wsl_uuid, wsl_name,\nuser, runtime_wsl_name)"]
+        loop["calls api_use_disable()\nfor each mounted=1 row"]
         iface --> loop
     end
 
     cmd --> iface
     iface -->|"envelope"| cmd
-    cmd -->|"emit_from_interface()\nor quiet exit code"| stdout([stdout])
+    cmd -->|"emit_from_api()\nor quiet exit code"| stdout([stdout])
 ```
 
 ---
@@ -353,7 +353,7 @@ flowchart LR
 ## 8. Implementation reference
 
 - `commands/use_commands.py` — CLI thin wrappers, argparse.
-- `commands/interface.py` — `interface_use_*()` business logic.
+- `commands/api.py` — `api_use_*()` business logic.
 - `commands/tui_decorator.py` — `use_list_records()`, `use_list_mounted_records()`.
 - `commands/wsl_db.py` — `resolve_wsl_uuid`, `resolve_registry_target`.
 - `commands/common.py` — `load_local_env_paths`, `expand_path_template`.

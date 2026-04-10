@@ -5,14 +5,14 @@ from collections.abc import Callable
 
 from commands.api_json import OptionSpec, options_from_args
 from commands.help_md import help_summary_for_root, parser_description_from_manual
-from commands.interface import (
-    emit_from_interface,
-    interface_use_add,
-    interface_use_disable,
-    interface_use_disableall,
-    interface_use_enable,
-    interface_use_list,
-    interface_use_remove,
+from commands.api import (
+    emit_from_api,
+    api_use_add,
+    api_use_disable,
+    api_use_disableall,
+    api_use_enable,
+    api_use_list,
+    api_use_remove,
 )
 
 
@@ -31,7 +31,7 @@ def cmd_use_list(args: Namespace) -> int:
         ],
     )
     ri = _ri(args)
-    env = interface_use_list(
+    env = api_use_list(
         wsl_uuid=(getattr(args, "use_wsl_uuid", "") or "").strip(),
         wsl_name=(getattr(args, "use_wsl_name", "") or "").strip(),
         user=ri.user,
@@ -39,7 +39,7 @@ def cmd_use_list(args: Namespace) -> int:
         use_all=bool(getattr(args, "use_all", False)),
         mounted_filter=None,
     )
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def cmd_use_add(args: Namespace) -> int:
@@ -53,14 +53,14 @@ def cmd_use_add(args: Namespace) -> int:
         ],
     )
     ri = _ri(args)
-    env = interface_use_add(
+    env = api_use_add(
         registry_uuid=getattr(args, "use_registry_uuid", "") or "",
         wsl_uuid=getattr(args, "use_wsl_uuid", "") or "",
         wsl_name=getattr(args, "use_wsl_name", "") or "",
         user=ri.user,
         runtime_wsl_name=ri.wsl_name,
     )
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def cmd_use_remove(args: Namespace) -> int:
@@ -74,7 +74,7 @@ def cmd_use_remove(args: Namespace) -> int:
         ],
     )
     ri = _ri(args)
-    env = interface_use_remove(
+    env = api_use_remove(
         registry_uuid=getattr(args, "use_registry_uuid", "") or "",
         wsl_uuid=getattr(args, "use_wsl_uuid", "") or "",
         registry_name=getattr(args, "use_registry_name", "") or "",
@@ -82,7 +82,7 @@ def cmd_use_remove(args: Namespace) -> int:
         user=ri.user,
         runtime_wsl_name=ri.wsl_name,
     )
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def cmd_use_enable(args: Namespace) -> int:
@@ -96,7 +96,7 @@ def cmd_use_enable(args: Namespace) -> int:
         ],
     )
     ri = _ri(args)
-    env = interface_use_enable(
+    env = api_use_enable(
         registry_uuid=getattr(args, "use_registry_uuid", "") or "",
         wsl_uuid=getattr(args, "use_wsl_uuid", "") or "",
         registry_name=getattr(args, "use_registry_name", "") or "",
@@ -104,7 +104,7 @@ def cmd_use_enable(args: Namespace) -> int:
         user=ri.user,
         runtime_wsl_name=ri.wsl_name,
     )
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def cmd_use_disable(args: Namespace) -> int:
@@ -118,7 +118,7 @@ def cmd_use_disable(args: Namespace) -> int:
         ],
     )
     ri = _ri(args)
-    env = interface_use_disable(
+    env = api_use_disable(
         registry_uuid=getattr(args, "use_registry_uuid", "") or "",
         wsl_uuid=getattr(args, "use_wsl_uuid", "") or "",
         registry_name=getattr(args, "use_registry_name", "") or "",
@@ -126,23 +126,23 @@ def cmd_use_disable(args: Namespace) -> int:
         user=ri.user,
         runtime_wsl_name=ri.wsl_name,
     )
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def cmd_use_disableall(args: Namespace) -> int:
     opts = options_from_args(args, [OptionSpec("--quiet", "quiet", is_flag=True)])
     quiet = bool(getattr(args, "quiet", False))
     ri = _ri(args)
-    env = interface_use_disableall(
+    env = api_use_disableall(
         wsl_uuid=getattr(args, "use_wsl_uuid", "") or "",
         wsl_name=getattr(args, "use_wsl_name", "") or "",
         user=ri.user,
         runtime_wsl_name=ri.wsl_name,
     )
     if quiet:
-        from commands.interface import status_of
+        from commands.api import status_of
         return status_of(env)
-    return emit_from_interface(args, env, opts)
+    return emit_from_api(args, env, opts)
 
 
 def _add_registry_pair(p) -> None:

@@ -1086,13 +1086,13 @@ if _HAS_TEXTUAL:
         """Registry Remove — list view with Cancel/Remove buttons."""
 
         def __init__(self, breadcrumb: str) -> None:
-            from commands.interface import interface_registry_list
+            from commands.api import api_registry_list
             from commands.tui_decorator import registry_list_records
-            env = interface_registry_list()
+            env = api_registry_list()
             hdr, recs = registry_list_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons    = ["Cancel", "Remove"]
-            from commands.interface import rows_of
+            from commands.api import rows_of
             self._env_rows   = rows_of(env)
 
         def _handle_key(self, event: "events.Key") -> None:
@@ -1123,8 +1123,8 @@ if _HAS_TEXTUAL:
             def _do_remove(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.interface import interface_registry_remove, message_of, status_of
-                env = interface_registry_remove(registry_uuid=uuid)
+                from commands.api import api_registry_remove, message_of, status_of
+                env = api_registry_remove(registry_uuid=uuid)
                 if status_of(env) == 0:
                     self.app.notify(f"Removed registry: {name}", timeout=3)
                     self.dismiss(None)
@@ -1211,8 +1211,8 @@ if _HAS_TEXTUAL:
             def _do_save(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.interface import interface_wsl_set, message_of, status_of
-                env = interface_wsl_set(cli_val, wsl_uuid=self._wsl_uuid)
+                from commands.api import api_wsl_set, message_of, status_of
+                env = api_wsl_set(cli_val, wsl_uuid=self._wsl_uuid)
                 if status_of(env) == 0:
                     self.app.notify(f"Updated CLI cmd for '{self._wsl_name}'", timeout=3)
                     self.dismiss(None)
@@ -1225,9 +1225,9 @@ if _HAS_TEXTUAL:
         """Select a WSL entry to edit its CLI command."""
 
         def __init__(self, breadcrumb: str) -> None:
-            from commands.interface import interface_wsl_list, rows_of
+            from commands.api import api_wsl_list, rows_of
             from commands.tui_decorator import wsl_list_records
-            env = interface_wsl_list()
+            env = api_wsl_list()
             hdr, recs = wsl_list_records(env)
             super().__init__(breadcrumb, hdr, recs)
             self._buttons   = ["Cancel", "Set"]
@@ -1358,8 +1358,8 @@ if _HAS_TEXTUAL:
             if not name or not host or not wsl:
                 self.app.notify("All fields are required", timeout=3)
                 return
-            from commands.interface import interface_registry_add, message_of, status_of
-            env = interface_registry_add(name, host, wsl)
+            from commands.api import api_registry_add, message_of, status_of
+            env = api_registry_add(name, host, wsl)
             if status_of(env) == 0:
                 self.app.notify(f"Registry added: {name}", timeout=3)
                 self.dismiss(None)
@@ -1401,9 +1401,9 @@ if _HAS_TEXTUAL:
         def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
             self._wsl_name = wsl_name
             self._user     = user
-            from commands.interface import interface_registry_list_available, rows_of
+            from commands.api import api_registry_list_available, rows_of
             from commands.tui_decorator import registry_available_records
-            env = interface_registry_list_available(wsl_name, user)
+            env = api_registry_list_available(wsl_name, user)
             hdr, recs = registry_available_records(env)
             super().__init__(breadcrumb, hdr, recs, width=80)
             self._buttons   = ["Cancel", "Add"]
@@ -1423,8 +1423,8 @@ if _HAS_TEXTUAL:
 
         def _do_add(self, r_uuid: str, r_name: str) -> None:
             ri = self.app._cli_args.runtime_identity
-            from commands.interface import interface_use_add, message_of, status_of
-            env = interface_use_add(
+            from commands.api import api_use_add, message_of, status_of
+            env = api_use_add(
                 registry_uuid=r_uuid,
                 wsl_name=ri.wsl_name,
                 user=ri.user,
@@ -1442,9 +1442,9 @@ if _HAS_TEXTUAL:
         """Select a use link to remove (filtered to current WSL)."""
 
         def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
-            from commands.interface import interface_use_list, rows_of
+            from commands.api import api_use_list, rows_of
             from commands.tui_decorator import use_list_records
-            env = interface_use_list(
+            env = api_use_list(
                 wsl_uuid="", wsl_name=wsl_name, user=user,
                 runtime_wsl_name=wsl_name, use_all=False, mounted_filter=None,
             )
@@ -1476,8 +1476,8 @@ if _HAS_TEXTUAL:
             def _do_remove(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.interface import interface_use_remove, message_of, status_of
-                env = interface_use_remove(r_uuid, w_uuid)
+                from commands.api import api_use_remove, message_of, status_of
+                env = api_use_remove(r_uuid, w_uuid)
                 if status_of(env) == 0:
                     self.app.notify(f"Removed use: {r_name}", timeout=3)
                     self.dismiss(None)
@@ -1496,9 +1496,9 @@ if _HAS_TEXTUAL:
         _ACTION_LABEL:   str = "Enable"
 
         def __init__(self, breadcrumb: str, wsl_name: str, user: str) -> None:
-            from commands.interface import interface_use_list, rows_of
+            from commands.api import api_use_list, rows_of
             from commands.tui_decorator import use_list_records
-            env = interface_use_list(
+            env = api_use_list(
                 wsl_uuid="", wsl_name=wsl_name, user=user,
                 runtime_wsl_name=wsl_name, use_all=False,
                 mounted_filter=self._TARGET_MOUNTED,
@@ -1530,10 +1530,10 @@ if _HAS_TEXTUAL:
             def _do_toggle(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.interface import (
-                    interface_use_disable, interface_use_enable, message_of, status_of,
+                from commands.api import (
+                    api_use_disable, api_use_enable, message_of, status_of,
                 )
-                fn = interface_use_enable if self._NEW_MOUNTED == 1 else interface_use_disable
+                fn = api_use_enable if self._NEW_MOUNTED == 1 else api_use_disable
                 env = fn(r_uuid, w_uuid)
                 if status_of(env) == 0:
                     self.app.notify(f"{self._ACTION_LABEL}d: {r_name}", timeout=3)
@@ -1562,9 +1562,9 @@ if _HAS_TEXTUAL:
         """Show aliases with Name / Type fields."""
 
         def __init__(self, breadcrumb: str) -> None:
-            from commands.interface import interface_alias_list
+            from commands.api import api_alias_list
             from commands.tui_decorator import alias_list_records
-            hdr, recs = alias_list_records(interface_alias_list())
+            hdr, recs = alias_list_records(api_alias_list())
             super().__init__(breadcrumb, hdr, recs)
 
         def _handle_key(self, event: "events.Key") -> None:
@@ -1631,8 +1631,8 @@ if _HAS_TEXTUAL:
             if name in _PROTECTED_ALIASES:
                 _notify_err(self.app, f"'{name}' is a protected alias")
                 return
-            from commands.interface import interface_alias_add, message_of, status_of
-            env = interface_alias_add([name])
+            from commands.api import api_alias_add, message_of, status_of
+            env = api_alias_add([name])
             if status_of(env) == 0:
                 self.app.notify(f"Alias added: {name}", timeout=3)
                 self.dismiss(None)
@@ -1645,9 +1645,9 @@ if _HAS_TEXTUAL:
         """Select an alias to remove. Shows Name / Type. Protected aliases blocked."""
 
         def __init__(self, breadcrumb: str) -> None:
-            from commands.interface import interface_alias_list, rows_of
+            from commands.api import api_alias_list, rows_of
             from commands.tui_decorator import alias_list_records
-            env = interface_alias_list()
+            env = api_alias_list()
             hdr, recs = alias_list_records(env)
             super().__init__(breadcrumb, hdr, recs)
             self._buttons   = ["Cancel", "Remove"]
@@ -1673,8 +1673,8 @@ if _HAS_TEXTUAL:
             def _do_remove(result: "str | None") -> None:
                 if result != "Ok":
                     return
-                from commands.interface import interface_alias_remove, message_of, status_of
-                env = interface_alias_remove([alias])
+                from commands.api import api_alias_remove, message_of, status_of
+                env = api_alias_remove([alias])
                 if status_of(env) == 0:
                     self.app.notify(f"Alias removed: {alias}", timeout=3)
                     self.dismiss(None)
@@ -1959,7 +1959,7 @@ if _HAS_TEXTUAL:
                 numeric = getattr(_logging, level_name, _logging.WARNING)
                 _logging.disable(_logging.NOTSET)
                 _logging.getLogger().setLevel(numeric)
-                for name in ("TUI", "interface"):
+                for name in ("TUI", "api"):
                     _logging.getLogger(name).setLevel(numeric)
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
@@ -2227,9 +2227,9 @@ if _HAS_TEXTUAL:
 
             # ── List dialogs ───────────────────────────────────────────────────
             if path == ["Registry", "List"]:
-                from commands.interface import interface_registry_list
+                from commands.api import api_registry_list
                 from commands.tui_decorator import registry_list_records
-                hdr, recs = registry_list_records(interface_registry_list())
+                hdr, recs = registry_list_records(api_registry_list())
                 self.push_screen(ListDialog(breadcrumb, hdr, recs, width=80))
                 return
             if path == ["Registry", "Remove"]:
@@ -2242,9 +2242,9 @@ if _HAS_TEXTUAL:
                 ri = self._cli_args.runtime_identity
                 wn, usr = ri.wsl_name, ri.user
                 if path == ["Use", "List"]:
-                    from commands.interface import interface_use_list
+                    from commands.api import api_use_list
                     from commands.tui_decorator import use_list_records
-                    env = interface_use_list(
+                    env = api_use_list(
                         wsl_uuid="", wsl_name=wn, user=usr,
                         runtime_wsl_name=wn, use_all=False, mounted_filter=None,
                     )
@@ -2264,15 +2264,15 @@ if _HAS_TEXTUAL:
                     self.push_screen(UseDisableDialog(breadcrumb, wn, usr))
                     return
             if path == ["Wsl", "List"]:
-                from commands.interface import interface_wsl_list
+                from commands.api import api_wsl_list
                 from commands.tui_decorator import wsl_list_records
-                hdr, recs = wsl_list_records(interface_wsl_list())
+                hdr, recs = wsl_list_records(api_wsl_list())
                 self.push_screen(ListDialog(breadcrumb, hdr, recs))
                 return
             if path == ["Wsl", "Set"]:
                 ri = self._cli_args.runtime_identity
-                from commands.interface import interface_wsl_list, rows_of
-                env = interface_wsl_list()
+                from commands.api import api_wsl_list, rows_of
+                env = api_wsl_list()
                 env_rows = rows_of(env)
                 row_match = next(
                     (r for r in env_rows
@@ -2303,8 +2303,8 @@ if _HAS_TEXTUAL:
                 def _do_install_db(result: "str | None") -> None:
                     if result != "Ok":
                         return
-                    from commands.interface import interface_install_database, message_of, status_of
-                    env = interface_install_database(force=False)
+                    from commands.api import api_install_database, message_of, status_of
+                    env = api_install_database(force=False)
                     if status_of(env) == 0:
                         self.notify(message_of(env), timeout=3)
                     else:
@@ -2336,14 +2336,14 @@ if _HAS_TEXTUAL:
 
             if path == ["Start"]:
                 ri = self._cli_args.runtime_identity
-                from commands.interface import (
-                    interface_start_prepare, interface_use_list_mounted, message_of, status_of,
+                from commands.api import (
+                    api_start_prepare, api_use_list_mounted, message_of, status_of,
                 )
-                env_prep = interface_start_prepare(ri.wsl_name, ri.user)
+                env_prep = api_start_prepare(ri.wsl_name, ri.user)
                 if status_of(env_prep) != 0:
                     _notify_err(self, message_of(env_prep), timeout=5)
                     return
-                env_mount = interface_use_list_mounted(ri.wsl_name, ri.user)
+                env_mount = api_use_list_mounted(ri.wsl_name, ri.user)
                 if status_of(env_mount) != 0:
                     _notify_err(self, message_of(env_mount))
                     return

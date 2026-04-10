@@ -3,12 +3,12 @@
 from argparse import Namespace, _SubParsersAction
 
 from commands.help_md import help_summary_for_root, parser_description_from_manual
-from commands.interface import emit_from_interface, interface_registry_list
+from commands.api import emit_from_api, api_registry_list
 
 
 def cmd_list(args: Namespace) -> int:
     """Return all `registries` rows with resolved paths and linked `uses`."""
-    return emit_from_interface(args, interface_registry_list(), [])
+    return emit_from_api(args, api_registry_list(), [])
 
 
 def register_list_command(

@@ -45,8 +45,8 @@ flowchart LR
         cmd_list["list_registry.cmd_list()"]
         rl --> cmd_list
     end
-    subgraph Interface["interface.py"]
-        iface["interface_registry_list()"]
+    subgraph Interface["api.py"]
+        iface["api_registry_list()"]
     end
     subgraph TUI
         dispatch["_dispatch\n(['Registry','List'])"]
@@ -61,7 +61,7 @@ flowchart LR
     iface -->|"envelope"| cmd_list
     iface -->|"envelope"| rec
     rec --> ldiag
-    cmd_list -->|"emit_from_interface()"| stdout([stdout])
+    cmd_list -->|"emit_from_api()"| stdout([stdout])
 ```
 
 ---
@@ -97,8 +97,8 @@ flowchart LR
         cmd_add["add_remove.cmd_add()"]
         ra --> cmd_add
     end
-    subgraph Interface["interface.py"]
-        iface["interface_registry_add\n(name, host_rel, wsl_rel, force)"]
+    subgraph Interface["api.py"]
+        iface["api_registry_add\n(name, host_rel, wsl_rel, force)"]
     end
     subgraph TUI
         dlg["RegistryAddDialog\n._try_submit()"]
@@ -108,7 +108,7 @@ flowchart LR
     dlg -->|"call"| iface
     iface -->|"envelope"| cmd_add
     iface -->|"envelope → status"| dlg
-    cmd_add -->|"emit_from_interface()"| stdout([stdout])
+    cmd_add -->|"emit_from_api()"| stdout([stdout])
     dlg -->|"notify success/error"| ui([TUI notify])
 ```
 
@@ -143,9 +143,9 @@ flowchart LR
         cmd_rm["add_remove.cmd_remove()"]
         rr --> cmd_rm
     end
-    subgraph Interface["interface.py"]
-        iface_list["interface_registry_list()"]
-        iface_rm["interface_registry_remove\n(registry_uuid, registry_name)"]
+    subgraph Interface["api.py"]
+        iface_list["api_registry_list()"]
+        iface_rm["api_registry_remove\n(registry_uuid, registry_name)"]
     end
     subgraph TUI
         dlg_init["RegistryRemoveDialog\n.__init__() — load list"]
@@ -163,6 +163,6 @@ flowchart LR
     iface_list -->|"envelope"| rec --> dlg_init
     iface_rm -->|"envelope"| cmd_rm
     iface_rm -->|"envelope → status"| dlg_rm
-    cmd_rm -->|"emit_from_interface()"| stdout([stdout])
+    cmd_rm -->|"emit_from_api()"| stdout([stdout])
     dlg_rm -->|"notify success/error"| ui([TUI notify])
 ```

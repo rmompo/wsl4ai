@@ -33,8 +33,8 @@ flowchart LR
         cmd["wsl_cli.cmd_wsl_list()"]
         wl --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface["interface_wsl_list()"]
+    subgraph Interface["api.py"]
+        iface["api_wsl_list()"]
     end
     subgraph TUI
         dispatch["_dispatch(['Wsl','List'])"]
@@ -52,7 +52,7 @@ flowchart LR
     iface -->|"envelope"| rec
     rec --> ldiag
     rec --> wsl_set_init
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
 ```
 
 ---
@@ -79,9 +79,9 @@ flowchart LR
         cmd["wsl_cli.cmd_wsl_set()"]
         ws --> cmd
     end
-    subgraph Interface["interface.py"]
-        iface_list["interface_wsl_list()"]
-        iface_set["interface_wsl_set\n(cli_command, wsl_uuid,\nwsl_name, user,\nruntime_wsl_name)"]
+    subgraph Interface["api.py"]
+        iface_list["api_wsl_list()"]
+        iface_set["api_wsl_set\n(cli_command, wsl_uuid,\nwsl_name, user,\nruntime_wsl_name)"]
     end
     subgraph TUI
         wsl_sel["WslSetDialog\n— picker: select WSL row"]
@@ -97,6 +97,6 @@ flowchart LR
     wsl_form --> iface_set
     iface_set -->|"envelope"| cmd
     iface_set -->|"envelope → status"| wsl_form
-    cmd -->|"emit_from_interface()"| stdout([stdout])
+    cmd -->|"emit_from_api()"| stdout([stdout])
     wsl_form -->|"notify success/error"| ui([TUI notify])
 ```
