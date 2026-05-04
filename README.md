@@ -23,6 +23,7 @@ WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manage
 
 ~/wsl4ai/
 ├── tool/              — Python application (replaced on update)
+├── extras/            — optional startup scripts for other WSL distros
 ├── proyectos/         — bind-mount → HOST_PROJECTS (Windows)
 └── conf/              — persistent config (never replaced on update)
     ├── local.env      — HOST_DDBB, WSL_DDBB, HOST_PROJECTS, WSL_PROJECTS
@@ -38,7 +39,13 @@ WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manage
 
 ### Assisted
 
-Place `install.sh` in `/tmp/wsl4ai/` and run it as root. Use `curl` or `wget`:
+Switch all APT sources from HTTP to HTTPS:
+
+```bash
+sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources
+```
+
+Then place `install.sh` in `/tmp/wsl4ai/` and run it as root. Use `curl` or `wget`:
 
 ```bash
 mkdir -p /tmp/wsl4ai
@@ -75,7 +82,15 @@ HOST_PROJECTS="C:/LocalFiles/proyectos/"        # Windows path for projects
 
 ---
 
-**Step 1 — system packages**
+**Step 1 — switch APT sources to HTTPS**
+
+```bash
+sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources
+```
+
+---
+
+**Step 2 — system packages**
 
 ```bash
 export DEBIAN_FRONTEND=noninteractive
@@ -86,7 +101,7 @@ apt-get install -y git python3 python3-pip
 
 ---
 
-**Step 2 — clone repository**
+**Step 3 — clone repository**
 
 ```bash
 mkdir -p /tmp/wsl4ai
@@ -95,7 +110,7 @@ git clone --depth=1 --branch main https://github.com/rmompo/wsl4ai.git /tmp/wsl4
 
 ---
 
-**Step 3 — create Linux user**
+**Step 4 — create Linux user**
 
 Password is set to the username; change it after first login.
 
@@ -107,7 +122,7 @@ usermod -aG sudo "${WSL4AI_USER}"
 
 ---
 
-**Step 4 — set default WSL login user**
+**Step 5 — set default WSL login user**
 
 ```bash
 printf '[user]\ndefault=%s\n' "${WSL4AI_USER}" > /etc/wsl.conf
@@ -117,7 +132,7 @@ If `/etc/wsl.conf` already exists, add or update the `default=` line under `[use
 
 ---
 
-**Step 5 — copy tool/**
+**Step 6 — copy tool/**
 
 ```bash
 mkdir -p "${INSTALL_BASE}/tool"
@@ -127,7 +142,7 @@ chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_BASE}/tool"
 
 ---
 
-**Step 6 — install pip dependencies**
+**Step 7 — install pip dependencies**
 
 ```bash
 sudo -u "${WSL4AI_USER}" -H env HOME="/home/${WSL4AI_USER}" bash -lc \
@@ -137,7 +152,7 @@ sudo -u "${WSL4AI_USER}" -H env HOME="/home/${WSL4AI_USER}" bash -lc \
 
 ---
 
-**Step 7 — configure .bashrc**
+**Step 8 — configure .bashrc**
 
 ```bash
 BASHRC="/home/${WSL4AI_USER}/.bashrc"
@@ -148,7 +163,7 @@ chown "${WSL4AI_USER}:${WSL4AI_USER}" "${BASHRC}"
 
 ---
 
-**Step 8 — create mount point directories**
+**Step 9 — create mount point directories**
 
 Convert Windows paths to WSL mount paths (`C:/foo/bar` → `/mnt/c/foo/bar`):
 
@@ -168,7 +183,7 @@ mount --bind "${HOST_DDBB_WSL}" "${WSL_DDBB%/}"
 
 ---
 
-**Step 9 — install .startup-wsl4ai.sh**
+**Step 10 — install .startup-wsl4ai.sh**
 
 ```bash
 sed "s|__INSTALL_BASE__|${INSTALL_BASE}|g" \
@@ -180,7 +195,7 @@ chown "${WSL4AI_USER}:${WSL4AI_USER}" "/home/${WSL4AI_USER}/.startup-wsl4ai.sh"
 
 ---
 
-**Step 10 — configure sudoers for bind-mounts**
+**Step 11 — configure sudoers for bind-mounts**
 
 ```bash
 MOUNT_BIN="$(command -v mount)"
@@ -195,7 +210,7 @@ chmod 440 /etc/sudoers.d/wsl4ai-mount
 
 ---
 
-**Step 11 — write conf/**
+**Step 12 — write conf/**
 
 ```bash
 INSTALL_CONF="${INSTALL_BASE}/conf/"
@@ -219,7 +234,7 @@ chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_CONF}"
 
 ---
 
-**Step 12 — create the SQLite database**
+**Step 13 — create the SQLite database**
 
 ```bash
 sudo -u "${WSL4AI_USER}" -H env HOME="/home/${WSL4AI_USER}" bash -lc \
@@ -228,7 +243,7 @@ sudo -u "${WSL4AI_USER}" -H env HOME="/home/${WSL4AI_USER}" bash -lc \
 
 ---
 
-**Step 13 — restart WSL**
+**Step 14 — restart WSL**
 
 From Windows PowerShell or CMD:
 
@@ -326,9 +341,9 @@ Step-by-step setup guides for WSL distros dedicated to specific AI tools:
 
 | Guide | Tool | Method |
 | ----- | ---- | ------ |
-| [`wsls/wsl4codex.md`](wsls/wsl4codex.md) | OpenAI Codex CLI | Homebrew |
+| [`wsls/wsl4codexcli.md`](wsls/wsl4codexcli.md) | OpenAI Codex CLI | Homebrew |
 | [`wsls/wsl4claudecode.md`](wsls/wsl4claudecode.md) | Anthropic Claude Code | Native installer |
-| [`wsls/wsl4copilot.md`](wsls/wsl4copilot.md) | GitHub Copilot CLI | Homebrew + gh extension |
+| [`wsls/wsl4ghcopilot.md`](wsls/wsl4ghcopilot.md) | GitHub Copilot CLI | Homebrew + gh extension |
 
 Each guide covers prerequisites, installation, authentication, and startup script configuration.
 

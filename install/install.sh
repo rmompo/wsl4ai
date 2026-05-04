@@ -234,6 +234,17 @@ if [[ ! -f "${REQ}" ]]; then
   exit 1
 fi
 
+# ─── PHASE 6b: COPY extras/ ─────────────────────────────────────────────────
+
+EXTRAS_SRC="${REPO_DIR}/extras"
+INSTALL_EXTRAS="${INSTALL_BASE}/extras/"
+if [[ -d "${EXTRAS_SRC}" ]]; then
+  echo -e "${C_STEP}Step 6b: copying extras/ to ${INSTALL_EXTRAS}${C_R}"
+  sudo -u "${WSL4AI_USER}" -H mkdir -p "${INSTALL_EXTRAS}"
+  cp -a "${EXTRAS_SRC}/." "${INSTALL_EXTRAS}"
+  chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_EXTRAS}"
+fi
+
 # ─── PHASE 7: PIP INSTALL ────────────────────────────────────────────────────
 
 echo -e "${C_STEP}Step 7: pip install --user — requirements from tool/ as ${WSL4AI_USER}...${C_R}"
@@ -341,6 +352,11 @@ sudo -u "${WSL4AI_USER}" -H env HOME="${_USER_HOME}" INSTALL_TOOL="${INSTALL_TOO
 echo -e "${C_STEP}       database location:${C_R}"
 echo -e "${C_STEP}         WSL:     ${WSL_DDBB}wsl4ai.db${C_R}"
 echo -e "${C_STEP}         Windows: ${HOST_DDBB}wsl4ai.db${C_R}"
+
+# ─── CLEANUP ────────────────────────────────────────────────────────────────
+
+rm -rf "${REPO_DIR}"
+echo -e "${C_STEP}       removed temporary clone ${REPO_DIR}${C_R}"
 
 echo ""
 echo -e "${C_OK}Installation complete.${C_R}"

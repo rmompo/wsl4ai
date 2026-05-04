@@ -23,8 +23,7 @@ sudo apt-get install -y build-essential procps curl file git
 After the installer finishes, follow the printed instructions to add Homebrew to your PATH. Typically:
 
 ```bash
-echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 ```
 
 Verify:

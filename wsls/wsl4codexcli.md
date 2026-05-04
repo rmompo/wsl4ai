@@ -23,8 +23,7 @@ sudo apt-get install -y build-essential procps curl file git
 After the installer finishes, follow the printed instructions to add Homebrew to your PATH. Typically:
 
 ```bash
-echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 ```
 
 Verify:
@@ -63,19 +62,10 @@ Without it, Codex falls back to a vendored binary and prints a warning on startu
 
 ## 5. Configure startup script
 
-Copy `extras/.startup-codex.sh` from the wsl4ai repository to your home directory:
+Insert it into `~/.bashrc` just above the `.startup-wsl4ai.sh` line:
 
 ```bash
-cp ~/wsl4ai/extras/.startup-codex.sh ~/.startup-codex.sh
-chmod +x ~/.startup-codex.sh
-```
-
-Then add it to `~/.bashrc` **above** the `.startup-wsl4ai.sh` line:
-
-```bash
-# ~/.bashrc (relevant section)
-source ~/.startup-codex.sh
-source ~/.startup-wsl4ai.sh
+sed -i 's|source ~/.startup-wsl4ai.sh|source ~/wsl4ai/extras/.startup-codex.sh\nsource ~/.startup-wsl4ai.sh|' ~/.bashrc
 ```
 
 The `.startup-codex.sh` script runs `brew update` and `brew upgrade codex` silently on each session start, keeping Codex up to date automatically.
