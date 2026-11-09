@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Version: 0.1.0
 # Install GitHub Copilot CLI (latest) in this WSL distro with its standalone installer (no Node.js needed).
 # Rule: one AI client per WSL distro.
 # Usage: bash ~/wsl4ai/tool/scripts/wsl4ai-install-ghcopilot.sh [-h]

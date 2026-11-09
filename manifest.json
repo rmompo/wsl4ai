@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "components": {
+    "tool": "1.7.0",
+    "config_schema": "1.0",
+    "db_schema": "1",
+    "updater": "1.0.0",
+    "installer": "3.0.0",
+    "scripts": {
+      "wsl4ai-install-claudecode.sh": "0.1.0",
+      "wsl4ai-install-ghcopilot.sh": "0.1.0"
+    }
+  }
+}

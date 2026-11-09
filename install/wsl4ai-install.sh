@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# WSL4AI — install v3.0 — bootstrap: prompts, user + sudo, wsl.conf, copy tool+conf, Python (apt), pip --user, bind-mount ddbb+projects, install database, local.env
+# Version: 3.0.0
+# WSL4AI installer — bootstrap: prompts, user + sudo, wsl.conf, copy tool+conf, Python (apt), pip --user, bind-mount ddbb+projects, install database, local.env
 # Must be placed and run from /tmp/wsl4ai/
 # Must run as root: sudo bash /tmp/wsl4ai/wsl4ai-install.sh
 set -euo pipefail
@@ -308,7 +309,7 @@ EOF
 chmod 440 "${SUDOERS_FILE}"
 echo -e "${C_STEP}       sudoers written → ${SUDOERS_FILE}${C_R}"
 
-# ─── PHASE 9: conf/ (local.env, wsl4ai-update.py, config.json) ──────────────
+# ─── PHASE 9: conf/ (local.env, manifest.json, wsl4ai-update.py, config.json) ──────────────
 
 # INSTALL_CONF already exists (created by mkdir -p WSL_DDBB in phase 8)
 CONF_LOCAL="${INSTALL_CONF}local.env"
@@ -323,6 +324,10 @@ echo -e "${C_STEP}Step 9: writing local.env → ${CONF_LOCAL}...${C_R}"
   printf '%s\n' "WSL_PROJECTS=${WSL_PROJECTS}"
 } >"${CONF_LOCAL}"
 chown "${WSL4AI_USER}:${WSL4AI_USER}" "${CONF_LOCAL}"
+
+echo -e "${C_STEP}       copying manifest.json → ${INSTALL_CONF}${C_R}"
+cp -a "${REPO_DIR}/manifest.json" "${INSTALL_CONF}manifest.json"
+chown "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_CONF}manifest.json"
 
 echo -e "${C_STEP}       copying wsl4ai-update.py → ${INSTALL_CONF}${C_R}"
 cp -a "${CONF_SRC}/wsl4ai-update.py" "${INSTALL_CONF}wsl4ai-update.py"

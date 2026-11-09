@@ -28,6 +28,7 @@ WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manage
 └── conf/              — persistent config (never replaced on update)
     ├── local.env      — HOST_DDBB, WSL_DDBB, HOST_PROJECTS, WSL_PROJECTS
     ├── config.json
+    ├── manifest.json  — versions of the installed components
     ├── wsl4ai-update.py
     └── ddbb/          — bind-mount → HOST_DDBB (Windows)
         └── wsl4ai.db
@@ -225,7 +226,8 @@ HOST_PROJECTS=${HOST_PROJECTS}
 WSL_PROJECTS=${WSL_PROJECTS}
 EOF
 
-# updater script and default config
+# component manifest, updater script and default config
+cp -a /tmp/wsl4ai/repo/manifest.json "${INSTALL_CONF}manifest.json"
 cp -a /tmp/wsl4ai/repo/conf/wsl4ai-update.py "${INSTALL_CONF}wsl4ai-update.py"
 [[ -f "${INSTALL_CONF}config.json" ]] || cp -a /tmp/wsl4ai/repo/conf/config.json "${INSTALL_CONF}config.json"
 

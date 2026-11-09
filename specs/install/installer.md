@@ -88,7 +88,7 @@ The default WSL login user is **always set** to `WSL4AI_USER` (no prompt).
 | 8 | Create mount point directories: `WSL_DDBB` and `WSL_PROJECTS` (and their Windows-side counterparts); bind-mount `HOST_DDBB` → `WSL_DDBB` now so the database is created on the host path. Requires `/mnt/c`. |
 | 8b | Copy **`.startup-wsl4ai.sh`** template to `~/.startup-wsl4ai.sh`, replacing `__INSTALL_BASE__` with the resolved `INSTALL_BASE` path. |
 | 8c | Write **`/etc/sudoers.d/wsl4ai-mount`** (mode `440`): `NOPASSWD` for `mount --bind HOST_DDBB_WSL WSL_DDBB`, and for `mount --bind * WSL_PROJECTS*` / `umount WSL_PROJECTS*`. |
-| 9 | Write **`local.env`** → `INSTALL_CONF`; copy `wsl4ai-update.py` and `config.json` from repo `conf/` into `INSTALL_CONF` (`config.json` skipped if already present); `chown`. |
+| 9 | Write **`local.env`** → `INSTALL_CONF`; copy `manifest.json` (repo root), `wsl4ai-update.py` and `config.json` (repo `conf/`) into `INSTALL_CONF` (`config.json` skipped if already present); `chown`. |
 | 10 | As **`WSL4AI_USER`**: **`cd INSTALL_TOOL && python3 wsl4ai.py install database`**. |
 | — | Remove the temporary clone (`/tmp/wsl4ai/repo`). |
 | — | Print final message: exit WSL and run `wsl --shutdown` from Windows. |
@@ -109,6 +109,7 @@ The default WSL login user is **always set** to `WSL4AI_USER` (no prompt).
 └── conf/                  ← INSTALL_CONF — persistent configuration (never replaced on update)
     ├── local.env
     ├── config.json
+    ├── manifest.json      — versions of the installed components (see specs-manifest.md)
     ├── wsl4ai-update.py
     └── ddbb/              ← WSL_DDBB — bind-mount → HOST_DDBB (Windows)
         └── wsl4ai.db

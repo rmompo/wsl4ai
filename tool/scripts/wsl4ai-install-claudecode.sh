@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Version: 0.1.0
 # Install Claude Code (latest) in this WSL distro with its official native installer.
 # Rule: one AI client per WSL distro.
 # Usage: bash ~/wsl4ai/tool/scripts/wsl4ai-install-claudecode.sh [-h]

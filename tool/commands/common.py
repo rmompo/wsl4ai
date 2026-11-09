@@ -204,6 +204,10 @@ def resolve_runtime_identity() -> RuntimeIdentity:
     return RuntimeIdentity(machine=machine, user=user, wsl_name=wsl_name)
 
 
+# Version of the database schema, stored in ``PRAGMA user_version`` (see specs/tool/specs-manifest.md).
+# 0 means an unversioned database created before this field existed.
+DB_SCHEMA_VERSION = 1
+
 # Column bodies for ``wsls`` / ``uses`` (shared by ``TABLE_DDL``).
 WSLS_TABLE_BODY = """  uuid TEXT NOT NULL PRIMARY KEY,
   name TEXT NOT NULL,

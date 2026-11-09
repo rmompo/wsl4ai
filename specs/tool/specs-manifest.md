@@ -1,6 +1,6 @@
 # WSL4AI — Component Manifest Specification
 
-> **Status: planned** — not yet implemented.
+> **Status: partially implemented.** Done: `manifest.json`, the version of every component, the installer writing `conf/manifest.json`, and the consistency check (`dev/check-manifest.py`). Pending: the updater comparing manifests (§4) and the `wsl4ai version` command.
 
 This document specifies `manifest.json`: a single file that records the version of every independently versioned component of WSL4AI, and how the updater uses it.
 
@@ -27,7 +27,7 @@ Today only two things carry a version: the tool (`__version__` in `tool/wsl4ai.p
   "components": {
     "tool": "1.6.9",
     "config_schema": "1.0",
-    "db_schema": "1.0",
+    "db_schema": "1",
     "updater": "1.0.0",
     "installer": "3.0.0",
     "scripts": {
@@ -42,12 +42,12 @@ Today only two things carry a version: the tool (`__version__` in `tool/wsl4ai.p
 |-----------|------------------|---------------------|
 | `tool` | The Python application (`tool/`) | `__version__` in `tool/wsl4ai.py` |
 | `config_schema` | Structure of `conf/config.json` | `__config_version__` in `tool/wsl4ai.py` |
-| `db_schema` | Structure of the SQLite database | *(new)* stored in the database (`PRAGMA user_version` or a metadata table) |
-| `updater` | `conf/wsl4ai-update.py` | *(new)* `__version__` constant in the script |
-| `installer` | `install/wsl4ai-install.sh` | *(new)* `# Version:` header in the script |
-| `scripts` | Each file in `tool/scripts/`, by file name | *(new)* `# Version:` header in each script |
+| `db_schema` | Structure of the SQLite database | `DB_SCHEMA_VERSION` in `tool/commands/common.py`, stored in the database as `PRAGMA user_version` (an **integer**; `0` = unversioned database created before this field) |
+| `updater` | `conf/wsl4ai-update.py` | `__version__` constant in the script |
+| `installer` | `install/wsl4ai-install.sh` | `# Version:` header in the script |
+| `scripts` | Each file in `tool/scripts/`, by file name | `# Version:` header in each script |
 
-Versions follow **semantic versioning** (`MAJOR.MINOR.PATCH`); schema versions keep the `MAJOR.MINOR` form already used by `config_schema`.
+Versions follow **semantic versioning** (`MAJOR.MINOR.PATCH`). `config_schema` keeps the `MAJOR.MINOR` form it already has, and `db_schema` is a plain integer.
 
 `manifest_version` is the version of the manifest format itself (an integer).
 
@@ -86,11 +86,12 @@ The manifest must never disagree with the code it describes. These must hold in 
 
 1. `components.tool` equals `__version__` in `tool/wsl4ai.py`.
 2. `components.config_schema` equals `__config_version__` in `tool/wsl4ai.py`.
-3. `components.updater` equals the version constant in `conf/wsl4ai-update.py`.
-4. `components.installer` equals the `# Version:` header of the installer.
-5. Each entry of `components.scripts` equals the `# Version:` header of that script, and every `*.sh` in `tool/scripts/` has an entry.
+3. `components.db_schema` equals `DB_SCHEMA_VERSION` in `tool/commands/common.py`.
+4. `components.updater` equals the version constant in `conf/wsl4ai-update.py`.
+5. `components.installer` equals the `# Version:` header of the installer.
+6. Each entry of `components.scripts` equals the `# Version:` header of that script, and every `*.sh` in `tool/scripts/` has an entry.
 
-A **consistency check** (script or pre-commit hook; to be defined) enforces these rules. When a component changes, its version is bumped in both places in the same commit.
+The **consistency check** `python3 dev/check-manifest.py` enforces these rules (exit code `1` and a list of differences when they do not hold). It is a development tool and is not installed; running it from a pre-commit hook is left to the developer. When a component changes, its version is bumped in both places in the same commit.
 
 ---
 
@@ -103,5 +104,5 @@ A **consistency check** (script or pre-commit hook; to be defined) enforces thes
 
 ## 7. Open questions
 
-- Where the `db_schema` value lives (`PRAGMA user_version` vs a metadata table) and the first migration it needs.
+- The first database migration. Databases created before `db_schema` existed report `user_version = 0` and must be stamped with `1` by the updater (no structural change).
 - Whether the updater should be allowed to replace itself on request (e.g. `--self`), instead of warning only.

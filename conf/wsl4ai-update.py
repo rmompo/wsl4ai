@@ -18,6 +18,8 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+__version__ = "1.0.0"
+
 REPO_RAW_BASE = "https://raw.githubusercontent.com/rmompo/wsl4ai/{branch}/tool"
 REPO_CLONE_URL = "https://github.com/rmompo/wsl4ai.git"
 DEFAULT_BRANCH = "main"

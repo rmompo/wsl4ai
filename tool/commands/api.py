@@ -40,6 +40,7 @@ from commands.common import (
     APP_DIR,
     CONF_DIR,
     DB_PATH,
+    DB_SCHEMA_VERSION,
     TABLE_DDL,
     connect_db,
     expand_path_template,
@@ -841,6 +842,7 @@ def api_install_database(*, force: bool = False) -> dict:
     try:
         con = connect_db(db_path)
         con.executescript(TABLE_DDL)
+        con.execute(f"PRAGMA user_version = {int(DB_SCHEMA_VERSION)}")
         con.commit()
         con.close()
     except Exception as exc:
