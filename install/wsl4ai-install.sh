@@ -234,17 +234,6 @@ if [[ ! -f "${REQ}" ]]; then
   exit 1
 fi
 
-# ─── PHASE 6b: COPY extras/ ─────────────────────────────────────────────────
-
-EXTRAS_SRC="${REPO_DIR}/extras"
-INSTALL_EXTRAS="${INSTALL_BASE}/extras/"
-if [[ -d "${EXTRAS_SRC}" ]]; then
-  echo -e "${C_STEP}Step 6b: copying extras/ to ${INSTALL_EXTRAS}${C_R}"
-  sudo -u "${WSL4AI_USER}" -H mkdir -p "${INSTALL_EXTRAS}"
-  cp -a "${EXTRAS_SRC}/." "${INSTALL_EXTRAS}"
-  chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_EXTRAS}"
-fi
-
 # ─── PHASE 7: PIP INSTALL ────────────────────────────────────────────────────
 
 echo -e "${C_STEP}Step 7: pip install --user — requirements from tool/ as ${WSL4AI_USER}...${C_R}"

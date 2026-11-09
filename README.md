@@ -23,7 +23,6 @@ WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manage
 
 ~/wsl4ai/
 ├── tool/              — Python application (replaced on update)
-├── extras/            — optional startup scripts for other WSL distros
 ├── projects/          — bind-mount → HOST_PROJECTS (Windows)
 └── conf/              — persistent config (never replaced on update)
     ├── local.env      — HOST_DDBB, WSL_DDBB, HOST_PROJECTS, WSL_PROJECTS
@@ -138,16 +137,6 @@ If `/etc/wsl.conf` already exists, add or update the `default=` line under `[use
 mkdir -p "${INSTALL_BASE}/tool"
 cp -a /tmp/wsl4ai/repo/tool/. "${INSTALL_BASE}/tool/"
 chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_BASE}/tool"
-```
-
----
-
-**Step 6b — copy extras/ (optional startup scripts for other WSL distros)**
-
-```bash
-mkdir -p "${INSTALL_BASE}/extras"
-cp -a /tmp/wsl4ai/repo/extras/. "${INSTALL_BASE}/extras/"
-chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_BASE}/extras"
 ```
 
 ---
@@ -351,11 +340,10 @@ Step-by-step setup guides for WSL distros dedicated to specific AI tools:
 
 | Guide | Tool | Method |
 | ----- | ---- | ------ |
-| [`wsls/wsl4codexcli.md`](wsls/wsl4codexcli.md) | OpenAI Codex CLI | Homebrew |
 | [`wsls/wsl4claudecode.md`](wsls/wsl4claudecode.md) | Anthropic Claude Code | Native installer |
 | [`wsls/wsl4ghcopilot.md`](wsls/wsl4ghcopilot.md) | GitHub Copilot CLI | Homebrew + gh extension |
 
-Each guide covers prerequisites, installation, authentication, and startup script configuration.
+Each guide covers installation, authentication, and applying the changes (restarting the distro).
 
 ---
 
