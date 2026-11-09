@@ -259,6 +259,8 @@ Others
   │    └─ Setup
   ├─ ─────────
   ├─ Theme
+  ├─ Info
+  ├─ Version
   ├─ ─────────
   └─ Install
        ├─ Database
@@ -327,9 +329,9 @@ All right-aligned content is padded dynamically to terminal width.
 The menu bar (`MenuBar` widget) is **3 rows tall** and spans the full terminal width.
 
 ```
-────────────────┬────────┬──────────────────────────────────────
-  Registry  Use  │ Others │  Wsl  Start  Exit
-────────────────┴┌───────┘──────────────────────────────────────
+────────────────────────────┬────────┬──────────────────────────────
+  Registry  Use  Wsl  Start │ Others │ Exit
+────────────────────────────┴────────┴──────────────────────────────
 ```
 
 **Row 1 — top border:** full-width `─` line. `┬` characters mark the left and right sides of the `Others` box.
