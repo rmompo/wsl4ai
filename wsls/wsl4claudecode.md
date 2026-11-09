@@ -6,7 +6,13 @@ Target: Linux / Ubuntu WSL distro.
 
 ## 1. Install Claude Code
 
-Use the official native installer:
+Run the script shipped with WSL4AI (it refuses to run if GitHub Copilot CLI is already installed: one AI client per distro):
+
+```bash
+bash ~/wsl4ai/tool/scripts/wsl4ai-install-claudecode.sh
+```
+
+It runs the official native installer:
 
 ```bash
 curl -fsSL https://claude.ai/install.sh | bash

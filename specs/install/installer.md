@@ -103,6 +103,7 @@ The default WSL login user is **always set** to `WSL4AI_USER` (no prompt).
 
 ~/wsl4ai/                  ← INSTALL_BASE
 ├── tool/                  ← INSTALL_TOOL — Python application (replaced on update)
+│   └── scripts/           — wsl4ai-install-claudecode.sh, wsl4ai-install-ghcopilot.sh
 ├── projects/              ← WSL_PROJECTS — bind-mount → HOST_PROJECTS (Windows)
 ├── .tmp/                  — temporary working directory (used by updater)
 └── conf/                  ← INSTALL_CONF — persistent configuration (never replaced on update)

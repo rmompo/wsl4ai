@@ -1,76 +1,46 @@
-# WSL setup: Homebrew + GitHub Copilot CLI
+# WSL setup: GitHub Copilot CLI
 
 Target: Linux / Ubuntu WSL distro.
 
 ---
 
-## 1. Install build tools (Homebrew requirement)
+## 1. Install GitHub Copilot CLI
 
-Homebrew on Linux requires GCC and basic build utilities:
+Run the script shipped with WSL4AI (it refuses to run if Claude Code is already installed: one AI client per distro):
 
 ```bash
-sudo apt-get install -y build-essential procps curl file git
+bash ~/wsl4ai/tool/scripts/wsl4ai-install-ghcopilot.sh
 ```
 
----
-
-## 2. Install Homebrew
+It runs the standalone installer, which needs no Node.js or Homebrew:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-After the installer finishes, follow the printed instructions to add Homebrew to your PATH. Typically:
-
-```bash
-echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+curl -fsSL https://gh.io/copilot-install | bash
 ```
 
 Verify:
 
 ```bash
-brew --version
+copilot --version
 ```
 
 ---
 
-## 3. Install GitHub Copilot CLI
+## 2. Authenticate
+
+On first run, GitHub Copilot CLI asks you to log in with your GitHub account:
 
 ```bash
-brew install gh
-gh extension install github/gh-copilot
+copilot
 ```
 
-Verify:
-
-```bash
-gh copilot --version
-```
+Follow the prompts (choose `GitHub.com` and authenticate via browser).
 
 ---
 
-## 4. Authenticate
+## 3. Apply changes
 
-```bash
-gh auth login
-```
-
-Follow the prompts to log in with your GitHub account. Choose `GitHub.com` and authenticate via browser.
-
----
-
-## 5. Usage
-
-```bash
-gh copilot suggest "list all running docker containers"
-gh copilot explain "sudo apt-get update && sudo apt-get upgrade -y"
-```
-
----
-
-## 6. Apply changes
-
-Reload your shell if needed:
+`~/.local/bin` is already on the PATH through `~/.startup-wsl4ai.sh`. If the command is not found, reload your shell:
 
 ```bash
 source ~/.bashrc

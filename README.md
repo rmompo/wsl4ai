@@ -23,6 +23,7 @@ WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manage
 
 ~/wsl4ai/
 ├── tool/              — Python application (replaced on update)
+│   └── scripts/       — install scripts for Claude Code and GitHub Copilot CLI
 ├── projects/          — bind-mount → HOST_PROJECTS (Windows)
 └── conf/              — persistent config (never replaced on update)
     ├── local.env      — HOST_DDBB, WSL_DDBB, HOST_PROJECTS, WSL_PROJECTS
@@ -340,8 +341,8 @@ Step-by-step setup guides for WSL distros dedicated to specific AI tools:
 
 | Guide | Tool | Method |
 | ----- | ---- | ------ |
-| [`wsls/wsl4claudecode.md`](wsls/wsl4claudecode.md) | Anthropic Claude Code | Native installer |
-| [`wsls/wsl4ghcopilot.md`](wsls/wsl4ghcopilot.md) | GitHub Copilot CLI | Homebrew + gh extension |
+| [`wsls/wsl4claudecode.md`](wsls/wsl4claudecode.md) | Anthropic Claude Code | `tool/scripts/wsl4ai-install-claudecode.sh` (native installer) |
+| [`wsls/wsl4ghcopilot.md`](wsls/wsl4ghcopilot.md) | GitHub Copilot CLI | `tool/scripts/wsl4ai-install-ghcopilot.sh` (standalone installer) |
 
 Each guide covers installation, authentication, and applying the changes (restarting the distro).
 
