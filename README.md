@@ -301,6 +301,31 @@ python3 ~/wsl4ai/conf/wsl4ai-update.py --check -b feature/TUI-Textual
 
 > **Warning:** Branches other than `main` may contain unstable or experimental code. Use only for testing purposes.
 
+### Replace the updater manually
+
+`conf/wsl4ai-update.py` is **never replaced by an update**, so an install made with an older updater keeps it until you replace it by hand. Do it when `wsl4ai version` shows `updater` as `outdated` (or `wsl4ai iu` prints a `NOTE: a newer updater exists`), or when an install predates the manifest (no `~/wsl4ai/conf/manifest.json`). The new updater also saves that manifest and stamps old databases with their schema version.
+
+Run it inside the distro, as the WSL4AI user:
+
+```bash
+# 1. Download the new updater to a temporary file and check that it is valid Python
+curl -fsSL https://raw.githubusercontent.com/rmompo/wsl4ai/main/conf/wsl4ai-update.py -o /tmp/wsl4ai-update.py
+python3 -m py_compile /tmp/wsl4ai-update.py && grep '^__version__' /tmp/wsl4ai-update.py
+
+# 2. Keep a copy of the current one and put the new one in place
+cp -a ~/wsl4ai/conf/wsl4ai-update.py ~/wsl4ai/conf/wsl4ai-update.py.bak
+mv /tmp/wsl4ai-update.py ~/wsl4ai/conf/wsl4ai-update.py
+
+# 3. Check, then update (--force also writes conf/manifest.json when the tool is already up to date)
+wsl4ai install update --check
+wsl4ai install update          # add --force if it says "Already up to date" and there is no conf/manifest.json
+wsl4ai version                 # every component should now be listed with a version
+```
+
+Use `wget -qO /tmp/wsl4ai-update.py <url>` instead of `curl` if you prefer. To take the updater from another branch, replace `main` in the URL. If something goes wrong, restore the copy: `mv ~/wsl4ai/conf/wsl4ai-update.py.bak ~/wsl4ai/conf/wsl4ai-update.py`.
+
+If `wsl4ai` itself does not start, run the updater directly: `python3 ~/wsl4ai/conf/wsl4ai-update.py`.
+
 ---
 
 ## Usage
