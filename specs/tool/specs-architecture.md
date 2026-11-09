@@ -167,6 +167,7 @@ flowchart TD
 | `tool/commands/install_database.py` | CLI: install database |
 | `tool/commands/info.py` | CLI: info |
 | `tool/commands/version_cmd.py` | CLI: version |
+| `tool/scripts/wsl4ai-install-tools.sh` | Standalone script: install the basic apt tools (base, python, build groups) |
 | `tool/scripts/wsl4ai-install-claudecode.sh` | Standalone script: install Claude Code (one AI client per distro) |
 | `tool/scripts/wsl4ai-install-ghcopilot.sh` | Standalone script: install GitHub Copilot CLI (one AI client per distro) |
 | `tool/commands/install_alias.py` | CLI: install alias |

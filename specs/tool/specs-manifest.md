@@ -25,14 +25,15 @@ Today only two things carry a version: the tool (`__version__` in `tool/wsl4ai.p
 {
   "manifest_version": 1,
   "components": {
-    "tool": "1.6.9",
+    "tool": "1.9.0",
     "config_schema": "1.0",
     "db_schema": "1",
     "updater": "1.0.0",
     "installer": "3.0.0",
     "scripts": {
       "wsl4ai-install-claudecode.sh": "0.1.0",
-      "wsl4ai-install-ghcopilot.sh": "0.1.0"
+      "wsl4ai-install-ghcopilot.sh": "0.1.0",
+      "wsl4ai-install-tools.sh": "0.1.0"
     }
   }
 }

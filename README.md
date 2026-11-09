@@ -23,7 +23,7 @@ WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manage
 
 ~/wsl4ai/
 ├── tool/              — Python application (replaced on update)
-│   └── scripts/       — install scripts for Claude Code and GitHub Copilot CLI
+│   └── scripts/       — install scripts: basic tools, Claude Code, GitHub Copilot CLI
 ├── projects/          — bind-mount → HOST_PROJECTS (Windows)
 └── conf/              — persistent config (never replaced on update)
     ├── local.env      — HOST_DDBB, WSL_DDBB, HOST_PROJECTS, WSL_PROJECTS
@@ -370,7 +370,14 @@ wsl --unregister <image name>
 
 ## Install an AI client
 
-Each WSL distro is dedicated to **one** AI client: a script refuses to run if the other client is already installed. Run the one you need inside the distro (they ship with the tool in `~/wsl4ai/tool/scripts/`; `-h` shows their help):
+First, make sure the basic tools are there (curl, wget, git, sudo, zip, unzip, jq, ripgrep, nano, Python, build-essential and the rest of what the AI clients and their installers use). The same set the docker-devbox image ships:
+
+```bash
+bash ~/wsl4ai/tool/scripts/wsl4ai-install-tools.sh          # installs what is missing (apt, needs sudo)
+bash ~/wsl4ai/tool/scripts/wsl4ai-install-tools.sh check    # only lists what is missing
+```
+
+Then install the client. Each WSL distro is dedicated to **one** AI client: a script refuses to run if the other client is already installed. Run the one you need inside the distro (they ship with the tool in `~/wsl4ai/tool/scripts/`; `-h` shows their help):
 
 | Client | Script | Installer used | First run |
 | ------ | ------ | -------------- | --------- |
