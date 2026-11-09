@@ -45,18 +45,18 @@ Switch all APT sources from HTTP to HTTPS:
 sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources
 ```
 
-Then place `install.sh` in `/tmp/wsl4ai/` and run it as root. Use `curl` or `wget`:
+Then place `wsl4ai-install.sh` in `/tmp/wsl4ai/` and run it as root. Use `curl` or `wget`:
 
 ```bash
 mkdir -p /tmp/wsl4ai
-curl -fsSL https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh -o /tmp/wsl4ai/install.sh
-sudo bash /tmp/wsl4ai/install.sh
+curl -fsSL https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/wsl4ai-install.sh -o /tmp/wsl4ai/wsl4ai-install.sh
+sudo bash /tmp/wsl4ai/wsl4ai-install.sh
 ```
 
 ```bash
 mkdir -p /tmp/wsl4ai
-wget -qO /tmp/wsl4ai/install.sh https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh
-sudo bash /tmp/wsl4ai/install.sh
+wget -qO /tmp/wsl4ai/wsl4ai-install.sh https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/wsl4ai-install.sh
+sudo bash /tmp/wsl4ai/wsl4ai-install.sh
 ```
 
 The script clones the repository and downloads any missing files automatically. Follow the prompts for `WSL4AI_USER`, `WSL_DDBB`, `WSL_PROJECTS`, `HOST_DDBB`, and `HOST_PROJECTS`.

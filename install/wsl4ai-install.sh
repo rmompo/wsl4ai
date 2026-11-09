@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # WSL4AI — install v3.0 — bootstrap: prompts, user + sudo, wsl.conf, copy tool+conf, Python (apt), pip --user, bind-mount ddbb+projects, install database, local.env
 # Must be placed and run from /tmp/wsl4ai/
-# Must run as root: sudo bash /tmp/wsl4ai/install.sh
+# Must run as root: sudo bash /tmp/wsl4ai/wsl4ai-install.sh
 set -euo pipefail
 shopt -s extglob
 
@@ -21,12 +21,12 @@ DEFAULTS_URL="https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/defau
 REPO_URL="https://github.com/rmompo/wsl4ai.git"
 
 if [[ "${SCRIPT_DIR}" != "${WORK_DIR}" ]]; then
-  echo "install.sh: must be run from ${WORK_DIR} (current: ${SCRIPT_DIR})" >&2
+  echo "wsl4ai-install.sh: must be run from ${WORK_DIR} (current: ${SCRIPT_DIR})" >&2
   exit 1
 fi
 
 if [[ "${EUID:-0}" -ne 0 ]]; then
-  echo "install.sh: run as root (example: sudo bash ${WORK_DIR}/install.sh)" >&2
+  echo "wsl4ai-install.sh: run as root (example: sudo bash ${WORK_DIR}/wsl4ai-install.sh)" >&2
   exit 1
 fi
 
@@ -37,7 +37,7 @@ _download() {
   elif command -v wget >/dev/null 2>&1; then
     wget -qO "${dest}" "${url}"
   else
-    echo "install.sh: need curl or wget to download files." >&2
+    echo "wsl4ai-install.sh: need curl or wget to download files." >&2
     exit 1
   fi
 }
@@ -49,13 +49,13 @@ ensure_repo() {
   if ! command -v git >/dev/null 2>&1; then
     return 1
   fi
-  echo -e "${C_STEP}install.sh: cloning repository to ${REPO_DIR}...${C_R}"
+  echo -e "${C_STEP}wsl4ai-install.sh: cloning repository to ${REPO_DIR}...${C_R}"
   git clone --depth=1 --branch main "${REPO_URL}" "${REPO_DIR}"
   if [[ ! -d "${REPO_DIR}/tool" ]]; then
-    echo "install.sh: tool/ not found inside cloned repository." >&2
+    echo "wsl4ai-install.sh: tool/ not found inside cloned repository." >&2
     exit 1
   fi
-  echo -e "${C_STEP}install.sh: repository ready at ${REPO_DIR}${C_R}"
+  echo -e "${C_STEP}wsl4ai-install.sh: repository ready at ${REPO_DIR}${C_R}"
 }
 
 ensure_defaults_env() {
@@ -68,10 +68,10 @@ ensure_defaults_env() {
   if [[ -f "${fallback}" ]]; then
     return 0
   fi
-  echo "install.sh: defaults.env not found; downloading from GitHub..." >&2
+  echo "wsl4ai-install.sh: defaults.env not found; downloading from GitHub..." >&2
   _download "${DEFAULTS_URL}" "${fallback}"
   if [[ ! -s "${fallback}" ]]; then
-    echo "install.sh: failed to download defaults.env (empty or missing)." >&2
+    echo "wsl4ai-install.sh: failed to download defaults.env (empty or missing)." >&2
     rm -f "${fallback}"
     exit 1
   fi
@@ -93,7 +93,7 @@ win_path_to_wsl_mnt() {
     local rest="${BASH_REMATCH[2]}"
     printf '/mnt/%s/%s' "${letter}" "${rest}"
   else
-    echo "install.sh: expected Windows path like C:/... got: ${wp}" >&2
+    echo "wsl4ai-install.sh: expected Windows path like C:/... got: ${wp}" >&2
     return 1
   fi
 }
@@ -129,18 +129,18 @@ echo ""
 
 read -r -p "$(echo -e "${C_PROMPT}WSL4AI_USER (Linux account to create; password will match this name):${C_R} ")" WSL4AI_USER || true
 if [[ -z "${WSL4AI_USER// }" ]]; then
-  echo "install.sh: WSL4AI_USER is required." >&2
+  echo "wsl4ai-install.sh: WSL4AI_USER is required." >&2
   exit 1
 fi
 WSL4AI_USER="${WSL4AI_USER##+([[:space:]])}"
 WSL4AI_USER="${WSL4AI_USER%%+([[:space:]])}"
 WSL4AI_USER="${WSL4AI_USER,,}"
 if ! valid_linux_username "${WSL4AI_USER}"; then
-  echo "install.sh: invalid username (use lowercase letters, digits, _, -; must start with letter or _)." >&2
+  echo "wsl4ai-install.sh: invalid username (use lowercase letters, digits, _, -; must start with letter or _)." >&2
   exit 1
 fi
 if id -u "${WSL4AI_USER}" &>/dev/null; then
-  echo "install.sh: user '${WSL4AI_USER}' already exists." >&2
+  echo "wsl4ai-install.sh: user '${WSL4AI_USER}' already exists." >&2
   exit 1
 fi
 
@@ -172,7 +172,7 @@ echo -e "${C_STEP}Step 3: installing required packages (git, python3, python3-pi
 apt-get install -y git python3 python3-pip
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "install.sh: python3 is not available after install; aborting." >&2
+  echo "wsl4ai-install.sh: python3 is not available after install; aborting." >&2
   exit 1
 fi
 
@@ -180,7 +180,7 @@ fi
 
 ensure_repo
 if [[ ! -d "${REPO_DIR}/tool" ]]; then
-  echo "install.sh: repository not available after apt install; aborting." >&2
+  echo "wsl4ai-install.sh: repository not available after apt install; aborting." >&2
   exit 1
 fi
 
@@ -194,7 +194,7 @@ if getent group sudo >/dev/null 2>&1; then
 elif getent group wheel >/dev/null 2>&1; then
   usermod -aG wheel "${WSL4AI_USER}"
 else
-  echo "install.sh: warning: no 'sudo' or 'wheel' group found; grant ${WSL4AI_USER} sudo manually." >&2
+  echo "wsl4ai-install.sh: warning: no 'sudo' or 'wheel' group found; grant ${WSL4AI_USER} sudo manually." >&2
 fi
 
 # ─── PHASE 5: WSL DEFAULT USER ───────────────────────────────────────────────
@@ -230,7 +230,7 @@ done
 
 REQ="${INSTALL_TOOL}requirements.txt"
 if [[ ! -f "${REQ}" ]]; then
-  echo "install.sh: missing ${REQ}" >&2
+  echo "wsl4ai-install.sh: missing ${REQ}" >&2
   exit 1
 fi
 
@@ -264,7 +264,7 @@ chown "${WSL4AI_USER}:${WSL4AI_USER}" "${BASHRC}"
 # ─── PHASE 8: MOUNT ddbb ─────────────────────────────────────────────────────
 
 if [[ ! -d /mnt/c ]]; then
-  echo "install.sh: /mnt/c not found — not running in WSL? Cannot mount ddbb from Windows path." >&2
+  echo "wsl4ai-install.sh: /mnt/c not found — not running in WSL? Cannot mount ddbb from Windows path." >&2
   exit 1
 fi
 
@@ -291,7 +291,7 @@ fi
 STARTUP_SRC="${STARTUP_FILE}"
 STARTUP_DST="/home/${WSL4AI_USER}/.startup-wsl4ai.sh"
 if [[ ! -f "${STARTUP_SRC}" ]]; then
-  echo "install.sh: missing ${STARTUP_SRC}" >&2
+  echo "wsl4ai-install.sh: missing ${STARTUP_SRC}" >&2
   exit 1
 fi
 sed \
@@ -325,7 +325,7 @@ echo -e "${C_STEP}       sudoers written → ${SUDOERS_FILE}${C_R}"
 CONF_LOCAL="${INSTALL_CONF}local.env"
 echo -e "${C_STEP}Step 9: writing local.env → ${CONF_LOCAL}...${C_R}"
 {
-  printf '%s\n' '# Generated by WSL4AI install.sh — edit or re-run install to change.'
+  printf '%s\n' '# Generated by WSL4AI wsl4ai-install.sh — edit or re-run install to change.'
   printf '%s\n' "# Created: $(date -Iseconds 2>/dev/null || date)"
   printf '%s\n' ''
   printf '%s\n' "HOST_DDBB=${HOST_DDBB}"

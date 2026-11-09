@@ -25,17 +25,17 @@ The installer prepares a **dedicated WSL (Linux)** environment for the **WSL4AI 
 ## 2. Prerequisites
 
 - Run inside **WSL** with **`/mnt/c`** available (Windows drives mounted).
-- Run the script **as root**: `sudo bash /tmp/wsl4ai/install.sh`.
+- Run the script **as root**: `sudo bash /tmp/wsl4ai/wsl4ai-install.sh`.
 - Script must be placed in **`/tmp/wsl4ai/`** and run from there.
-- **`install/defaults.env`** supplies default values for the interactive prompts. If missing, **`install.sh`** downloads it from GitHub raw (`main` branch) using **`curl`** or **`wget`**.
-- **`tool/`** must be present at `/tmp/wsl4ai/tool/`. If missing, `install.sh` clones it from GitHub (requires **`git`**, installed in the apt step first).
+- **`install/defaults.env`** supplies default values for the interactive prompts. If missing, **`wsl4ai-install.sh`** downloads it from GitHub raw (`main` branch) using **`curl`** or **`wget`**.
+- **`tool/`** must be present at `/tmp/wsl4ai/tool/`. If missing, `wsl4ai-install.sh` clones it from GitHub (requires **`git`**, installed in the apt step first).
 - **`conf/`** must be present at `/tmp/wsl4ai/conf/`. Obtained from the same clone as `tool/`.
 
 ---
 
 ## 3. Configuration: `defaults.env`
 
-Provides default values for the interactive prompts. If the file is absent, `install.sh` downloads it from GitHub.
+Provides default values for the interactive prompts. If the file is absent, `wsl4ai-install.sh` downloads it from GitHub.
 
 | Variable | Role |
 | -------- | ---- |
@@ -150,14 +150,14 @@ Sections in order:
 
 ```bash
 mkdir -p /tmp/wsl4ai
-curl -fsSL https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh -o /tmp/wsl4ai/install.sh
-sudo bash /tmp/wsl4ai/install.sh
+curl -fsSL https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/wsl4ai-install.sh -o /tmp/wsl4ai/wsl4ai-install.sh
+sudo bash /tmp/wsl4ai/wsl4ai-install.sh
 ```
 
 ```bash
 mkdir -p /tmp/wsl4ai
-wget -qO /tmp/wsl4ai/install.sh https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/install.sh
-sudo bash /tmp/wsl4ai/install.sh
+wget -qO /tmp/wsl4ai/wsl4ai-install.sh https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/wsl4ai-install.sh
+sudo bash /tmp/wsl4ai/wsl4ai-install.sh
 ```
 
 `defaults.env` and `tool/` are downloaded automatically if not present in `/tmp/wsl4ai/`.
