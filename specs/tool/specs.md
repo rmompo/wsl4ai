@@ -230,6 +230,8 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | `wsl4ai wsl list`          | `wl`     | List all known `wsls` rows and their `cli_command` values.                                                |
 | `wsl4ai wsl set …`         | `ws`     | Set `wsls.cli_command` (row must exist).                                                                  |
 | `wsl4ai whoami`            | `wai`    | Print the current `machine` and `user` runtime identity.                                                  |
+| `wsl4ai info`              | `inf`    | *(planned)* Read-only report of how this distro is set up (identity, paths, mounts, database, config, AI client). |
+| `wsl4ai version`           | `ver`    | *(planned)* Version of every component; `--remote` compares with GitHub.                                  |
 | `wsl4ai tui`               | -        | Open the interactive text user interface.                                                                 |
 | `wsl4ai start`             | -        | Run one mounted use in foreground: cd to resolved WSL path and execute that WSL `cli_command`.           |
 
@@ -250,9 +252,10 @@ This section is an index only. Operational details must live in grouped files na
 - `use` -> [`specs-use.md`](specs-use.md)
 - `wsl` -> [`specs-wsl.md`](specs-wsl.md)
 - `whoami` -> [`specs-whoami.md`](specs-whoami.md)
+- `info` -> [`specs-info.md`](specs-info.md)
+- `version` command and `-v/--version` flag -> [`specs-version.md`](specs-version.md)
 - `start` -> [`specs-start.md`](specs-start.md)
 - `tui` (interactive mode spec) -> [`specs-tui.md`](specs-tui.md)
-- `-v/--version` flag -> [`specs-version.md`](specs-version.md)
 
 ### 5.2 Grouping rule (normative)
 
@@ -336,3 +339,5 @@ No redundant "Per-command options" line.
 ## 9. Special commands — explicit non-application of §2
 
 `install` (including `install database`, `install alias`, `install update`) is **not** bound by §2 unless a bullet is added here for a specific case.
+
+`info` and `version` are **not** bound by §2.1 (database existence check): they are diagnostic commands, so they must work when the database is missing or unusable and report that state instead of failing.

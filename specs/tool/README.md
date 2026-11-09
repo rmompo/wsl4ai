@@ -13,8 +13,9 @@ Do not add parallel spec files outside `specs/` unless the project convention ch
 | [specs-use.md](specs-use.md) | `wsl4ai use ...` — `list`, `add`, `remove`, `enable`, `disable`, `disableall` with optional WSL selectors, runtime default, and lifecycle state machine. |
 | [specs-wsl.md](specs-wsl.md) | `wsl4ai wsl ...` — `list` and `set`, including `--cli`, optional WSL selectors, and runtime default target resolution. |
 | [specs-whoami.md](specs-whoami.md) | `wsl4ai whoami` / `wai` runtime identity output contract (CLI only). |
+| [specs-info.md](specs-info.md) | *(planned)* `wsl4ai info` / `inf` — read-only report of the distro setup: identity, paths, mounts, database, config, AI client (CLI and TUI). |
 | [specs-start.md](specs-start.md) | `wsl4ai start` — run one mounted use in foreground; CLI and TUI flows. |
 | [specs-tui.md](specs-tui.md) | `wsl4ai tui` — TUI specification: menu model, scope rules, theme, log config, Start loop behavior, UI design (banner, menus, dialogs, buttons, style tokens). |
 | [specs-config.md](specs-config.md) | `conf/config.json` — config file structure, schema versioning, update procedure, and config migrations. |
 | [specs-manifest.md](specs-manifest.md) | *(planned)* `manifest.json` — version of every component (tool, config and DB schema, updater, installer, scripts) and how the updater uses it. |
-| [specs-version.md](specs-version.md) | `-v` / `--version` flag — version string location and format. |
+| [specs-version.md](specs-version.md) | `-v` / `--version` flag — version string location and format; *(planned)* `wsl4ai version` command for every component. |

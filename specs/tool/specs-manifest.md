@@ -76,6 +76,8 @@ The updater keeps a **local copy** at `conf/manifest.json` (never replaced by to
 
 `--check` output lists every component whose remote version differs, one per line (`component: local → remote`).
 
+The full report is the `wsl4ai version` command (CLI and TUI), specified in [`specs-version.md`](specs-version.md) §5; `wsl4ai info` ([`specs-info.md`](specs-info.md)) reports the setup of the distro.
+
 ---
 
 ## 5. Consistency rules
@@ -103,4 +105,3 @@ A **consistency check** (script or pre-commit hook; to be defined) enforces thes
 
 - Where the `db_schema` value lives (`PRAGMA user_version` vs a metadata table) and the first migration it needs.
 - Whether the updater should be allowed to replace itself on request (e.g. `--self`), instead of warning only.
-- Whether `wsl4ai -v` should also print the manifest (all components) with a flag such as `-v --all`.

@@ -29,7 +29,7 @@ Registry | Use | Wsl | Start | Others | Exit
 | `Use` | List · Add · Remove · Enable · Disable |
 | `Wsl` | List · Set |
 | `Start` | *(direct action — shows mounted-use picker)* |
-| `Others` | Install › Database · Alias (List · Add · Remove) · Theme |
+| `Others` | Install › Database · Alias (List · Add · Remove) · Theme · Info · Version *(Info and Version planned)* |
 | `Exit` | *(exits TUI)* |
 
 ### 2.2 Interaction keys
