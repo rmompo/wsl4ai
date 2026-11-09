@@ -76,7 +76,7 @@ WSL4AI_USER="wsl4ai"                            # Linux account to create
 INSTALL_BASE="/home/${WSL4AI_USER}/wsl4ai"      # application root
 WSL_DDBB="${INSTALL_BASE}/conf/ddbb/"           # WSL path for the database bind-mount
 WSL_PROJECTS="${INSTALL_BASE}/projects/"       # WSL path for the projects bind-mount
-HOST_DDBB="C:/LocalFiles/data/wsl/wsl4ai/ddbb/"           # Windows path for the database
+HOST_DDBB="C:/LocalFiles/data/wsl/wsl4ai/ddbb/"  # Windows path for the database
 HOST_PROJECTS="C:/LocalFiles/proyectos/"        # Windows path for projects
 ```
 
@@ -142,6 +142,16 @@ chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_BASE}/tool"
 
 ---
 
+**Step 6b — copy extras/ (optional startup scripts for other WSL distros)**
+
+```bash
+mkdir -p "${INSTALL_BASE}/extras"
+cp -a /tmp/wsl4ai/repo/extras/. "${INSTALL_BASE}/extras/"
+chown -R "${WSL4AI_USER}:${WSL4AI_USER}" "${INSTALL_BASE}/extras"
+```
+
+---
+
 **Step 7 — install pip dependencies**
 
 ```bash
@@ -168,8 +178,8 @@ chown "${WSL4AI_USER}:${WSL4AI_USER}" "${BASHRC}"
 Convert Windows paths to WSL mount paths (`C:/foo/bar` → `/mnt/c/foo/bar`):
 
 ```bash
-HOST_DDBB_WSL="/mnt/c/LocalFiles/data/wsl/wsl4ai/ddbb"      # adjust drive letter / path
-HOST_PROJECTS_WSL="/mnt/c/LocalFiles/proyectos"   # adjust drive letter / path
+HOST_DDBB_WSL="/mnt/c/LocalFiles/data/wsl/wsl4ai/ddbb"  # adjust drive letter / path
+HOST_PROJECTS_WSL="/mnt/c/LocalFiles/proyectos"          # adjust drive letter / path
 
 sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_DDBB}" "${WSL_PROJECTS}"
 mkdir -p "${HOST_DDBB_WSL}" "${HOST_PROJECTS_WSL}"

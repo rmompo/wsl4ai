@@ -9,9 +9,11 @@ The installer prepares a **dedicated WSL (Linux)** environment for the **WSL4AI 
 - Sets **default WSL login user** via `/etc/wsl.conf`.
 - Copies the **Python application** from `tool/` into `INSTALL_TOOL`.
 - Copies **`conf/`** contents (`wsl4ai-update.py`, `config.json`) into `INSTALL_CONF` (skips `config.json` if already present).
+- Copies **`extras/`** (optional startup scripts for other WSL distros) into `INSTALL_EXTRAS`.
 - Installs **Python 3**, **pip**, and **git** system-wide via **apt**.
 - Installs **`tool/requirements.txt`** with **`pip install --user`** for the new user.
-- Creates the `WSL_DDBB` and `WSL_PROJECTS` mount point directories.
+- Creates the `WSL_DDBB` and `WSL_PROJECTS` mount point directories (and their Windows-side counterparts) and bind-mounts `WSL_DDBB` immediately.
+- Writes a **sudoers** rule (`/etc/sudoers.d/wsl4ai-mount`) so the new user can run `mount --bind` / `umount` for the database and `WSL_PROJECTS` without a password.
 - Copies **`.startup-wsl4ai.sh`** to the new user's `~`, with paths resolved.
 - Configures **`.bashrc`** to source `~/.startup-wsl4ai.sh` on shell start.
 - Writes **`local.env`** with the four environment variables.
@@ -68,6 +70,7 @@ HOST_PROJECTS=C:/LocalFiles/proyectos
 | `INSTALL_BASE` | `dirname(dirname(WSL_DDBB))` — root of the WSL4AI installation |
 | `INSTALL_CONF` | `INSTALL_BASE/conf/` |
 | `INSTALL_TOOL` | `INSTALL_BASE/tool/` |
+| `INSTALL_EXTRAS` | `INSTALL_BASE/extras/` |
 
 The default WSL login user is **always set** to `WSL4AI_USER` (no prompt).
 
@@ -83,11 +86,14 @@ The default WSL login user is **always set** to `WSL4AI_USER` (no prompt).
 | 4 | `useradd`, `chpasswd` (password = username), add to **sudo** or **wheel**. |
 | 5 | Update/create **`/etc/wsl.conf`** `[user] default=<WSL4AI_USER>`. |
 | 6 | Copy **`tool/`** → **`INSTALL_TOOL`**; `chown`. |
+| 6b | Copy **`extras/`** → **`INSTALL_EXTRAS`** (if present in the repo); `chown`. |
 | 7 | As new user: **`pip install --user`** from **`INSTALL_TOOL/requirements.txt`**; add to **`.bashrc`**: `source ~/.startup-wsl4ai.sh`. |
-| 8 | Create mount point directories: `WSL_DDBB` and `WSL_PROJECTS` (and their Windows-side counterparts). |
+| 8 | Create mount point directories: `WSL_DDBB` and `WSL_PROJECTS` (and their Windows-side counterparts); bind-mount `HOST_DDBB` → `WSL_DDBB` now so the database is created on the host path. Requires `/mnt/c`. |
 | 8b | Copy **`.startup-wsl4ai.sh`** template to `~/.startup-wsl4ai.sh`, replacing `__INSTALL_BASE__` with the resolved `INSTALL_BASE` path. |
+| 8c | Write **`/etc/sudoers.d/wsl4ai-mount`** (mode `440`): `NOPASSWD` for `mount --bind HOST_DDBB_WSL WSL_DDBB`, and for `mount --bind * WSL_PROJECTS*` / `umount WSL_PROJECTS*`. |
 | 9 | Write **`local.env`** → `INSTALL_CONF`; copy `wsl4ai-update.py` and `config.json` from repo `conf/` into `INSTALL_CONF` (`config.json` skipped if already present); `chown`. |
 | 10 | As **`WSL4AI_USER`**: **`cd INSTALL_TOOL && python3 wsl4ai.py install database`**. |
+| — | Remove the temporary clone (`/tmp/wsl4ai/repo`). |
 | — | Print final message: exit WSL and run `wsl --shutdown` from Windows. |
 
 ---
@@ -100,6 +106,7 @@ The default WSL login user is **always set** to `WSL4AI_USER` (no prompt).
 
 ~/wsl4ai/                  ← INSTALL_BASE
 ├── tool/                  ← INSTALL_TOOL — Python application (replaced on update)
+├── extras/                ← INSTALL_EXTRAS — optional startup scripts for other WSL distros
 ├── projects/              ← WSL_PROJECTS — bind-mount → HOST_PROJECTS (Windows)
 ├── .tmp/                  — temporary working directory (used by updater)
 └── conf/                  ← INSTALL_CONF — persistent configuration (never replaced on update)
@@ -139,10 +146,10 @@ Installed from `install/.startup-wsl4ai.sh` template. The only placeholder subst
 Sections in order:
 
 1. **Load config** — `source INSTALL_BASE/conf/local.env`
-2. **Automatic mounts** — waits for `/mnt/c`, then bind-mounts `HOST_DDBB` → `WSL_DDBB` and `HOST_PROJECTS` → `WSL_PROJECTS` if not already mounted.
+2. **Automatic mounts** — waits for `/mnt/c`, then bind-mounts `HOST_DDBB` → `WSL_DDBB` if not already mounted. Project mounts under `WSL_PROJECTS` are not created here: they are managed on demand with `wsl4ai use enable` / `disable`.
 3. **Environment setup** — extends `PATH` with `~/.local/bin`; `cd ~`.
 4. **Aliases** — managed block between markers `# >>> WSL4AI BEGIN >>>` / `# <<< WSL4AI END <<<`; default alias is `wsl4ai()`.
-5. **Welcome banner** — calls `python3 INSTALL_BASE/tool/wsl4ai.py -v`, then `use disableall --quiet`, then prints usage hints.
+5. **Welcome banner** — runs `wsl4ai use disableall --quiet` (every session starts with no project mounts), prints the title, runs `wsl4ai install update --check`, then prints usage hints (`cli: wsl4ai <command>`, `tui: wsl4ai tui`).
 
 ---
 
