@@ -27,13 +27,13 @@ The installer prepares a **dedicated WSL (Linux)** environment for the **WSL4AI 
 - Run inside **WSL** with **`/mnt/c`** available (Windows drives mounted).
 - Run the script **as root**: `sudo bash /tmp/wsl4ai/wsl4ai-install.sh`.
 - Script must be placed in **`/tmp/wsl4ai/`** and run from there.
-- **`install/defaults.env`** supplies default values for the interactive prompts. If missing, **`wsl4ai-install.sh`** downloads it from GitHub raw (`main` branch) using **`curl`** or **`wget`**.
+- **`install/wsl4ai-defaults.env`** supplies default values for the interactive prompts. If missing, **`wsl4ai-install.sh`** downloads it from GitHub raw (`main` branch) using **`curl`** or **`wget`**.
 - **`tool/`** must be present at `/tmp/wsl4ai/tool/`. If missing, `wsl4ai-install.sh` clones it from GitHub (requires **`git`**, installed in the apt step first).
 - **`conf/`** must be present at `/tmp/wsl4ai/conf/`. Obtained from the same clone as `tool/`.
 
 ---
 
-## 3. Configuration: `defaults.env`
+## 3. Configuration: `wsl4ai-defaults.env`
 
 Provides default values for the interactive prompts. If the file is absent, `wsl4ai-install.sh` downloads it from GitHub.
 
@@ -56,10 +56,10 @@ HOST_PROJECTS=C:/LocalFiles/proyectos
 ## 4. Interactive prompts (order)
 
 1. **`WSL4AI_USER`** — Linux account to create (required; validated; must not already exist).
-2. **`WSL_DDBB`** — WSL mount point for the shared ddbb directory (default from `defaults.env`, `${HOME}` replaced with actual user home).
-3. **`WSL_PROJECTS`** — WSL mount point for the projects directory (default from `defaults.env`).
-4. **`HOST_DDBB`** — Windows path to the shared database directory (default from `defaults.env`).
-5. **`HOST_PROJECTS`** — Windows path to the projects directory (default from `defaults.env`).
+2. **`WSL_DDBB`** — WSL mount point for the shared ddbb directory (default from `wsl4ai-defaults.env`, `${HOME}` replaced with actual user home).
+3. **`WSL_PROJECTS`** — WSL mount point for the projects directory (default from `wsl4ai-defaults.env`).
+4. **`HOST_DDBB`** — Windows path to the shared database directory (default from `wsl4ai-defaults.env`).
+5. **`HOST_PROJECTS`** — Windows path to the projects directory (default from `wsl4ai-defaults.env`).
 
 **Internal variables** (derived from `WSL_DDBB`; not stored in `local.env`; not prompted):
 
@@ -160,7 +160,7 @@ wget -qO /tmp/wsl4ai/wsl4ai-install.sh https://raw.githubusercontent.com/rmompo/
 sudo bash /tmp/wsl4ai/wsl4ai-install.sh
 ```
 
-`defaults.env` and `tool/` are downloaded automatically if not present in `/tmp/wsl4ai/`.
+`wsl4ai-defaults.env` and `tool/` are downloaded automatically if not present in `/tmp/wsl4ai/`.
 
 ---
 

@@ -15,9 +15,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${WORK_DIR}/repo"
 TOOL_SRC="${REPO_DIR}/tool"
 CONF_SRC="${REPO_DIR}/conf"
-DEFAULTS_FILE="${REPO_DIR}/install/defaults.env"
+DEFAULTS_FILE="${REPO_DIR}/install/wsl4ai-defaults.env"
 STARTUP_FILE="${REPO_DIR}/install/.startup-wsl4ai.sh"
-DEFAULTS_URL="https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/defaults.env"
+DEFAULTS_URL="https://raw.githubusercontent.com/rmompo/wsl4ai/main/install/wsl4ai-defaults.env"
 REPO_URL="https://github.com/rmompo/wsl4ai.git"
 
 if [[ "${SCRIPT_DIR}" != "${WORK_DIR}" ]]; then
@@ -59,19 +59,19 @@ ensure_repo() {
 }
 
 ensure_defaults_env() {
-  # Use repo if already cloned; otherwise download only defaults.env as fallback
+  # Use repo if already cloned; otherwise download only wsl4ai-defaults.env as fallback
   if [[ -f "${DEFAULTS_FILE}" ]]; then
     return 0
   fi
-  local fallback="${WORK_DIR}/defaults.env"
+  local fallback="${WORK_DIR}/wsl4ai-defaults.env"
   DEFAULTS_FILE="${fallback}"
   if [[ -f "${fallback}" ]]; then
     return 0
   fi
-  echo "wsl4ai-install.sh: defaults.env not found; downloading from GitHub..." >&2
+  echo "wsl4ai-install.sh: wsl4ai-defaults.env not found; downloading from GitHub..." >&2
   _download "${DEFAULTS_URL}" "${fallback}"
   if [[ ! -s "${fallback}" ]]; then
-    echo "wsl4ai-install.sh: failed to download defaults.env (empty or missing)." >&2
+    echo "wsl4ai-install.sh: failed to download wsl4ai-defaults.env (empty or missing)." >&2
     rm -f "${fallback}"
     exit 1
   fi
