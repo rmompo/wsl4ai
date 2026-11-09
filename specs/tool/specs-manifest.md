@@ -1,0 +1,106 @@
+# WSL4AI — Component Manifest Specification
+
+> **Status: planned** — not yet implemented.
+
+This document specifies `manifest.json`: a single file that records the version of every independently versioned component of WSL4AI, and how the updater uses it.
+
+---
+
+## 1. Motivation
+
+Today only two things carry a version: the tool (`__version__` in `tool/wsl4ai.py`) and the `config.json` schema (`__config_version__`). The updater reads the tool version with a regular expression over `wsl4ai.py`. Everything else is unversioned:
+
+- `conf/wsl4ai-update.py` is never replaced by an update, so a fix in it never reaches existing installs, and there is no way to tell which version an install has.
+- The SQLite database has no schema version, so it cannot be migrated.
+- The installer has only a comment (`install v3.0`) that nothing reads.
+- The install scripts in `tool/scripts/` have no version.
+
+---
+
+## 2. File
+
+`manifest.json` at the **repository root**:
+
+```json
+{
+  "manifest_version": 1,
+  "components": {
+    "tool": "1.6.9",
+    "config_schema": "1.0",
+    "db_schema": "1.0",
+    "updater": "1.0.0",
+    "installer": "3.0.0",
+    "scripts": {
+      "wsl4ai-install-claudecode.sh": "0.1.0",
+      "wsl4ai-install-ghcopilot.sh": "0.1.0"
+    }
+  }
+}
+```
+
+| Component | What it versions | Source of the value |
+|-----------|------------------|---------------------|
+| `tool` | The Python application (`tool/`) | `__version__` in `tool/wsl4ai.py` |
+| `config_schema` | Structure of `conf/config.json` | `__config_version__` in `tool/wsl4ai.py` |
+| `db_schema` | Structure of the SQLite database | *(new)* stored in the database (`PRAGMA user_version` or a metadata table) |
+| `updater` | `conf/wsl4ai-update.py` | *(new)* `__version__` constant in the script |
+| `installer` | `install/wsl4ai-install.sh` | *(new)* `# Version:` header in the script |
+| `scripts` | Each file in `tool/scripts/`, by file name | *(new)* `# Version:` header in each script |
+
+Versions follow **semantic versioning** (`MAJOR.MINOR.PATCH`); schema versions keep the `MAJOR.MINOR` form already used by `config_schema`.
+
+`manifest_version` is the version of the manifest format itself (an integer).
+
+---
+
+## 3. Installed copy
+
+The updater keeps a **local copy** at `conf/manifest.json` (never replaced by tool updates). It records what this install has:
+
+- The installer writes the initial copy at install time.
+- The updater rewrites it **only after a successful update**.
+- If it is missing (installs made before this feature), every component is treated as **unknown** and the next update creates it. A missing file must never make the updater fail.
+
+---
+
+## 4. Updater behaviour
+
+`wsl4ai install update [--check]` downloads the remote `manifest.json` (same branch rules as today, see `--branch`) instead of parsing `wsl4ai.py`, and compares each component with the local copy.
+
+| Component | On difference |
+|-----------|---------------|
+| `tool`, `scripts` | Applied by the update: both travel inside `tool/`, which is replaced atomically. `--check` lists which ones changed. |
+| `config_schema` | Migrations are applied as already specified in [`specs-config.md`](specs-config.md). |
+| `db_schema` | A migration chain, analogous to the config one, applies pending database migrations. |
+| `updater`, `installer` | **Advisory only.** The updater is never replaced automatically; `--check` and the update print a warning that a newer version exists and where to get it. |
+
+`--check` output lists every component whose remote version differs, one per line (`component: local → remote`).
+
+---
+
+## 5. Consistency rules
+
+The manifest must never disagree with the code it describes. These must hold in every commit:
+
+1. `components.tool` equals `__version__` in `tool/wsl4ai.py`.
+2. `components.config_schema` equals `__config_version__` in `tool/wsl4ai.py`.
+3. `components.updater` equals the version constant in `conf/wsl4ai-update.py`.
+4. `components.installer` equals the `# Version:` header of the installer.
+5. Each entry of `components.scripts` equals the `# Version:` header of that script, and every `*.sh` in `tool/scripts/` has an entry.
+
+A **consistency check** (script or pre-commit hook; to be defined) enforces these rules. When a component changes, its version is bumped in both places in the same commit.
+
+---
+
+## 6. Out of scope
+
+- `specs/` and `wsls/` guides carry no version: they follow the repository.
+- Per-script update on its own: scripts are replaced together with `tool/`.
+
+---
+
+## 7. Open questions
+
+- Where the `db_schema` value lives (`PRAGMA user_version` vs a metadata table) and the first migration it needs.
+- Whether the updater should be allowed to replace itself on request (e.g. `--self`), instead of warning only.
+- Whether `wsl4ai -v` should also print the manifest (all components) with a flag such as `-v --all`.
