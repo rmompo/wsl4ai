@@ -313,14 +313,14 @@ wsl4ai -v              # Show version
 
 ---
 
-## WSL configuration guides
+## WSL distro management
 
-General WSL commands you may need before following a tool-specific guide:
+General WSL commands, run from Windows:
 
 Create a WSL distribution with a specific name from a specific image:
 
 ```bash
-wsl --import <image name> c:\wsl2data\<image name> C:\tools\ubuntu24.tar.gz
+wsl --import <image name> C:\LocalFiles\data\wsl\<image name> C:\tools\ubuntu24.tar.gz
 ```
 
 Start a specific WSL distribution:
@@ -341,14 +341,28 @@ Completely remove a specific WSL distribution:
 wsl --unregister <image name>
 ```
 
-Step-by-step setup guides for WSL distros dedicated to specific AI tools:
+---
 
-| Guide | Tool | Method |
-| ----- | ---- | ------ |
-| [`wsls/wsl4claudecode.md`](wsls/wsl4claudecode.md) | Anthropic Claude Code | `tool/scripts/wsl4ai-install-claudecode.sh` (native installer) |
-| [`wsls/wsl4ghcopilot.md`](wsls/wsl4ghcopilot.md) | GitHub Copilot CLI | `tool/scripts/wsl4ai-install-ghcopilot.sh` (standalone installer) |
+## Install an AI client
 
-Each guide covers installation, authentication, and applying the changes (restarting the distro).
+Each WSL distro is dedicated to **one** AI client: a script refuses to run if the other client is already installed. Run the one you need inside the distro (they ship with the tool in `~/wsl4ai/tool/scripts/`; `-h` shows their help):
+
+| Client | Script | Installer used | First run |
+| ------ | ------ | -------------- | --------- |
+| Anthropic Claude Code | `bash ~/wsl4ai/tool/scripts/wsl4ai-install-claudecode.sh` | Official native installer (`claude.ai/install.sh`, about 240 MB, no Node.js) | `claude` — opens the browser to log in; `claude doctor` for diagnostics |
+| GitHub Copilot CLI | `bash ~/wsl4ai/tool/scripts/wsl4ai-install-ghcopilot.sh` | Standalone installer (`gh.io/copilot-install`, no Node.js or Homebrew) | `copilot` — log in with your GitHub account |
+
+Both install under `~/.local`; `~/.local/bin` is already on the `PATH` through `~/.startup-wsl4ai.sh`, so no shell reload is needed (open a new shell if the command is not found).
+
+---
+
+## Development
+
+`manifest.json` records the version of every component (see [`specs/tool/specs-manifest.md`](specs/tool/specs-manifest.md)). When you change one, bump it in the manifest and in the code, then check that they agree:
+
+```bash
+python3 dev/check-manifest.py
+```
 
 ---
 

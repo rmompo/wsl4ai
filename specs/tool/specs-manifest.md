@@ -97,7 +97,7 @@ The **consistency check** `python3 dev/check-manifest.py` enforces these rules (
 
 ## 6. Out of scope
 
-- `specs/` and `wsls/` guides carry no version: they follow the repository.
+- `specs/` carries no version: it follows the repository.
 - Per-script update on its own: scripts are replaced together with `tool/`.
 
 ---
