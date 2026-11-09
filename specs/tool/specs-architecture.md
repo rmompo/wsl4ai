@@ -128,7 +128,7 @@ Each record is a list of `(label, value)` pairs displayed as a form-style row in
   ("UUID     ", "550e8400-..."),
   ("Name     ", "myproject"),
   ("Path Host", "/mnt/c/LocalFiles/proyectos/myproject"),
-  ("Path Wsl ", "/home/user/wsl4ai/proyectos/myproject"),
+  ("Path Wsl ", "/home/user/wsl4ai/projects/myproject"),
   ("In Use   ", "yes"),
 ]
 ```

@@ -46,8 +46,8 @@ Provides default values for the interactive prompts. If the file is absent, `ins
 
 ```
 WSL_DDBB=${HOME}/wsl4ai/conf/ddbb
-WSL_PROJECTS=${HOME}/wsl4ai/proyectos
-HOST_DDBB=C:/wsl2data/wsl4ai/ddbb
+WSL_PROJECTS=${HOME}/wsl4ai/projects
+HOST_DDBB=C:/LocalFiles/data/wsl/wsl4ai/ddbb
 HOST_PROJECTS=C:/LocalFiles/proyectos
 ```
 
@@ -100,7 +100,7 @@ The default WSL login user is **always set** to `WSL4AI_USER` (no prompt).
 
 ~/wsl4ai/                  ← INSTALL_BASE
 ├── tool/                  ← INSTALL_TOOL — Python application (replaced on update)
-├── proyectos/             ← WSL_PROJECTS — bind-mount → HOST_PROJECTS (Windows)
+├── projects/              ← WSL_PROJECTS — bind-mount → HOST_PROJECTS (Windows)
 ├── .tmp/                  — temporary working directory (used by updater)
 └── conf/                  ← INSTALL_CONF — persistent configuration (never replaced on update)
     ├── local.env

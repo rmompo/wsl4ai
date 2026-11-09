@@ -24,7 +24,7 @@ WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manage
 ~/wsl4ai/
 ├── tool/              — Python application (replaced on update)
 ├── extras/            — optional startup scripts for other WSL distros
-├── proyectos/         — bind-mount → HOST_PROJECTS (Windows)
+├── projects/          — bind-mount → HOST_PROJECTS (Windows)
 └── conf/              — persistent config (never replaced on update)
     ├── local.env      — HOST_DDBB, WSL_DDBB, HOST_PROJECTS, WSL_PROJECTS
     ├── config.json
@@ -75,8 +75,8 @@ Perform the following steps **as root** (`sudo -i` or prefix each command with `
 WSL4AI_USER="wsl4ai"                            # Linux account to create
 INSTALL_BASE="/home/${WSL4AI_USER}/wsl4ai"      # application root
 WSL_DDBB="${INSTALL_BASE}/conf/ddbb/"           # WSL path for the database bind-mount
-WSL_PROJECTS="${INSTALL_BASE}/proyectos/"       # WSL path for the projects bind-mount
-HOST_DDBB="C:/wsl2data/wsl4ai/ddbb/"           # Windows path for the database
+WSL_PROJECTS="${INSTALL_BASE}/projects/"       # WSL path for the projects bind-mount
+HOST_DDBB="C:/LocalFiles/data/wsl/wsl4ai/ddbb/"           # Windows path for the database
 HOST_PROJECTS="C:/LocalFiles/proyectos/"        # Windows path for projects
 ```
 
@@ -168,7 +168,7 @@ chown "${WSL4AI_USER}:${WSL4AI_USER}" "${BASHRC}"
 Convert Windows paths to WSL mount paths (`C:/foo/bar` → `/mnt/c/foo/bar`):
 
 ```bash
-HOST_DDBB_WSL="/mnt/c/wsl2data/wsl4ai/ddbb"      # adjust drive letter / path
+HOST_DDBB_WSL="/mnt/c/LocalFiles/data/wsl/wsl4ai/ddbb"      # adjust drive letter / path
 HOST_PROJECTS_WSL="/mnt/c/LocalFiles/proyectos"   # adjust drive letter / path
 
 sudo -u "${WSL4AI_USER}" -H mkdir -p "${WSL_DDBB}" "${WSL_PROJECTS}"
