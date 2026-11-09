@@ -4,7 +4,7 @@ from argparse import Namespace, _SubParsersAction
 from collections.abc import Callable
 
 from commands.api_json import OptionSpec, options_from_args
-from commands.help_md import help_summary_for_root, parser_description_from_manual
+from commands.cli_help import help_summary, parser_description
 from commands.api import (
     emit_from_api,
     api_use_add,
@@ -208,8 +208,8 @@ def _add_wsl_only(p) -> None:
 def register_use_command(subparsers: _SubParsersAction) -> None:
     """Register ``use`` with real subcommand handlers."""
     use_fb = "Connect WSL workspaces with mount definitions or break those ties."
-    use_desc = parser_description_from_manual("use", use_fb)
-    help_line = help_summary_for_root("use", "Link WSLs to mount definitions")
+    use_desc = parser_description(use_fb)
+    help_line = help_summary("Link WSLs to mount definitions")
     use = subparsers.add_parser(
         "use",
         help=help_line,

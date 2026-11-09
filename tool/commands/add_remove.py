@@ -4,7 +4,7 @@ from argparse import Namespace, _SubParsersAction
 
 from commands.api_json import OptionSpec, options_from_args
 from commands.common import load_local_env_paths
-from commands.help_md import help_summary_for_root, parser_description_from_manual
+from commands.cli_help import help_summary, parser_description
 from commands.api import emit_from_api, api_registry_add, api_registry_remove
 
 
@@ -50,11 +50,11 @@ def register_add_command(
     help_override: str | None = None,
 ) -> None:
     fb = "Register a new mount definition (name plus host and WSL path segments)."
-    desc = parser_description_from_manual("registry add", fb)
+    desc = parser_description(fb)
     if help_override:
         help_line = help_override
     else:
-        help_line = help_summary_for_root("registry add", "Add a mount definition")
+        help_line = help_summary("Add a mount definition")
     add = subparsers.add_parser(
         name,
         aliases=list(aliases),
@@ -103,11 +103,11 @@ def register_remove_command(
     help_override: str | None = None,
 ) -> None:
     fb = "Delete a mount definition from the catalog."
-    desc = parser_description_from_manual("registry remove", fb)
+    desc = parser_description(fb)
     if help_override:
         help_line = help_override
     else:
-        help_line = help_summary_for_root("registry remove", "Remove a mount definition")
+        help_line = help_summary("Remove a mount definition")
     rm = subparsers.add_parser(
         name,
         aliases=list(aliases),

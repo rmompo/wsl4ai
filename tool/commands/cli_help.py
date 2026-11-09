@@ -9,10 +9,56 @@ import shutil
 import sys
 import textwrap
 
-from commands.help_md import strip_subcommand_boilerplate, synthetic_blurb
 from commands.style_constants import HELP_NAME, HELP_SECTION, RST
 
 _HELP_FLAGS = frozenset(("-h", "--help"))
+
+
+def strip_subcommand_boilerplate(text: str) -> str:
+    """Drop a leading ``Subcommand of <name>.`` from manual-derived paragraphs.
+
+    Registry (and similar) sections start with that phrase; summaries should use
+    the following sentence so router listings stay meaningful.
+    """
+    text = " ".join(str(text).split())
+    if not text:
+        return text
+    return re.sub(r"^Subcommand of\s+[^.]+\.\s*", "", text, count=1, flags=re.IGNORECASE)
+
+
+def synthetic_blurb(
+    text: str,
+    *,
+    max_chars: int = 88,
+    prefer_sentence_under: int = 96,
+    fallback: str = "",
+) -> str:
+    """Short synthetic line: first sentence if reasonably short, else truncate."""
+    raw = " ".join(str(text).split())
+    raw = strip_subcommand_boilerplate(raw)
+    raw = " ".join(raw.split())
+    if not raw:
+        return fallback
+    for sep in (". ", "? ", "! "):
+        p = raw.find(sep)
+        if 0 < p < prefer_sentence_under:
+            return raw[: p + 1].strip()
+    if len(raw) <= max_chars:
+        return raw
+    return raw[: max(1, max_chars - 3)].rstrip() + "..."
+
+
+def parser_description(text: str) -> str:
+    """Short ``description=`` line for a parser (first sentence, or truncated)."""
+    text = text.strip()
+    return synthetic_blurb(text, max_chars=98, prefer_sentence_under=110, fallback=text)
+
+
+def help_summary(text: str) -> str:
+    """Short ``help=`` line for the command lists (first sentence, or truncated)."""
+    text = text.strip()
+    return synthetic_blurb(text, max_chars=70, prefer_sentence_under=78, fallback=text)
+
 
 # Normalized section heading titles
 _SECTION_ALIASES: dict[str, str] = {

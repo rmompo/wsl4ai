@@ -3,7 +3,7 @@
 from argparse import Namespace, _SubParsersAction
 
 from commands.api_json import OptionSpec, options_from_args
-from commands.help_md import help_summary_for_root, parser_description_from_manual
+from commands.cli_help import help_summary, parser_description
 from commands.api import (
     emit_from_api,
     api_wsl_list,
@@ -72,11 +72,11 @@ def register_wsl_set_parser(
     help_override: str | None = None,
 ) -> None:
     fb = "Set which command runs when this WSL workspace is started."
-    desc = parser_description_from_manual("wsl / ws", fb)
+    desc = parser_description(fb)
     if help_override:
         help_line = help_override
     else:
-        help_line = help_summary_for_root("wsl / ws", "Set a WSL launch command")
+        help_line = help_summary("Set a WSL launch command")
     p = subparsers.add_parser(
         name,
         aliases=list(aliases),
@@ -90,8 +90,8 @@ def register_wsl_set_parser(
 def register_wsl_command(subparsers: _SubParsersAction) -> None:
     """Register ``wsl`` with nested ``set`` (and alias ``ws`` on nested subparser if desired)."""
     wsl_fb = "Adjust per-WSL launch command using the set subcommand."
-    wsl_desc = parser_description_from_manual("wsl / ws", wsl_fb)
-    help_line = help_summary_for_root("wsl / ws", "Configure WSL launch commands")
+    wsl_desc = parser_description(wsl_fb)
+    help_line = help_summary("Configure WSL launch commands")
     wsl = subparsers.add_parser(
         "wsl",
         help=help_line,

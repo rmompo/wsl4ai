@@ -2,7 +2,7 @@
 
 from argparse import Namespace, _SubParsersAction
 
-from commands.help_md import help_summary_for_root, parser_description_from_manual
+from commands.cli_help import help_summary, parser_description
 from commands.api import emit_from_api, api_registry_list
 
 
@@ -20,11 +20,11 @@ def register_list_command(
 ) -> None:
     """Register ``list`` subparser (e.g. under ``registry`` or as root shortcut ``rl``)."""
     fb = "Show every mount definition and which WSL workspaces reference it."
-    desc = parser_description_from_manual("registry list", fb)
+    desc = parser_description(fb)
     if help_override:
         help_line = help_override
     else:
-        help_line = help_summary_for_root("registry list", "List mount definitions")
+        help_line = help_summary("List mount definitions")
     lst = subparsers.add_parser(
         name,
         aliases=list(aliases),

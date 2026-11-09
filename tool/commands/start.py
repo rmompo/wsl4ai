@@ -8,7 +8,7 @@ from argparse import Namespace, _SubParsersAction
 
 from commands.api_json import OptionSpec, emit_envelope, options_from_args
 from commands.common import DB_PATH, connect_db, expand_path_template, load_local_env_paths, require_database_file
-from commands.help_md import help_summary_for_root, parser_description_from_manual
+from commands.cli_help import help_summary, parser_description
 from commands.wsl_db import resolve_registry_target, resolve_wsl_uuid
 
 
@@ -105,8 +105,8 @@ def cmd_start(args: Namespace) -> int:
 def register_start_command(subparsers: _SubParsersAction) -> None:
     """Register the concrete `start` command."""
     fb = "Run one mounted use: cd to WSL path and execute this WSL cli command."
-    desc = parser_description_from_manual("start", fb)
-    help_line = help_summary_for_root("start", "Run one mounted use in the current console")
+    desc = parser_description(fb)
+    help_line = help_summary("Run one mounted use in the current console")
     p = subparsers.add_parser("start", help=help_line, description=desc)
     reg = p.add_mutually_exclusive_group(required=True)
     reg.add_argument(

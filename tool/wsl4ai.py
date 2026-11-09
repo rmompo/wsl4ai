@@ -15,11 +15,10 @@ from commands.cli_help import (
 )
 from commands.common import resolve_runtime_identity
 from commands.core import register_core_commands
-from commands.help_md import root_description_short, root_epilog_short
 from commands.install import register_install_command
 from commands.output_decorator import format_envelope_for_cli, try_parse_envelope
 
-__version__ = "1.9.1"
+__version__ = "1.9.2"
 __config_version__ = "1.0"
 
 APP_DIR = Path(__file__).resolve().parent
@@ -92,8 +91,7 @@ def build_parser() -> Wsl4aiArgumentParser:
     """
     parser = Wsl4aiArgumentParser(
         prog="wsl4ai",
-        description=root_description_short(),
-        epilog=root_epilog_short(),
+        description="WSL4AI — project mounts and tooling for AI clients in WSL.",
     )
 
     parser.add_argument(

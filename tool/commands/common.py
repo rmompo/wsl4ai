@@ -11,7 +11,6 @@ import sys
 
 APP_DIR = Path(__file__).resolve().parent.parent
 CONF_DIR = APP_DIR.parent / "conf"
-MAN_DIR = APP_DIR / "man"
 
 
 def _resolve_ddbb_dir() -> Path:
