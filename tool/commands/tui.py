@@ -251,6 +251,7 @@ MENU: list = [
         None,
         "Theme",
         "Info",
+        "Version",
         None,
         ("Install", [
             "Database",
@@ -1591,6 +1592,22 @@ if _HAS_TEXTUAL:
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+    class VersionDialog(ListDialog):
+        """Version of every component (local only; ``--remote`` is CLI only)."""
+
+        def __init__(self, breadcrumb: str) -> None:
+            from commands.api import api_version
+            from commands.tui_decorator import version_records
+            hdr, recs = version_records(api_version())
+            super().__init__(breadcrumb, hdr, recs, width=90)
+
+        def _handle_key(self, event: "events.Key") -> None:
+            if not self._navigate(event.key):
+                if event.key in ("escape", "enter"):
+                    self.dismiss(None)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
     class AliasAddDialog(Wsl4aiDialog):
         """Add a new alias to ~/.startup-wsl4ai.sh."""
 
@@ -2244,6 +2261,9 @@ if _HAS_TEXTUAL:
 
             if path == ["Others", "Info"]:
                 self.push_screen(InfoDialog(breadcrumb))
+                return
+            if path == ["Others", "Version"]:
+                self.push_screen(VersionDialog(breadcrumb))
                 return
 
             # ── List dialogs ───────────────────────────────────────────────────

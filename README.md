@@ -273,7 +273,9 @@ wsl4ai install update
 wsl4ai iu                      # shorthand
 ```
 
-The updater (`conf/wsl4ai-update.py`) is a standalone script that is **never replaced by updates**. It downloads `wsl4ai.py` from GitHub to compare versions, then clones the repository and replaces `tool/` atomically. `conf/` is never touched.
+The updater (`conf/wsl4ai-update.py`) is a standalone script that is **never replaced by updates**. It downloads `manifest.json` from GitHub to compare versions, then clones the repository and replaces `tool/` atomically (config and database migrations are applied when needed). `conf/` is otherwise never touched. When a newer updater or installer exists it prints a note with its URL instead of replacing it.
+
+To see the version of every component (tool, config and database schemas, updater, installer and scripts), use `wsl4ai version` (`--remote` compares with GitHub); `wsl4ai info` shows how the distro is set up.
 
 > **Note:** `install update` is a CLI-only command — it is not available in the TUI.
 

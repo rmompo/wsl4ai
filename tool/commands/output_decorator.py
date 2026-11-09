@@ -209,6 +209,24 @@ def _format_info(rows: list) -> list[str]:
     return lines
 
 
+def _format_version(rows: list) -> list[str]:
+    """Render ``version`` rows as an aligned table (the REMOTE column only with ``--remote``)."""
+    entries: list[dict[str, str]] = []
+    for row in rows:
+        fields = row.get("fields", []) if isinstance(row, dict) else []
+        entries.append({f["key"]: f["value"] for f in fields if isinstance(f, dict) and "key" in f})
+    cols = ["component", "local"] + (["remote"] if any("remote" in e for e in entries) else []) + ["status"]
+    widths = {c: max(len(c), *(len(e.get(c, "")) for e in entries)) for c in cols}
+
+    def line(values: dict) -> str:
+        return "  ".join(values.get(c, "").ljust(widths[c]) for c in cols).rstrip()
+
+    lines = [tty_styled(line({c: c.upper() for c in cols}), HELP_NAME)]
+    for e in entries:
+        lines.append(line(e))
+    return lines
+
+
 def format_envelope_for_cli(envelope: dict) -> str:
     """Render a compact human-friendly CLI output from envelope JSON."""
     output = envelope.get("output", {}) if isinstance(envelope, dict) else {}
@@ -240,6 +258,8 @@ def format_envelope_for_cli(envelope: dict) -> str:
             lines.extend(_format_use_list(rows))
         elif status == 0 and command == "wsl" and subcommand == "list":
             lines.extend(_format_wsl_list(rows))
+        elif status == 0 and command == "version":
+            lines.extend(_format_version(rows))
         elif status == 0 and command == "info":
             lines.extend(_format_info(rows))
         elif status == 0 and command == "install" and subcommand == "alias":

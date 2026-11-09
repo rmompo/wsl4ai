@@ -149,6 +149,7 @@ class Wsl4aiHelpFormatter(argparse.RawDescriptionHelpFormatter):
 _ROOT_LONG_COMMANDS: tuple[str, ...] = (
     "whoami",
     "info",
+    "version",
     "registry",
     "use",
     "wsl",

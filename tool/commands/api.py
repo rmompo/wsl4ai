@@ -1095,6 +1095,140 @@ def api_info() -> dict:
     return _ok(cmd, "", "wsl4ai info", rows=rows)
 
 
+# ─── Version (every component) ────────────────────────────────────────────────
+
+_REPO_RAW_ROOT = "https://raw.githubusercontent.com/rmompo/wsl4ai/{branch}"
+_COMPONENT_ORDER = ("tool", "config_schema", "db_schema", "updater", "installer")
+_SCRIPT_HEADER_RE = re.compile(r"^# Version:\s*(\S+)", re.MULTILINE)
+
+
+def _version_tuple(text: str) -> "tuple | None":
+    try:
+        return tuple(int(x) for x in str(text).strip().split("."))
+    except ValueError:
+        return None
+
+
+def _flatten_components(manifest: "dict | None") -> dict:
+    """``components`` as ``{name: version}``; scripts become ``scripts/<file>``."""
+    flat: dict = {}
+    comps = (manifest or {}).get("components", {})
+    if not isinstance(comps, dict):
+        return flat
+    for name, value in comps.items():
+        if isinstance(value, dict):
+            for fname, ver in value.items():
+                flat[f"{name}/{fname}"] = str(ver)
+        else:
+            flat[name] = str(value)
+    return flat
+
+
+def _read_manifest_file(path: Path) -> "dict | None":
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and isinstance(data.get("components"), dict) else None
+
+
+def _fetch_remote_manifest(branch: str) -> "tuple[dict | None, str]":
+    """Download the remote ``manifest.json``. Returns ``(manifest, error)``."""
+    import urllib.request
+    url = f"{_REPO_RAW_ROOT.format(branch=branch)}/manifest.json"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            text = resp.read().decode("utf-8", errors="ignore")
+    except Exception as exc:
+        return None, f"could not reach remote: {exc}"
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None, "remote manifest.json is not valid JSON"
+    if not isinstance(data, dict) or not isinstance(data.get("components"), dict):
+        return None, "remote manifest.json has no 'components'"
+    return data, ""
+
+
+def _local_component_versions(manifest: "dict | None") -> dict:
+    """Versions read from the real artifacts; the installer only exists in the manifest."""
+    local = {}
+    local["tool"] = _info_tool_version()
+    try:
+        cfg = json.loads((CONF_DIR / "config.json").read_text(encoding="utf-8"))
+        local["config_schema"] = str(cfg.get("metadata", {}).get("schema_version") or "")
+    except (OSError, ValueError):
+        pass
+    if DB_PATH.is_file():
+        try:
+            con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True, timeout=5.0)
+            try:
+                local["db_schema"] = str(con.execute("PRAGMA user_version").fetchone()[0])
+            finally:
+                con.close()
+        except sqlite3.Error:
+            pass
+    try:
+        m = _VERSION_LINE_RE.search((CONF_DIR / "wsl4ai-update.py").read_text(encoding="utf-8"))
+        if m:
+            local["updater"] = m.group(1)
+    except OSError:
+        pass
+    scripts_dir = APP_DIR / "scripts"
+    if scripts_dir.is_dir():
+        for f in sorted(scripts_dir.glob("*.sh")):
+            try:
+                m = _SCRIPT_HEADER_RE.search(f.read_text(encoding="utf-8"))
+            except OSError:
+                continue
+            if m:
+                local[f"scripts/{f.name}"] = m.group(1)
+    # The installer is not kept after installation: only the manifest knows it.
+    manifest_flat = _flatten_components(manifest)
+    if "installer" in manifest_flat:
+        local["installer"] = manifest_flat["installer"]
+    return local
+
+
+def api_version(*, remote: bool = False, branch: str = "main") -> dict:
+    """Version of every component (``specs-version.md`` §5). Read-only.
+
+    One row per component with fields ``component`` / ``local`` / ``remote`` / ``status``.
+    Without *remote* the command is offline and compares the artifacts with the local manifest.
+    """
+    cmd = "version"
+    local_manifest = _read_manifest_file(CONF_DIR / "manifest.json")
+    manifest_flat = _flatten_components(local_manifest)
+    local = _local_component_versions(local_manifest)
+
+    remote_flat: dict = {}
+    if remote:
+        remote_manifest, err = _fetch_remote_manifest(branch or "main")
+        if remote_manifest is None:
+            return _err(cmd, "", err)
+        remote_flat = _flatten_components(remote_manifest)
+
+    names = list(_COMPONENT_ORDER)
+    names += sorted(n for n in set(local) | set(manifest_flat) | set(remote_flat)
+                    if n not in _COMPONENT_ORDER)
+
+    rows = []
+    for name in names:
+        have = local.get(name) or manifest_flat.get(name) or "unknown"
+        want = remote_flat.get(name, "")
+        if remote:
+            lv, rv = _version_tuple(have), _version_tuple(want)
+            status = "unknown" if lv is None or rv is None else ("outdated" if rv > lv else "ok")
+        else:
+            status = "ok" if name in manifest_flat and manifest_flat[name] == have else "unknown"
+        pairs = [("component", name), ("local", have)]
+        if remote:
+            pairs.append(("remote", want or "-"))
+        pairs.append(("status", status))
+        rows.append(row_from_pairs(pairs))
+    return _ok(cmd, "", "wsl4ai version", rows=rows)
+
+
 # ─── Start (validation only) ──────────────────────────────────────────────────
 
 def api_start_prepare(wsl_name: str, user: str) -> dict:

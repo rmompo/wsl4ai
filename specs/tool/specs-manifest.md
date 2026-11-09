@@ -1,6 +1,6 @@
 # WSL4AI — Component Manifest Specification
 
-> **Status: partially implemented.** Done: `manifest.json`, the version of every component, the installer writing `conf/manifest.json`, and the consistency check (`dev/check-manifest.py`). Pending: the updater comparing manifests (§4) and the `wsl4ai version` command.
+> **Status: implemented.** `manifest.json`, the version of every component, the installer writing `conf/manifest.json`, the consistency check (`dev/check-manifest.py`), the updater comparing manifests and running database migrations (§4), and the `wsl4ai version` command.
 
 This document specifies `manifest.json`: a single file that records the version of every independently versioned component of WSL4AI, and how the updater uses it.
 
@@ -76,7 +76,7 @@ The updater keeps a **local copy** at `conf/manifest.json` (never replaced by to
 
 `--check` output lists every component whose remote version differs, one per line (`component: local → remote`).
 
-The full report is the `wsl4ai version` command (CLI and TUI), specified in [`specs-version.md`](specs-version.md) §5; `wsl4ai info` ([`specs-info.md`](specs-info.md)) reports the setup of the distro.
+The updater falls back to the old `wsl4ai.py` parsing when the remote branch has no `manifest.json`, so branches created before the manifest keep updating. The full report is the `wsl4ai version` command (CLI and TUI), specified in [`specs-version.md`](specs-version.md) §5; `wsl4ai info` ([`specs-info.md`](specs-info.md)) reports the setup of the distro.
 
 ---
 

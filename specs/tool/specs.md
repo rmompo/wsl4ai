@@ -217,7 +217,7 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | -------------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
 | `wsl4ai install database`  | `id`     | Create the database if missing; with `-f/--force`, overwrite (destructive reset).                         |
 | `wsl4ai install alias`     | `ia`     | Add/remove/list shell aliases in PowerShell or Bash (`-a/-n` required).                                   |
-| `wsl4ai install update`    | `iu`     | Check for and apply a new version of the tool. `--check` flag prints available version without updating.  |
+| `wsl4ai install update`    | `iu`     | Check for and apply a new version of the tool. `--check` prints it without updating; `-b/--branch` selects the branch. |
 | `wsl4ai registry list`     | `rl`     | List `registries` rows with resolved paths and linked `wsls` lines (`uses.mounted` on link lines).        |
 | `wsl4ai registry add …`    | `ra`     | Insert a row into `registries` (mount definition).                                                        |
 | `wsl4ai registry remove …` | `rr`     | Delete a row from `registries` **only if** there are **no** rows in `uses` for that registry.             |
@@ -231,7 +231,7 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | `wsl4ai wsl set …`         | `ws`     | Set `wsls.cli_command` (row must exist).                                                                  |
 | `wsl4ai whoami`            | `wai`    | Print the current `machine` and `user` runtime identity.                                                  |
 | `wsl4ai info`              | `inf`    | Read-only report of how this distro is set up (identity, paths, mounts, database, config, AI client). |
-| `wsl4ai version`           | `ver`    | *(planned)* Version of every component; `--remote` compares with GitHub.                                  |
+| `wsl4ai version`           | `ver`    | Version of every component; `--remote` compares with GitHub.                                  |
 | `wsl4ai tui`               | -        | Open the interactive text user interface.                                                                 |
 | `wsl4ai start`             | -        | Run one mounted use in foreground: cd to resolved WSL path and execute that WSL `cli_command`.           |
 

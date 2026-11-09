@@ -17,5 +17,5 @@ Do not add parallel spec files outside `specs/` unless the project convention ch
 | [specs-start.md](specs-start.md) | `wsl4ai start` — run one mounted use in foreground; CLI and TUI flows. |
 | [specs-tui.md](specs-tui.md) | `wsl4ai tui` — TUI specification: menu model, scope rules, theme, log config, Start loop behavior, UI design (banner, menus, dialogs, buttons, style tokens). |
 | [specs-config.md](specs-config.md) | `conf/config.json` — config file structure, schema versioning, update procedure, and config migrations. |
-| [specs-manifest.md](specs-manifest.md) | *(planned)* `manifest.json` — version of every component (tool, config and DB schema, updater, installer, scripts) and how the updater uses it. |
-| [specs-version.md](specs-version.md) | `-v` / `--version` flag — version string location and format; *(planned)* `wsl4ai version` command for every component. |
+| [specs-manifest.md](specs-manifest.md) | `manifest.json` — version of every component (tool, config and DB schema, updater, installer, scripts) and how the updater uses it. |
+| [specs-version.md](specs-version.md) | `-v` / `--version` flag — version string location and format; `wsl4ai version` command for every component. |

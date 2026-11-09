@@ -144,7 +144,7 @@ flowchart LR
 
 ## 4. `install update`
 
-- Invocation: `wsl4ai install update [--check]` · `wsl4ai iu [--check]`
+- Invocation: `wsl4ai install update [--check] [-f] [-b BRANCH]` · `wsl4ai iu [--check] [-f] [-b BRANCH]`
 - Purpose: check for and apply a new version of the tool from GitHub.
 - Output contract: plain text (not JSON — delegated to external script).
 - **TUI**: not available; CLI-only.
@@ -154,13 +154,17 @@ flowchart LR
 | Flag | Long | Metavar | Required | Description |
 |------|------|---------|----------|-------------|
 | — | `--check` | — | no | Print available version without applying the update |
+| `-f` | `--force` | — | no | Update even if the remote version is not newer |
+| `-b` | `--branch` | BRANCH | no | Repository branch to check and download from (default: `main`) |
 
 Behavior:
 1. Delegates immediately to `conf/wsl4ai-update.py` via `os.execv`.
-2. The updater downloads `wsl4ai.py` from GitHub to extract the remote `__version__`.
-3. If remote version is not superior, exits with no changes.
-4. With `--check`: prints available version and exits.
-5. If updating: clones repository to `.tmp/`, replaces `tool/`, cleans up. `conf/` is never touched.
+2. The updater downloads the remote `manifest.json` (repository root) to read the remote versions. If the branch has no manifest it falls back to parsing `__version__` / `__config_version__` from the remote `tool/wsl4ai.py`.
+3. If the remote tool version is not superior and there are no pending migrations, it lists the advisory notes (step 6) and exits with no changes.
+4. With `--check`: prints available version, pending migrations and changed components, and exits.
+5. If updating: clones repository to `.tmp/`, replaces `tool/`, saves the remote manifest as `conf/manifest.json`, cleans up. `conf/` is otherwise never touched.
+6. **Components** (`specs-manifest.md` §4): lists every component whose remote version differs (`name: local -> remote`). `updater` and `installer` are never replaced automatically: when a newer one exists the updater prints a `NOTE` with its URL.
+7. **Database migrations**: if the database `PRAGMA user_version` is below the remote `db_schema`, the migration chain runs (`0 -> 1` only stamps the version; no structural change). Config migrations run as in `specs-config.md`.
 
 ```mermaid
 flowchart LR

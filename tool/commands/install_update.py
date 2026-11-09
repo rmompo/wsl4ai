@@ -14,9 +14,11 @@ def cmd_install_update(args: Namespace) -> int:
     opts = options_from_args(args, [
         OptionSpec("--check", "check_only", is_flag=True),
         OptionSpec("--force", "force", is_flag=True),
+        OptionSpec("--branch", "branch"),
     ])
     check_only = bool(getattr(args, "check_only", False))
     force = bool(getattr(args, "force", False))
+    branch = str(getattr(args, "branch", "") or "").strip()
 
     if not UPDATE_SCRIPT.is_file():
         return emit_envelope(
@@ -29,6 +31,8 @@ def cmd_install_update(args: Namespace) -> int:
         argv.append("--check")
     if force:
         argv.append("--force")
+    if branch:
+        argv.extend(["--branch", branch])
 
     os.execv(sys.executable, argv)
     # unreachable

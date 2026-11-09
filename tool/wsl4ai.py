@@ -19,7 +19,7 @@ from commands.help_md import root_description_short, root_epilog_short
 from commands.install import register_install_command
 from commands.output_decorator import format_envelope_for_cli, try_parse_envelope
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 __config_version__ = "1.0"
 
 APP_DIR = Path(__file__).resolve().parent
@@ -28,7 +28,7 @@ DDBB_DIR = CONF_DIR / "ddbb"
 
 _INSTALL_COMMANDS = {"install", "it", "id", "ia", "iu"}
 # Diagnostic commands must work even when the layout, database or config are broken.
-_DIAGNOSTIC_COMMANDS = {"info", "inf"}
+_DIAGNOSTIC_COMMANDS = {"info", "inf", "version", "ver"}
 
 
 def _parse_config_version(v: str) -> tuple[int, ...]:

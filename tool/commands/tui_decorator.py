@@ -62,6 +62,18 @@ def info_records(envelope: dict) -> tuple[str, list]:
     return "INFO", records
 
 
+def version_records(envelope: dict) -> tuple[str, list]:
+    """Convert ``api_version()`` envelope to ListDialog records (one record, one line per component)."""
+    if status_of(envelope) != 0:
+        return _error_record(message_of(envelope))
+    rows = [_fields(r) for r in rows_of(envelope)]
+    if not rows:
+        return _empty_record()
+    W = max(len(r.get("component", "")) for r in rows)
+    record = [(_lpad(r.get("component", ""), W), f"{r.get('local', '')}  [{r.get('status', '')}]") for r in rows]
+    return "VERSION", [record]
+
+
 # ─── Registry ─────────────────────────────────────────────────────────────────
 
 def registry_list_records(envelope: dict) -> tuple[str, list]:

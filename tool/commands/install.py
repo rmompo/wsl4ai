@@ -39,6 +39,7 @@ def register_install_command(subparsers: _SubParsersAction) -> None:
     p_update = install_sub.add_parser("update", help="Check and apply updates from GitHub")
     p_update.add_argument("--check", dest="check_only", action="store_true", help="Check for updates without applying")
     p_update.add_argument("-f", "--force", action="store_true", help="Force update even if already up to date (runs pip install)")
+    p_update.add_argument("-b", "--branch", metavar="BRANCH", help="Repository branch to check and download from (default: main)")
     p_update.set_defaults(func=cmd_install_update)
 
     p_id = subparsers.add_parser("id", help="Shorthand for install database")
@@ -67,4 +68,5 @@ def register_install_command(subparsers: _SubParsersAction) -> None:
     p_iu = subparsers.add_parser("iu", help="Shorthand for install update")
     p_iu.add_argument("--check", dest="check_only", action="store_true", help="Check for updates without applying")
     p_iu.add_argument("-f", "--force", action="store_true", help="Force update even if already up to date (runs pip install)")
+    p_iu.add_argument("-b", "--branch", metavar="BRANCH", help="Repository branch to check and download from (default: main)")
     p_iu.set_defaults(func=cmd_install_update)
