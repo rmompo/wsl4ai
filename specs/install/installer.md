@@ -8,7 +8,7 @@ The installer prepares a **dedicated WSL (Linux)** environment for the **WSL4AI 
 - Grants **sudo** (or **wheel** on RHEL-style distros).
 - Sets **default WSL login user** via `/etc/wsl.conf`.
 - Copies the **Python application** from `tool/` into `INSTALL_TOOL`.
-- Copies **`conf/`** contents (`wsl4ai-update.py`, `config.json`) into `INSTALL_CONF` (skips `config.json` if already present).
+- Copies **`conf/`** contents (`wsl4ai-update.py`, `config.json`) into `INSTALL_CONF` (skips `config.json` if already present), plus the repository `manifest.json`.
 - Installs **Python 3**, **pip**, and **git** system-wide via **apt**.
 - Installs **`tool/requirements.txt`** with **`pip install --user`** for the new user.
 - Creates the `WSL_DDBB` and `WSL_PROJECTS` mount point directories (and their Windows-side counterparts) and bind-mounts `WSL_DDBB` immediately.
@@ -17,7 +17,7 @@ The installer prepares a **dedicated WSL (Linux)** environment for the **WSL4AI 
 - Configures **`.bashrc`** to source `~/.startup-wsl4ai.sh` on shell start.
 - Writes **`local.env`** with the four environment variables.
 - Runs **`python3 wsl4ai.py install database`** as the new user.
-- Prints a final message instructing to run **`wsl --shutdown`** from Windows.
+- Prints a final message instructing to exit and run **`wsl --terminate <distro>`** from Windows.
 
 **Out of scope for this document:** business logic of `wsl4ai` commands (see [`../tool/`](../tool/)).
 
@@ -30,7 +30,8 @@ The installer prepares a **dedicated WSL (Linux)** environment for the **WSL4AI 
 - Script must be placed in **`/tmp/wsl4ai/`** and run from there.
 - **`install/wsl4ai-defaults.env`** supplies default values for the interactive prompts. If missing, **`wsl4ai-install.sh`** downloads it from GitHub raw (`main` branch) using **`curl`** or **`wget`**.
 - **`tool/`** must be present at `/tmp/wsl4ai/tool/`. If missing, `wsl4ai-install.sh` clones it from GitHub (requires **`git`**, installed in the apt step first).
-- **`conf/`** must be present at `/tmp/wsl4ai/conf/`. Obtained from the same clone as `tool/`.
+- **`conf/`** must be present at `/tmp/wsl4ai/conf/`. Obtained from the same clone as `tool/`, together with `manifest.json` (repository root).
+- After installation, `tool/scripts/` offers `wsl4ai-install-tools.sh`, `wsl4ai-install-claudecode.sh` and `wsl4ai-install-ghcopilot.sh` (see the README, *Install an AI client*).
 
 ---
 
@@ -91,7 +92,7 @@ The default WSL login user is **always set** to `WSL4AI_USER` (no prompt).
 | 9 | Write **`local.env`** → `INSTALL_CONF`; copy `manifest.json` (repo root), `wsl4ai-update.py` and `config.json` (repo `conf/`) into `INSTALL_CONF` (`config.json` skipped if already present); `chown`. |
 | 10 | As **`WSL4AI_USER`**: **`cd INSTALL_TOOL && python3 wsl4ai.py install database`**. |
 | — | Remove the temporary clone (`/tmp/wsl4ai/repo`). |
-| — | Print final message: exit WSL and run `wsl --shutdown` from Windows. |
+| — | Print final message: exit WSL and run `wsl --terminate <distro>` from Windows, then re-enter the distro. |
 
 ---
 

@@ -19,7 +19,7 @@ Command group for setup and shell integration tasks.
 ## 2. `install database`
 
 - Invocation: `wsl4ai install database [-f]` · `wsl4ai id [-f]`
-- Purpose: initialize database or reset it.
+- Purpose: initialize database or reset it. A new database is stamped with the schema version (`PRAGMA user_version = DB_SCHEMA_VERSION`, see `specs-manifest.md`).
 - Output contract: always `output.result`.
 
 ### Options

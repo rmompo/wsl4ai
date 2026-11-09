@@ -21,6 +21,7 @@ This document describes the layered architecture introduced in v1.5.74, where CL
 │            Business logic — returns JSON envelope                │
 │  api_registry_*  api_use_*  api_wsl_*                            │
 │  api_alias_*     api_install_*  api_whoami()                     │
+│  api_info()      api_version()                                   │
 │  api_start_prepare()  api_use_list_mounted()                     │
 └──────────────────┬──────────────────────────┬────────────────────┘
                    │                          │
@@ -64,7 +65,7 @@ flowchart TB
         i_use["api_use_*()"]
         i_wsl["api_wsl_*()"]
         i_inst["api_alias_*()\napi_install_database()"]
-        i_misc["api_whoami()\napi_start_prepare()\napi_use_list_mounted()"]
+        i_misc["api_whoami()\napi_info()\napi_version()\napi_start_prepare()\napi_use_list_mounted()"]
     end
 
     subgraph Decorators["Decorators"]

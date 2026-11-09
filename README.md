@@ -2,8 +2,9 @@
 
 WSL4AI is a **Python CLI and terminal UI (TUI)** for **Linux / WSL** that manages a small **SQLite** catalog: **registries** (mount definitions), per-distro **WSL** rows, and **use** links (bind-mount workflows). It coordinates project locations and tooling across **WSL** and the **Windows** host.
 
-- **Application code:** `tool/` (`wsl4ai` entrypoint, `requirements.txt`).
-- **Persistent config:** `conf/` (`wsl4ai-update.py`, `config.json` — installed to `~/wsl4ai/conf/`).
+- **Application code:** `tool/` (`wsl4ai` entrypoint, `requirements.txt`) and the install scripts in `tool/scripts/` (basic tools, Claude Code, GitHub Copilot CLI).
+- **Persistent config:** `conf/` (`wsl4ai-update.py`, `config.json` — installed to `~/wsl4ai/conf/`, together with `manifest.json`).
+- **Versions:** [`manifest.json`](manifest.json) records the version of every component; `wsl4ai version` shows them.
 - **Product specifications (CLI/TUI):** [`specs/tool/`](specs/tool/).
 - **Bootstrap installer (WSL):** [`install/`](install/) — see [`specs/install/installer.md`](specs/install/installer.md).
 
@@ -333,8 +334,33 @@ If `wsl4ai` itself does not start, run the updater directly: `python3 ~/wsl4ai/c
 ```bash
 wsl4ai <command>       # CLI mode
 wsl4ai tui             # Text User Interface
-wsl4ai -v              # Show version
+wsl4ai -v              # Show the tool version
+wsl4ai <command> -h    # Help of one command
 ```
+
+| Command | Shortcut | What it does |
+| ------- | -------- | ------------ |
+| `wsl4ai whoami` | `wai` | Print the `machine` and `user` of this session |
+| `wsl4ai info` | `inf` | Report how this distro is set up: identity, paths, mounts, database, config and AI client |
+| `wsl4ai version [--remote]` | `ver` | Version of every component; `--remote` compares with GitHub |
+| `wsl4ai registry list / add / remove` | `rl` / `ra` / `rr` | Manage the mount definitions (registries) |
+| `wsl4ai use list / add / remove / enable / disable / disableall` | `ul` / `ua` / `ur` / `ue` / `ud` / `uda` | Link this distro to a registry and bind-mount or unmount it |
+| `wsl4ai wsl list / set` | `wl` / `ws` | List the known WSL machines and set their launch command |
+| `wsl4ai start` | — | Run the launch command of one mounted use |
+| `wsl4ai tui` | — | Open the text user interface |
+| `wsl4ai install database / alias / update` | `id` / `ia` / `iu` | Create the database, manage shell aliases, update WSL4AI |
+
+Typical order: `registry add` → `use add` → `use enable`; to tear down: `use disable` → `use remove` → `registry remove`.
+
+### Text user interface
+
+`wsl4ai tui` opens a menu bar with the same operations (runtime distro only):
+
+```
+Registry  Use  Wsl  Start │ Others │ Exit
+```
+
+`Others` holds `Log` (View, Setup), `Theme`, `Install` (Database, Alias) and, at the end, `Info` and `Version`.
 
 ---
 
@@ -389,6 +415,17 @@ Both install under `~/.local`; `~/.local/bin` is already on the `PATH` through `
 ---
 
 ## Development
+
+Repository layout:
+
+```
+manifest.json      — version of every component
+tool/              — Python application (+ tool/scripts/ install scripts)
+conf/              — updater and default config
+install/           — bootstrap installer, defaults and startup script template
+dev/               — development tools (not installed)
+specs/             — specifications
+```
 
 `manifest.json` records the version of every component (see [`specs/tool/specs-manifest.md`](specs/tool/specs-manifest.md)). When you change one, bump it in the manifest and in the code, then check that they agree:
 

@@ -220,6 +220,13 @@ Named loggers: `TUI` (tui.py) · `interface` (api.py).
 - On confirm: writes new level to `conf/config.json` and updates all running loggers immediately (no restart needed).
 - `NONE` disables all logging output.
 
+### 8.3 Info and Version dialogs (`Others › Info`, `Others › Version`)
+
+Both are read-only `ListDialog`s (width 90) closed with `Escape` or `Enter`; they call `api_info()` and `api_version()` (local only: `--remote` is CLI-only).
+
+- **Info:** one record per section (`IDENTITY`, `INSTALL`, `PATHS`, `DATABASE`, `MOUNTS`, `CONFIG`, `AI_CLIENT`), one `property  value` line each. See [`specs-info.md`](specs-info.md).
+- **Version:** a single record with one line per component: `component  local  [status]`. See [`specs-version.md`](specs-version.md) §5.
+
 ---
 
 ## 9. English text policy
