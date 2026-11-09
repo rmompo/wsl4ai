@@ -19,7 +19,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 REPO_RAW_BASE = "https://raw.githubusercontent.com/rmompo/wsl4ai/{branch}/tool"
 REPO_RAW_ROOT = "https://raw.githubusercontent.com/rmompo/wsl4ai/{branch}"
@@ -354,7 +354,11 @@ def _print_summary(
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="wsl4ai-update",
-        description="WSL4AI standalone updater",
+        description=(
+            "WSL4AI standalone updater: checks GitHub for a newer version, replaces tool/, "
+            "applies config and database migrations and lists the components that changed. "
+            "conf/ and this script are never replaced."
+        ),
     )
     parser.add_argument(
         "--check",

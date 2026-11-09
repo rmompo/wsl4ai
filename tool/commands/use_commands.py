@@ -160,6 +160,7 @@ def _add_registry_pair(p) -> None:
         "--registry-name",
         dest="use_registry_name",
         default="",
+        metavar="NAME",
         help="Mount definition name",
     )
 
@@ -179,6 +180,7 @@ def _add_wsl_triple(p) -> None:
         "--wsl-name",
         dest="use_wsl_name",
         default="",
+        metavar="NAME",
         help="WSL name (omit to use the current workspace)",
     )
 
@@ -198,6 +200,7 @@ def _add_wsl_only(p) -> None:
         "--wsl-name",
         dest="use_wsl_name",
         default="",
+        metavar="NAME",
         help="WSL name (default: runtime WSL)",
     )
 

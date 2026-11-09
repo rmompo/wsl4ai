@@ -59,6 +59,7 @@ def _add_wsl_set_args(p) -> None:
         "--wsl-name",
         dest="wsl_set_wsl_name",
         default="",
+        metavar="NAME",
         help="WSL name (optional; omit to target runtime WSL)",
     )
 

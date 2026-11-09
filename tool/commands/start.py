@@ -122,6 +122,7 @@ def register_start_command(subparsers: _SubParsersAction) -> None:
         "--registry-name",
         dest="start_registry_name",
         default="",
+        metavar="NAME",
         help="Registry name for the target use",
     )
     wsl = p.add_mutually_exclusive_group(required=False)
@@ -138,6 +139,7 @@ def register_start_command(subparsers: _SubParsersAction) -> None:
         "--wsl-name",
         dest="start_wsl_name",
         default="",
+        metavar="NAME",
         help="WSL name (optional; omit to use runtime WSL)",
     )
     p.set_defaults(func=cmd_start)

@@ -62,8 +62,8 @@ def register_add_command(
         description=desc,
     )
     base_host, base_wsl = load_local_env_paths()
-    host_base_hint = base_host if base_host else "(HOST_PROJECTS not set)"
-    wsl_base_hint = base_wsl if base_wsl else "(WSL_PROJECTS not set)"
+    host_base_hint = base_host if base_host else "HOST_PROJECTS not set"
+    wsl_base_hint = base_wsl if base_wsl else "WSL_PROJECTS not set"
 
     req = add.add_argument_group("Required")
     req.add_argument("-n", "--name", dest="name", required=True, help="Name for this mount definition")

@@ -160,7 +160,7 @@ _ROOT_LONG_COMMANDS: tuple[str, ...] = (
 
 # Commands with no nested subparsers: static action hint for general help.
 _ROOT_STATIC_ACTIONS: dict[str, str] = {
-    "install": "— actions: tool, database, alias.",
+    "install": "— actions: database, alias, update.",
 }
 
 

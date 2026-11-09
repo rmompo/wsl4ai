@@ -152,7 +152,7 @@ def help_from_manual(key: str, fallback: str = "") -> str:
 
 def root_description_short() -> str:
     """One-line summary for top-level ``wsl4ai -h`` (list of commands)."""
-    return "WSL4AI — mount definitions, WSL machines, and attaching them."
+    return "WSL4AI — project mounts and tooling for AI clients in WSL."
 
 
 def root_epilog_short() -> str:
