@@ -33,13 +33,9 @@ The installer prepares a **dedicated WSL (Linux)** environment for the **WSL4AI 
 
 ---
 
-## 3. Configuration: `defaults-{mode}.env`
+## 3. Configuration: `defaults.env`
 
-> **Current state:** a single `install/defaults.env` is used. The split into mode-specific files is planned — see `specs-future.md §1` and `specs-mode.md §4.2`.
-
-Provides default values for the interactive prompts. The file loaded depends on the `--mode` flag passed to `install.sh` (default: `wsl`). If the file is absent, `install.sh` downloads it from GitHub.
-
-### `defaults-wsl.env`
+Provides default values for the interactive prompts. If the file is absent, `install.sh` downloads it from GitHub.
 
 | Variable | Role |
 | -------- | ---- |
@@ -53,20 +49,6 @@ WSL_DDBB=${HOME}/wsl4ai/conf/ddbb
 WSL_PROJECTS=${HOME}/wsl4ai/proyectos
 HOST_DDBB=C:/wsl2data/wsl4ai/ddbb
 HOST_PROJECTS=C:/LocalFiles/proyectos
-```
-
-### `defaults-docker.env`
-
-| Variable | Role |
-| -------- | ---- |
-| `WSL_DDBB` | Path to database directory inside the container |
-| `WSL_PROJECTS` | Path to projects directory inside the container |
-| `DOCKER_VOLUME_PATH` | Root path of the Docker volume |
-
-```
-WSL_DDBB=${HOME}/wsl4ai/conf/ddbb
-WSL_PROJECTS=${HOME}/wsl4ai/proyectos
-DOCKER_VOLUME_PATH=/mnt/wsl4ai
 ```
 
 ---
