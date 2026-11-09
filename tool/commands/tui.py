@@ -250,13 +250,14 @@ MENU: list = [
         ("Log", ["View", None, "Setup"]),
         None,
         "Theme",
-        "Info",
-        "Version",
         None,
         ("Install", [
             "Database",
             ("Alias", ["List", None, "Add", "Remove"]),
         ]),
+        None,
+        "Info",
+        "Version",
     ]),
     "Exit",
 ]
