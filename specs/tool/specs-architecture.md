@@ -165,6 +165,7 @@ flowchart TD
 | `tool/commands/use_commands.py` | CLI: use subcommands |
 | `tool/commands/wsl_cli.py` | CLI: wsl subcommands |
 | `tool/commands/install_database.py` | CLI: install database |
+| `tool/commands/info.py` | CLI: info |
 | `tool/scripts/wsl4ai-install-claudecode.sh` | Standalone script: install Claude Code (one AI client per distro) |
 | `tool/scripts/wsl4ai-install-ghcopilot.sh` | Standalone script: install GitHub Copilot CLI (one AI client per distro) |
 | `tool/commands/install_alias.py` | CLI: install alias |

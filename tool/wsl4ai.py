@@ -19,7 +19,7 @@ from commands.help_md import root_description_short, root_epilog_short
 from commands.install import register_install_command
 from commands.output_decorator import format_envelope_for_cli, try_parse_envelope
 
-__version__ = "1.6.9"
+__version__ = "1.7.0"
 __config_version__ = "1.0"
 
 APP_DIR = Path(__file__).resolve().parent
@@ -27,6 +27,8 @@ CONF_DIR = APP_DIR.parent / "conf"
 DDBB_DIR = CONF_DIR / "ddbb"
 
 _INSTALL_COMMANDS = {"install", "it", "id", "ia", "iu"}
+# Diagnostic commands must work even when the layout, database or config are broken.
+_DIAGNOSTIC_COMMANDS = {"info", "inf"}
 
 
 def _parse_config_version(v: str) -> tuple[int, ...]:
@@ -42,7 +44,7 @@ def _check_config_version(command: str) -> None:
     Skipped for install commands — they handle setup and migration.
     Skipped if config.json does not yet exist (fresh install).
     """
-    if command in _INSTALL_COMMANDS:
+    if command in _INSTALL_COMMANDS or command in _DIAGNOSTIC_COMMANDS:
         return
     config_path = CONF_DIR / "config.json"
     if not config_path.is_file():
@@ -127,7 +129,8 @@ def main() -> int:
             print_wsl4ai_root_help(parser)
             return 1
 
-        _ensure_layout()
+        if args.command not in _DIAGNOSTIC_COMMANDS:
+            _ensure_layout()
         _check_config_version(args.command)
         args.app_version = __version__
         ri = resolve_runtime_identity()

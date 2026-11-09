@@ -22,8 +22,10 @@ Consumers:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 
 _log = logging.getLogger("api")
 import platform
@@ -35,6 +37,8 @@ from pathlib import Path
 
 from commands.api_json import row_from_pairs
 from commands.common import (
+    APP_DIR,
+    CONF_DIR,
     DB_PATH,
     TABLE_DDL,
     connect_db,
@@ -971,6 +975,122 @@ def api_whoami() -> dict:
     ri = resolve_runtime_identity()
     return _ok("whoami", "", "runtime identity",
                rows=[row_from_pairs([("machine", ri.machine), ("user", ri.user), ("wslName", ri.wsl_name)])])
+
+
+# ─── Info ─────────────────────────────────────────────────────────────────────
+
+_VERSION_LINE_RE = re.compile(r'^__version__\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
+_UNAVAILABLE = "unavailable"
+
+
+def _read_local_env() -> dict:
+    """Parse ``conf/local.env`` into a plain dict (empty when missing or unreadable)."""
+    env: dict = {}
+    env_file = CONF_DIR / "local.env"
+    try:
+        for raw in env_file.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            env[key.strip()] = val.strip()
+    except OSError:
+        pass
+    return env
+
+
+def _info_tool_version() -> str:
+    try:
+        m = _VERSION_LINE_RE.search((APP_DIR / "wsl4ai.py").read_text(encoding="utf-8"))
+        return m.group(1) if m else f"{_UNAVAILABLE} (no __version__)"
+    except OSError as exc:
+        return f"{_UNAVAILABLE} ({exc.strerror or exc})"
+
+
+def _info_database(ri) -> "tuple[list, list]":
+    """Return ``(database_pairs, uses_mounted_pairs)`` without writing to the database."""
+    pairs = [("file", str(DB_PATH))]
+    mounted = [("uses_mounted", f"{_UNAVAILABLE} (no database)")]
+    if not DB_PATH.is_file():
+        return pairs + [("status", "missing")], mounted
+    try:
+        con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True, timeout=5.0)
+        try:
+            tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            if not {"registries", "wsls", "uses"} <= tables:
+                return pairs + [("status", "unusable (missing tables)")], mounted
+            n = con.execute(
+                """
+                SELECT COUNT(*) FROM uses u JOIN wsls w ON w.uuid = u.wsl_uuid
+                WHERE u.mounted = 1 AND w.name = ? AND w.user = ?
+                """,
+                (ri.wsl_name, ri.user),
+            ).fetchone()[0]
+        finally:
+            con.close()
+        return pairs + [("status", "ok")], [("uses_mounted", str(n))]
+    except Exception as exc:
+        return pairs + [("status", f"unusable ({exc})")], mounted
+
+
+def _info_config() -> list:
+    cfg_file = CONF_DIR / "config.json"
+    pairs = [("file", str(cfg_file))]
+    try:
+        cfg = json.loads(cfg_file.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return pairs + [(k, f"{_UNAVAILABLE} (file missing)") for k in ("schema", "theme", "log_level")]
+    except (OSError, ValueError) as exc:
+        return pairs + [(k, f"{_UNAVAILABLE} ({exc})") for k in ("schema", "theme", "log_level")]
+    meta = cfg.get("metadata", {}) if isinstance(cfg, dict) else {}
+    return pairs + [
+        ("schema",    str(meta.get("schema_version") or "unknown")),
+        ("theme",     str(cfg.get("tui", {}).get("theme") or "default")),
+        ("log_level", str(cfg.get("log", {}).get("level") or "default")),
+    ]
+
+
+def _info_ai_client() -> list:
+    local_bin = Path.home() / ".local" / "bin"
+    for name in ("claude", "copilot"):
+        found = shutil.which(name) or (str(local_bin / name) if (local_bin / name).exists() else "")
+        if found:
+            return [("name", name), ("path", found)]
+    return [("name", "none"), ("path", "")]
+
+
+def api_info() -> dict:
+    """Read-only report of how this distro is set up (``specs-info.md``).
+
+    One row per property with fields ``section`` / ``property`` / ``value``.
+    A section that cannot be resolved reports ``unavailable`` instead of failing.
+    Never writes to the database, the config or the mounts.
+    """
+    cmd = "info"
+    ri = resolve_runtime_identity()
+    env = _read_local_env()
+    wsl_ddbb = env.get("WSL_DDBB", "").rstrip("/")
+    ddbb_state = (
+        ("mounted" if os.path.ismount(wsl_ddbb) else "not mounted")
+        if wsl_ddbb else f"{_UNAVAILABLE} (WSL_DDBB not set)"
+    )
+    db_pairs, uses_pairs = _info_database(ri)
+
+    sections = [
+        ("identity", [("machine", ri.machine), ("user", ri.user), ("wsl_name", ri.wsl_name)]),
+        ("install",  [("base", str(APP_DIR.parent)), ("tool_version", _info_tool_version())]),
+        ("paths",    [(k.lower(), env.get(k) or f"{_UNAVAILABLE} (not in local.env)")
+                      for k in ("HOST_DDBB", "WSL_DDBB", "HOST_PROJECTS", "WSL_PROJECTS")]),
+        ("database", db_pairs),
+        ("mounts",   [("ddbb", ddbb_state)] + uses_pairs),
+        ("config",   _info_config()),
+        ("ai_client", _info_ai_client()),
+    ]
+    rows = [
+        row_from_pairs([("section", sec), ("property", prop), ("value", val)])
+        for sec, pairs in sections for prop, val in pairs
+    ]
+    return _ok(cmd, "", "wsl4ai info", rows=rows)
 
 
 # ─── Start (validation only) ──────────────────────────────────────────────────

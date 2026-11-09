@@ -148,6 +148,7 @@ class Wsl4aiHelpFormatter(argparse.RawDescriptionHelpFormatter):
 # Root commands shown in general help (long names only; shorthands stay runnable but hidden).
 _ROOT_LONG_COMMANDS: tuple[str, ...] = (
     "whoami",
+    "info",
     "registry",
     "use",
     "wsl",

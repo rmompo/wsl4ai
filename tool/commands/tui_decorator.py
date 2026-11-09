@@ -41,6 +41,27 @@ def _empty_record(message: str = "(no entries)") -> tuple[str, list]:
     return "LIST", [[(  "", message)]]
 
 
+# ─── Info ─────────────────────────────────────────────────────────────────────
+
+def info_records(envelope: dict) -> tuple[str, list]:
+    """Convert ``api_info()`` envelope to ListDialog records (one record per section)."""
+    if status_of(envelope) != 0:
+        return _error_record(message_of(envelope))
+    groups: dict[str, list[tuple[str, str]]] = {}
+    for row in rows_of(envelope):
+        f = _fields(row)
+        groups.setdefault(f.get("section", ""), []).append((f.get("property", ""), f.get("value", "")))
+    if not groups:
+        return _empty_record()
+    W = max(len(p) for props in groups.values() for p, _ in props)
+    records = []
+    for section, props in groups.items():
+        rec = [("", section.upper())]
+        rec.extend((_lpad(p, W), v) for p, v in props)
+        records.append(rec)
+    return "INFO", records
+
+
 # ─── Registry ─────────────────────────────────────────────────────────────────
 
 def registry_list_records(envelope: dict) -> tuple[str, list]:

@@ -230,7 +230,7 @@ For core commands, user-visible **result** lines should reflect success vs failu
 | `wsl4ai wsl list`          | `wl`     | List all known `wsls` rows and their `cli_command` values.                                                |
 | `wsl4ai wsl set …`         | `ws`     | Set `wsls.cli_command` (row must exist).                                                                  |
 | `wsl4ai whoami`            | `wai`    | Print the current `machine` and `user` runtime identity.                                                  |
-| `wsl4ai info`              | `inf`    | *(planned)* Read-only report of how this distro is set up (identity, paths, mounts, database, config, AI client). |
+| `wsl4ai info`              | `inf`    | Read-only report of how this distro is set up (identity, paths, mounts, database, config, AI client). |
 | `wsl4ai version`           | `ver`    | *(planned)* Version of every component; `--remote` compares with GitHub.                                  |
 | `wsl4ai tui`               | -        | Open the interactive text user interface.                                                                 |
 | `wsl4ai start`             | -        | Run one mounted use in foreground: cd to resolved WSL path and execute that WSL `cli_command`.           |

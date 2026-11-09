@@ -250,6 +250,7 @@ MENU: list = [
         ("Log", ["View", None, "Setup"]),
         None,
         "Theme",
+        "Info",
         None,
         ("Install", [
             "Database",
@@ -1574,6 +1575,22 @@ if _HAS_TEXTUAL:
 
     # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+    class InfoDialog(ListDialog):
+        """Read-only setup report (one record per section)."""
+
+        def __init__(self, breadcrumb: str) -> None:
+            from commands.api import api_info
+            from commands.tui_decorator import info_records
+            hdr, recs = info_records(api_info())
+            super().__init__(breadcrumb, hdr, recs, width=90)
+
+        def _handle_key(self, event: "events.Key") -> None:
+            if not self._navigate(event.key):
+                if event.key in ("escape", "enter"):
+                    self.dismiss(None)
+
+    # ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
     class AliasAddDialog(Wsl4aiDialog):
         """Add a new alias to ~/.startup-wsl4ai.sh."""
 
@@ -2223,6 +2240,10 @@ if _HAS_TEXTUAL:
             # ── Theme dialog ───────────────────────────────────────────────────
             if path == ["Others", "Theme"]:
                 self.push_screen(ThemeDialog(breadcrumb))
+                return
+
+            if path == ["Others", "Info"]:
+                self.push_screen(InfoDialog(breadcrumb))
                 return
 
             # ── List dialogs ───────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 from argparse import _SubParsersAction
 
+from commands.info import register_info_command
 from commands.registry import register_registry_command, register_registry_root_shortcuts
 from commands.start import register_start_command
 from commands.tui import cmd_tui
@@ -17,6 +18,7 @@ def register_core_commands(subparsers: _SubParsersAction) -> None:
         subparsers (_SubParsersAction): Root subparser registry.
     """
     register_whoami_command(subparsers)
+    register_info_command(subparsers)
     register_registry_command(subparsers)
     register_registry_root_shortcuts(subparsers)
     register_use_command(subparsers)

@@ -1,6 +1,6 @@
 # Specification: `wsl4ai info` / `wsl4ai inf`
 
-> **Status: planned** — not yet implemented.
+> **Status: implemented** (CLI `info` / `inf` and TUI `Others › Info`). Implementation: [`commands/info.py`](../../tool/commands/info.py), `api_info()` in [`commands/api.py`](../../tool/commands/api.py).
 
 Read-only report of how this WSL distro is set up, seen from inside it. Aligns with [`specs.md`](specs.md) §2 except for the exemption in §9. For component versions see `wsl4ai version` in [`specs-version.md`](specs-version.md).
 

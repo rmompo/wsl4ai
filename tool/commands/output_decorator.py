@@ -189,6 +189,26 @@ def _format_install_alias_list(rows: list) -> list[str]:
     return lines
 
 
+def _format_info(rows: list) -> list[str]:
+    """Render ``info`` rows grouped by section: heading, then ``PROPERTY ..... value`` lines."""
+    groups: dict[str, list[tuple[str, str]]] = {}
+    for row in rows:
+        fields = row.get("fields", []) if isinstance(row, dict) else []
+        fmap = {f["key"]: f["value"] for f in fields if isinstance(f, dict) and "key" in f}
+        groups.setdefault(fmap.get("section", ""), []).append((fmap.get("property", ""), fmap.get("value", "")))
+
+    lines: list[str] = []
+    for section, props in groups.items():
+        width = max(len(p) for p, _ in props)
+        if lines:
+            lines.append("")
+        lines.append(tty_styled(section.upper(), HELP_NAME))
+        for prop, val in props:
+            dots = "." * (width - len(prop) + 2)
+            lines.append(f"  {prop.upper()} {dots} {val}")
+    return lines
+
+
 def format_envelope_for_cli(envelope: dict) -> str:
     """Render a compact human-friendly CLI output from envelope JSON."""
     output = envelope.get("output", {}) if isinstance(envelope, dict) else {}
@@ -220,6 +240,8 @@ def format_envelope_for_cli(envelope: dict) -> str:
             lines.extend(_format_use_list(rows))
         elif status == 0 and command == "wsl" and subcommand == "list":
             lines.extend(_format_wsl_list(rows))
+        elif status == 0 and command == "info":
+            lines.extend(_format_info(rows))
         elif status == 0 and command == "install" and subcommand == "alias":
             options = input_obj.get("options", []) if isinstance(input_obj, dict) else []
             alias_action = next((o.get("value", "") for o in options if isinstance(o, dict) and o.get("key") == "--action"), "")
